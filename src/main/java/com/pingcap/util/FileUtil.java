@@ -1,17 +1,18 @@
 package com.pingcap.util;
 
 import com.pingcap.importer.IndexInfoS2T_bak;
+import org.apache.commons.lang.StringUtils;
 import org.apache.log4j.Logger;
 
 import java.io.*;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class FileUtil {
 
     private static final Logger logger = Logger.getLogger(FileUtil.class);
 
-    private static List<File> list = new ArrayList<>();
+    private static final List<File> list = new ArrayList<>();
 
     public static List<File> loadDirectory(File fileList) {
         File[] files = fileList.listFiles();
@@ -42,12 +43,18 @@ public class FileUtil {
             reader.skip(Long.MAX_VALUE);
             lines = reader.getLineNumber() + 1;
             reader.close();
-        } catch (FileNotFoundException e) {
-            e.printStackTrace();
         } catch (IOException e) {
             e.printStackTrace();
         }
         return lines;
+    }
+
+    public static HashMap<String, Long> getTtlTypeMap(List<String> list) {
+        HashMap<String, Long> ttlTypeCountMap = new HashMap<>();
+        for (String ttlType : list) {
+            ttlTypeCountMap.put(ttlType, 0L);
+        }
+        return ttlTypeCountMap;
     }
 
 }

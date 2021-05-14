@@ -15,12 +15,9 @@ public class PropertiesUtil {
         try {
             inputStream = new BufferedInputStream(new FileInputStream("src/main/resources/importer.properties"));
             properties.load(inputStream);
-        } catch (FileNotFoundException e) {
-            e.printStackTrace();
         } catch (IOException e) {
             e.printStackTrace();
         }
-        logger.info(String.format("Welcome to TiKV importer. Properties -> %s", properties.toString()));
         return properties;
     }
 

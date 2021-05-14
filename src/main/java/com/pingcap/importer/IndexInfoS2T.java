@@ -23,25 +23,28 @@ public class IndexInfoS2T {
 
     private static final Properties properties = PropertiesUtil.getProperties();
     private static final String importFilesPath_indexInfo = properties.getProperty("importer.in.importFilesPath_indexInfo");
-
     private static final int corePoolSize = Integer.parseInt(properties.getProperty("importer.tikv.corePoolSize"));
     private static final int maxPoolSize = Integer.parseInt(properties.getProperty("importer.tikv.maxPoolSize"));
 
-    public static void main(String[] args) throws InterruptedException {
+    public static void main(String[] args) {
 
+        long startTime = System.currentTimeMillis();
+
+        logger.info(String.format("Welcome to TiKV importer! Properties: %s", properties));
         List<File> fileList = FileUtil.loadDirectory(new File(importFilesPath_indexInfo));
-        logger.info(">>>>>>>>>> Need to import the following files.>>>>>>>>>>");
+        logger.info("--------------------------------------------------------------------------------> Need to import the following files.");
+        assert fileList != null;
         if (fileList.isEmpty()) {
-            logger.error("This filePath has no file.");
+            logger.error(String.format("This filePath [%s] has no file.", importFilesPath_indexInfo));
         } else {
             for (File file : fileList) {
                 int line = FileUtil.getFileLines(file);
-                logger.info(String.format("[ file ] { %s } , [ line ] { %d }.", file.getAbsolutePath(), line));
+                logger.info(String.format(" [FILE] '%s' ---- [TOTAL LINE] %d.", file.getAbsolutePath(), line));
             }
         }
-        logger.info(String.format(">>>>>>>>>>>>>>>>>>>>>>>>>>>> Total file is [ %s ] >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>", fileList.size()));
+        logger.info(String.format("<-------------------------------------------------------------------------------- [TOTAL FILE] %s.", fileList.size()));
 
-        ThreadPoolExecutor threadPoolExecutor = ThreadPoolUtil.startJob(corePoolSize, maxPoolSize, new IndexInfoS2TJob(fileList));
+        ThreadPoolExecutor threadPoolExecutor = ThreadPoolUtil.startJob(corePoolSize, maxPoolSize);
         for (int i = 0; i < fileList.size(); i++) {
             threadPoolExecutor.execute(new IndexInfoS2TJob(fileList));
         }
@@ -49,10 +52,10 @@ public class IndexInfoS2T {
 
         while (true) {
             if (threadPoolExecutor.isTerminated()) {
-                logger.info("All Thread had finished! Import success!");
+                long duration = System.currentTimeMillis() - startTime;
+                logger.info(String.format("[TOTAL RESULT] All Thread had finished! Total duration -> [%ss]", duration / 1000));
                 System.exit(0);
             }
-            Thread.sleep(3000);
         }
     }
 
@@ -72,10 +75,6 @@ class IndexInfoS2TJob implements Runnable {
     private static final String envId = properties.getProperty("importer.out.envId");
     private static final String appId = properties.getProperty("importer.out.appId");
     private static final String ttlType = properties.getProperty("importer.ttl.type");
-    private static final String timeInterval = properties.getProperty("importer.tikv.timeInterval");
-
-    private static final List<String> ttlTypeList = new ArrayList<>();
-    private static final Map<String, Long> ttlTypeCountMap = new HashMap<>();
 
     private final List<File> fileList;
     private static Integer num = 0;
@@ -89,12 +88,8 @@ class IndexInfoS2TJob implements Runnable {
 
         long startTime = System.currentTimeMillis();
 
-        if (StringUtils.isNotBlank(ttlType)) {
-            ttlTypeList.addAll(Arrays.asList(ttlType.split(",")));
-            for (String ttlType : ttlTypeList) {
-                ttlTypeCountMap.put(ttlType, 0L);
-            }
-        }
+        List<String> ttlTypeList = new ArrayList<>(Arrays.asList(ttlType.split(",")));
+        HashMap<String, Long> ttlTypeCountMap = FileUtil.getTtlTypeMap(ttlTypeList);
 
         SimpleDateFormat simpleDateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
         String time = simpleDateFormat.format(new Date());
@@ -136,7 +131,7 @@ class IndexInfoS2TJob implements Runnable {
                     indexInfoS = JSON.toJavaObject(jsonObject, IndexInfoS.class);
                     indexInfoS.setCreateTime(indexInfoS.getCreateTime().replaceAll("Z", " ").replaceAll("T", ""));
                 } catch (Exception e) {
-                    logger.error(String.format("Parse file [ %s ] failed!", file.getAbsolutePath()));
+                    logger.error(String.format(" Parse file [ %s ] failed!", file.getAbsolutePath()));
                     return;
                 }
                 if (ttlTypeList.contains(indexInfoS.getType())) {
@@ -165,9 +160,9 @@ class IndexInfoS2TJob implements Runnable {
                 }
 
                 if (count % batchSize == 0) {
-                    // for (Map.Entry<ByteString, ByteString> item : kvPairs.entrySet()) {
-                    // rawKVClient.delete(item.getKey());
-                    // }
+                    for (Map.Entry<ByteString, ByteString> item : kvPairs.entrySet()) {
+                        rawKVClient.delete(item.getKey());
+                    }
                     String k;
                     for (Iterator<Map.Entry<ByteString, ByteString>> iterator = kvPairs.entrySet().iterator(); iterator.hasNext(); ) {
                         Map.Entry<ByteString, ByteString> item = iterator.next();
@@ -193,12 +188,11 @@ class IndexInfoS2TJob implements Runnable {
         }
 
         long duration = System.currentTimeMillis() - startTime;
-        logger.info("########################################################################################################################################");
-        logger.info(String.format("Write file [%s] success! Total count = { %d }, skip count = { %d }, duration = %dms", file.getAbsolutePath(), count, skipCount, duration));
+        StringBuilder result = new StringBuilder("[Import result - SUCCESS] Write file [" + file.getAbsolutePath() + "] success! Total count = " + count + ", skip count = " + skipCount + ", duration = " + duration + "ms. ");
         for (Map.Entry<String, Long> item : ttlTypeCountMap.entrySet()) {
-            logger.info(String.format("Skip ttl type: %s, count: %s", item.getKey(), item.getValue()));
+            result.append(" | Skip ttl type: ").append(item.getKey()).append(", count: ").append(item.getValue()).append(" | ");
         }
-        logger.info("########################################################################################################################################");
+        logger.info(result.toString());
 
     }
 

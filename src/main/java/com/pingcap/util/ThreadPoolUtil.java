@@ -6,7 +6,7 @@ import java.util.concurrent.*;
 
 public class ThreadPoolUtil {
 
-    public static ThreadPoolExecutor startJob(int corePoolSize, int maxPoolSize, Object job) {
+    public static ThreadPoolExecutor startJob(int corePoolSize, int maxPoolSize) {
         return new ThreadPoolExecutor(
                 corePoolSize,
                 maxPoolSize,
