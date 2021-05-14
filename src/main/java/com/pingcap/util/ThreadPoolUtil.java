@@ -13,7 +13,7 @@ public class ThreadPoolUtil {
                 0,
                 TimeUnit.SECONDS,
                 new LinkedBlockingDeque<Runnable>(2),
-                new ThreadFactoryBuilder().setDaemon(true).setNameFormat("readFile-thread-%d").build(),
+                new ThreadFactoryBuilder().setDaemon(true).setNameFormat("thread-%d").build(),
                 new ThreadPoolExecutor.CallerRunsPolicy());
     }
 

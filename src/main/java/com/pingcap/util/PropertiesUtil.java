@@ -20,6 +20,7 @@ public class PropertiesUtil {
         } catch (IOException e) {
             e.printStackTrace();
         }
+        logger.info(String.format("Welcome to TiKV importer. Properties -> %s", properties.toString()));
         return properties;
     }
 
