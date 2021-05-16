@@ -17,5 +17,4 @@ public class ThreadPoolUtil {
                 new ThreadPoolExecutor.CallerRunsPolicy());
     }
 
-
 }

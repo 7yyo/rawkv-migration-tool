@@ -7,12 +7,14 @@ import org.apache.log4j.Logger;
 import java.io.*;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicLong;
 
 public class FileUtil {
 
     private static final Logger logger = Logger.getLogger(FileUtil.class);
 
     private static final List<File> list = new ArrayList<>();
+    private static final Properties properties = PropertiesUtil.getProperties();
 
     public static List<File> loadDirectory(File fileList) {
         File[] files = fileList.listFiles();
@@ -49,12 +51,28 @@ public class FileUtil {
         return lines;
     }
 
-    public static HashMap<String, Long> getTtlTypeMap(List<String> list) {
-        HashMap<String, Long> ttlTypeCountMap = new HashMap<>();
+    public static ConcurrentHashMap<String, Long> getTtlTypeMap(List<String> list) {
+        ConcurrentHashMap<String, Long> ttlTypeCountMap = new ConcurrentHashMap<>();
         for (String ttlType : list) {
             ttlTypeCountMap.put(ttlType, 0L);
         }
         return ttlTypeCountMap;
+    }
+
+    public static List<File> showFileList(String filePath) {
+        logger.info(String.format("Welcome to TiKV importer! Properties: %s", properties));
+        List<File> fileList = FileUtil.loadDirectory(new File(filePath));
+        logger.info("########## Need to import the following files. ##########");
+        assert fileList != null;
+        if (fileList.isEmpty()) {
+            logger.error(String.format("This filePath [%s] has no file.", filePath));
+        } else {
+            for (File file : fileList) {
+                logger.info(String.format("'%s': ", file.getAbsolutePath()));
+            }
+        }
+        logger.info(String.format("#################### [TOTAL FILE] %s. ####################", fileList.size()));
+        return fileList;
     }
 
 }

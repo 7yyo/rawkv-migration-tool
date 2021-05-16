@@ -7,8 +7,6 @@ import java.util.Properties;
 
 public class PropertiesUtil {
 
-    private static Logger logger = Logger.getLogger(PropertiesUtil.class);
-
     public static Properties getProperties() {
         InputStream inputStream;
         Properties properties = new Properties();
