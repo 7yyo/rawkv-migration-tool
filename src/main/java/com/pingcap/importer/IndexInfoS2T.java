@@ -236,6 +236,7 @@ class BatchPutIndexInfoJob implements Runnable {
 //                    }
                     BatchPutUtil.batchPut(kvPairs, rawKVClient, file);
                     totalLineCount.addAndGet(kvPairs.size());
+                    kvPairs.clear();
 //                    System.out.println("batch put");
                     count = 0;
                 }
