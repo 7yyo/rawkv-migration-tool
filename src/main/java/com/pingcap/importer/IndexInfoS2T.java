@@ -13,14 +13,12 @@ import shade.com.google.protobuf.ByteString;
 
 import java.io.*;
 import java.nio.charset.StandardCharsets;
-import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicLong;
 
 public class IndexInfoS2T {
 
@@ -28,7 +26,6 @@ public class IndexInfoS2T {
 
     private static final Properties properties = PropertiesUtil.getProperties();
     private static final String importFilesPath_indexInfo = properties.getProperty("importer.in.importFilesPath_indexInfo");
-    private static final String ttlType = properties.getProperty("importer.ttl.type");
     private static final int corePoolSize = Integer.parseInt(properties.getProperty("importer.tikv.corePoolSize"));
     private static final int maxPoolSize = Integer.parseInt(properties.getProperty("importer.tikv.maxPoolSize"));
 
@@ -39,17 +36,13 @@ public class IndexInfoS2T {
         // Traverse all the files that need to be written.
         List<File> fileList = FileUtil.showFileList(importFilesPath_indexInfo);
 
-        // Generate ttl type map.
-        List<String> ttlTypeList = new ArrayList<>(Arrays.asList(ttlType.split(",")));
-        ConcurrentHashMap<String, Long> ttlTypeCountMap = FileUtil.getTtlTypeMap(ttlTypeList);
-
-        // Start the main thread for each file.
+        // Start the Main thread for each file.
         ThreadPoolExecutor threadPoolExecutor = ThreadPoolUtil.startJob(corePoolSize, maxPoolSize);
         for (File file : fileList) {
-            logger.info(String.format(" Start running the main thread of [%s]", file.getAbsolutePath()));
+            logger.info(String.format(" Start running the Main thread of [%s]", file.getAbsolutePath()));
             // Pass in the file to be processed and the ttl map.
             // The ttl map is shared by all file threads, because it is a table for processing, which is summarized here.
-            threadPoolExecutor.execute(new IndexInfoS2TJob(file, ttlTypeList, ttlTypeCountMap));
+            threadPoolExecutor.execute(new IndexInfoS2TJob(file.getAbsolutePath()));
         }
         threadPoolExecutor.shutdown();
 
@@ -71,17 +64,14 @@ class IndexInfoS2TJob implements Runnable {
 
     private static final Properties properties = PropertiesUtil.getProperties();
     private static final int insideThread = Integer.parseInt(properties.getProperty("importer.tikv.insideThread"));
+    private static final String ttlType = properties.getProperty("importer.ttl.type");
 
-    private final File file;
-    private final List<String> ttlTypeList;
-    private final ConcurrentHashMap<String, Long> ttlTypeCountMap;
+    private final String filePath;
 
-    private static final AtomicInteger totalLineCount = new AtomicInteger(0);
+    private final AtomicInteger totalLineCount = new AtomicInteger(0);
 
-    public IndexInfoS2TJob(File file, List<String> ttlTypeList, ConcurrentHashMap<String, Long> ttlTypeCountMap) {
-        this.file = file;
-        this.ttlTypeList = ttlTypeList;
-        this.ttlTypeCountMap = ttlTypeCountMap;
+    public IndexInfoS2TJob(String filePath) {
+        this.filePath = filePath;
     }
 
     @Override
@@ -89,15 +79,20 @@ class IndexInfoS2TJob implements Runnable {
 
         long startTime = System.currentTimeMillis();
 
+        // Generate ttl type map.
+        List<String> ttlTypeList = new ArrayList<>(Arrays.asList(ttlType.split(",")));
+        ConcurrentHashMap<String, Long> ttlTypeCountMap = FileUtil.getTtlTypeMap(ttlTypeList);
+
         // Start the file sub-thread,
         // import the data of the file through the sub-thread, and divide the data in advance according to the number of sub-threads.
         // -1 for remainder
+        File file = new File(filePath);
         int lines = FileUtil.getFileLines(file);
-        List<String> threadPerLineList = CountUtil.getPerThreadFileLines(lines, insideThread - 1, file.getAbsolutePath());
+        List<String> threadPerLineList = CountUtil.getPerThreadFileLines(lines, insideThread, file.getAbsolutePath());
 
         ExecutorService threadPoolExecutor = Executors.newFixedThreadPool(insideThread);
         for (String s : threadPerLineList) {
-            threadPoolExecutor.execute(new BatchPutIndexInfoJob(totalLineCount, file, ttlTypeList, ttlTypeCountMap, s));
+            threadPoolExecutor.execute(new BatchPutIndexInfoJob(totalLineCount, filePath, ttlTypeList, ttlTypeCountMap, s));
         }
         threadPoolExecutor.shutdown();
 
@@ -108,7 +103,7 @@ class IndexInfoS2TJob implements Runnable {
         }
 
         long duration = System.currentTimeMillis() - startTime;
-        StringBuilder result = new StringBuilder("\n**************************************************************\n[[[[[[[ Import report ]]]]]]] \nFile= '" + file.getAbsolutePath() + "'. \nTotal number of rows: " + lines + " | Imported number of rows: " + totalLineCount + " | Skip rows: " + 11111 + " | Duration: " + duration / 1000 + "s.\n");
+        StringBuilder result = new StringBuilder("\n**************************************************************\n[Import Report] \nFile= '" + file.getAbsolutePath() + "'. \nTotal number of rows: " + lines + " | Imported number of rows: " + totalLineCount + " | Skip rows: " + 11111 + " | Duration: " + duration / 1000 + "s.\n");
         result.append("Skip TTL Type: ");
         for (Map.Entry<String, Long> item : ttlTypeCountMap.entrySet()) {
             result.append(item.getKey()).append("=").append(item.getValue()).append(" | ");
@@ -130,17 +125,17 @@ class BatchPutIndexInfoJob implements Runnable {
     private static final String appId = properties.getProperty("importer.out.appId");
     private static final int batchSize = Integer.parseInt(properties.getProperty("importer.tikv.batchSize"));
 
-    private static final TiSession tiSession = TiSessionUtil.getTiSession();
+    private final TiSession tiSession = TiSessionUtil.getTiSession();
 
-    private final File file;
+    private final String filePath;
     private final List<String> ttlTypeList;
     private final ConcurrentHashMap<String, Long> ttlTypeCountMap;
     private final String fileBlock;
     private final AtomicInteger totalLineCount;
 
-    public BatchPutIndexInfoJob(AtomicInteger totalLineCount, File file, List<String> ttlTypeList, ConcurrentHashMap<String, Long> ttlTypeCountMap, String fileBlock) {
+    public BatchPutIndexInfoJob(AtomicInteger totalLineCount, String filePath, List<String> ttlTypeList, ConcurrentHashMap<String, Long> ttlTypeCountMap, String fileBlock) {
         this.totalLineCount = totalLineCount;
-        this.file = file;
+        this.filePath = filePath;
         this.ttlTypeList = ttlTypeList;
         this.ttlTypeCountMap = ttlTypeCountMap;
         this.fileBlock = fileBlock;
@@ -149,115 +144,100 @@ class BatchPutIndexInfoJob implements Runnable {
     @Override
     public void run() {
 
-        BufferedInputStream bufferedInputStream = null;
+        File file = new File(filePath);
         BufferedReader bufferedReader = null;
 
         try {
-            bufferedInputStream = new BufferedInputStream(new FileInputStream(file));
+            bufferedReader = new BufferedReader(new InputStreamReader(new BufferedInputStream(new FileInputStream(file)), StandardCharsets.UTF_8));
         } catch (FileNotFoundException e) {
-            logger.error(String.format(" Failed to read file %s.", file), e);
             e.printStackTrace();
         }
-
-        if (bufferedInputStream != null) {
-            bufferedReader = new BufferedReader(new InputStreamReader(bufferedInputStream, StandardCharsets.UTF_8));
-        }
-
-        JSONObject jsonObject;
-        IndexInfoS indexInfoS;
-        String line;
-        String indexInfoKey;
-        String k;
-
-        SimpleDateFormat simpleDateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
-        String time = simpleDateFormat.format(new Date());
 
         int start = Integer.parseInt(fileBlock.split(",")[0]);
         int todo = Integer.parseInt(fileBlock.split(",")[1]);
 
-        if (bufferedReader != null) {
-
-            // Adjust the reading range to the correct position.
-            for (int j = 0; j < start; j++) {
-                try {
-                    bufferedReader.readLine();
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
+        for (int m = 0; m < start; m++) {
+            try {
+                assert bufferedReader != null;
+                bufferedReader.readLine();
+            } catch (IOException e) {
+                e.printStackTrace();
             }
+        }
 
+        int count = 0;
+        int totalCount = 0;
+        String line;
+        String indexInfoKey;
+        JSONObject jsonObject;
+        IndexInfoS indexInfoS;
+        HashMap<ByteString, ByteString> kvPairs = new HashMap<>();
+        RawKVClient rawKVClient = tiSession.createRawClient();
+
+        for (int n = 0; n < todo; n++) {
             try {
 
-                RawKVClient rawKVClient = tiSession.createRawClient();
+                assert bufferedReader != null;
+                line = bufferedReader.readLine();
+//                logger.error("Original == " + line);
 
-                int totalCount = 0;
-                HashMap<ByteString, ByteString> kvPairs = new HashMap<>();
+                jsonObject = JSONObject.parseObject(line);
 
-                while ((line = bufferedReader.readLine()) != null) {
+                indexInfoS = JSON.toJavaObject(jsonObject, IndexInfoS.class);
 
-                    if (StringUtils.isBlank(line)) {
-                        continue;
+                if (envId != null) {
+                    indexInfoKey = String.format(INDEX_INFO_KET_FORMAT, envId, indexInfoS.getType(), indexInfoS.getId());
+                } else {
+                    indexInfoKey = String.format(INDEX_INFO_KET_FORMAT, indexInfoS.getEnvId(), indexInfoS.getType(), indexInfoS.getId());
+                }
+
+                count++;
+                totalCount++;
+
+                // Skip the type that exists in the tty type map.
+                if (ttlTypeList.contains(indexInfoS.getType())) {
+                    ttlTypeCountMap.put(indexInfoS.getType(), ttlTypeCountMap.get(indexInfoS.getType()) + 1);
+                    logger.error(String.format(" Skip key: %s in '%s'", indexInfoKey, file.getAbsolutePath()));
+                    continue;
+                } else {
+                    IndexInfoT indexInfoT = new IndexInfoT();
+                    indexInfoT.setAppId(appId);
+                    indexInfoT.setTargetId(indexInfoS.getTargetId());
+                    if (StringUtils.isNotBlank(indexInfoS.getServiceTag())) {
+                        indexInfoT.setServiceTag(indexInfoS.getServiceTag());
                     }
+                    indexInfoT.setUpdateTime(indexInfoS.getCreateTime().replaceAll("Z", " ").replaceAll("T", ""));
+                    logger.debug(String.format(" File: %s - Thread - %s , K: {%s}, V: {%s}", file.getAbsolutePath(), Thread.currentThread().getId(), indexInfoKey, JSONObject.toJSONString(indexInfoT)));
 
-                    try {
+                    ByteString key = ByteString.copyFromUtf8(indexInfoKey);
+                    ByteString value = ByteString.copyFromUtf8(JSONObject.toJSONString(indexInfoT));
 
-                        jsonObject = JSONObject.parseObject(line);
-                        indexInfoS = JSON.toJavaObject(jsonObject, IndexInfoS.class);
-                        indexInfoS.setCreateTime(indexInfoS.getCreateTime().replaceAll("Z", " ").replaceAll("T", ""));
+                    kvPairs.put(key, value);
+                }
 
-                    } catch (Exception e) {
-                        logger.error(String.format("%s Failed to parse %s, the failure json is %s", Thread.currentThread().getId(), file.getAbsolutePath(), line), e);
-                        break;
+                if (totalCount == todo || count == batchSize) {
+                    // TODO
+                    for (Map.Entry<ByteString, ByteString> item : kvPairs.entrySet()) {
+                        rawKVClient.delete(item.getKey());
                     }
-
-                    if (envId != null) {
-                        indexInfoKey = String.format(INDEX_INFO_KET_FORMAT, envId, indexInfoS.getType(), indexInfoS.getId());
-                    } else {
-                        indexInfoKey = String.format(INDEX_INFO_KET_FORMAT, indexInfoS.getEnvId(), indexInfoS.getType(), indexInfoS.getId());
-                    }
-                    // Skip the type that exists in the tty type map.
-                    if (ttlTypeList.contains(indexInfoS.getType())) {
-                        ttlTypeCountMap.put(indexInfoS.getType(), ttlTypeCountMap.get(indexInfoS.getType()) + 1);
-                        logger.warn(String.format(" Skip key: %s in '%s'", indexInfoKey, file.getAbsolutePath()));
-                        continue;
-                    } else {
-                        IndexInfoT indexInfoT = new IndexInfoT();
-                        indexInfoT.setAppId(appId);
-                        if (StringUtils.isNotBlank(indexInfoS.getServiceTag())) {
-                            indexInfoT.setServiceTag(indexInfoS.getServiceTag());
-                        }
-                        indexInfoT.setTargetId(indexInfoS.getTargetId());
-                        indexInfoT.setUpdateTime(time); // time?
-                        logger.debug(String.format(" File: %s - Thread - %s , K: {%s}, V: {%s}", file.getAbsolutePath(), Thread.currentThread().getId(), indexInfoKey, JSONObject.toJSONString(indexInfoT)));
-                        ByteString key = ByteString.copyFromUtf8(indexInfoKey);
-                        ByteString value = ByteString.copyFromUtf8(JSONObject.toJSONString(indexInfoT));
-                        kvPairs.put(key, value);
-                        totalLineCount.addAndGet(1);
-                    }
-
-                    totalCount++;
-
-                    if (totalCount % batchSize == 0 || totalCount == todo) {
-                        // TODO
-                        for (Map.Entry<ByteString, ByteString> item : kvPairs.entrySet()) {
-                            rawKVClient.delete(item.getKey());
-                        }
-                        for (Iterator<Map.Entry<ByteString, ByteString>> iterator = kvPairs.entrySet().iterator(); iterator.hasNext(); ) {
-                            Map.Entry<ByteString, ByteString> item = iterator.next();
-                            k = item.getKey().toStringUtf8();
-                            // If the key already exists, do not insert.
-                            if (!rawKVClient.get(item.getKey()).isEmpty()) {
-                                iterator.remove();
-                                totalLineCount.addAndGet(-1);
-                                logger.warn(String.format("Skip key [ %s ], file is [ %s ]", k, file.getAbsolutePath()));
-                            }
-                        }
-                        BatchPutUtil.batchPut(kvPairs, rawKVClient, file);
-                        // All data import ends, break.
-                        if (totalCount == todo) {
-                            break;
+                    String k;
+                    for (Iterator<Map.Entry<ByteString, ByteString>> iterator = kvPairs.entrySet().iterator(); iterator.hasNext(); ) {
+                        Map.Entry<ByteString, ByteString> item = iterator.next();
+                        k = item.getKey().toStringUtf8();
+                        // If the key already exists, do not insert.
+                        if (!rawKVClient.get(item.getKey()).isEmpty()) {
+                            iterator.remove();
+                            totalLineCount.addAndGet(-1);
+//                            logger.error(String.format("Skip key [ %s ], file is [ %s ]", k, file.getAbsolutePath()));
                         }
                     }
+//                    for (Map.Entry<ByteString, ByteString> item : kvPairs.entrySet()) {
+//                        logger.error("Map === key=" + item.getKey().toStringUtf8() + "||||" + "value=" + item.getValue());
+//                    }
+                    BatchPutUtil.batchPut(kvPairs, rawKVClient, file);
+                    totalLineCount.addAndGet(kvPairs.size());
+//                    System.out.println("batch put");
+                    count = 0;
                 }
             } catch (IOException e) {
                 e.printStackTrace();

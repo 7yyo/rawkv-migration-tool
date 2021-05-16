@@ -11,7 +11,7 @@ public class PropertiesUtil {
         InputStream inputStream;
         Properties properties = new Properties();
         try {
-            inputStream = new BufferedInputStream(new FileInputStream("src/main/resources/importer.properties"));
+            inputStream = new BufferedInputStream(new FileInputStream("src/Main/resources/importer.properties"));
             properties.load(inputStream);
         } catch (IOException e) {
             e.printStackTrace();
