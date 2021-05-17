@@ -27,7 +27,9 @@ public class FileUtil {
             if (file.isDirectory()) {
                 insideFiles.add(file);
             } else {
-                list.add(file);
+                if (!file.getAbsolutePath().contains("DS")) {
+                    list.add(file);
+                }
             }
         }
         for (File file : insideFiles) {
@@ -60,18 +62,18 @@ public class FileUtil {
     }
 
     public static List<File> showFileList(String filePath) {
-        logger.info(String.format("Welcome to TiKV importer! Properties: %s", properties));
+        logger.info(String.format("Welcome to To_TiKV."));
+        logger.info(String.format("Properties->%s", properties));
         List<File> fileList = FileUtil.loadDirectory(new File(filePath));
-        logger.info("########## Need to import the following files. ##########");
         assert fileList != null;
         if (fileList.isEmpty()) {
-            logger.error(String.format("This filePath [%s] has no file.", filePath));
+            logger.error(String.format("%s has no file.", filePath));
         } else {
-            for (File file : fileList) {
-                logger.info(String.format("'%s': ", file.getAbsolutePath()));
+            for (int i = 0; i < fileList.size(); i++) {
+                logger.info(String.format("No.%s:'%s'", i, fileList.get(i).getAbsolutePath()));
             }
         }
-        logger.info(String.format("#################### [TOTAL FILE] %s. ####################", fileList.size()));
+        logger.info(String.format("Need to import the above files, total [%s]", fileList.size()));
         return fileList;
     }
 

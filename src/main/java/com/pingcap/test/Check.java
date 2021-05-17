@@ -15,11 +15,11 @@ import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Properties;
 
-public class Test {
+public class Check {
 
     private static final String PD_ADDRESS = "172.16.4.33:5555,172.16.4.34:5555,172.16.4.35:5555";
     private static final Properties properties = PropertiesUtil.getProperties();
-    private static final String filePath = properties.getProperty("importer.in.importFilesPath_indexInfo");
+    private static final String filePath = properties.getProperty("importer.in.filePath");
     private static final String INDEX_INFO_KET_FORMAT = "indexInfo_:_%s_:_%s_:_%s";
 
     public static void main(String[] args) throws IOException {
