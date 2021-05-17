@@ -17,67 +17,64 @@ import java.util.Properties;
 
 public class IndexTypeS2T {
 
-    // indexType_:_{envid}_:_{appid}
-    private static final String INDEX_TYPE_KET_FORMAT = "indexType_:_%s_:_%s";
-
     private static final Logger logger = Logger.getLogger(IndexTypeS2T.class);
 
     private static final Properties properties = PropertiesUtil.getProperties();
-    private static final String importFilesPath_indexTypes = properties.getProperty("importer.in.importFilesPath_indexTypes");
-
-    private static HashMap<ByteString, ByteString> hashMap = new HashMap<>();
+    private static final String filePath = properties.getProperty("importer.in.filePath");
 
     private static final TiSession tiSession = TiSessionUtil.getTiSession();
+    private static final HashMap<ByteString, ByteString> kvPairs = new HashMap<>();
 
     public static void main(String[] args) {
 
-        logger.info(String.format("Welcome to TiKV importer."));
-        List<File> fileList = FileUtil.loadDirectory(new File(importFilesPath_indexTypes));
-        logger.info(">>>>>>>>>> Need to import the following files.>>>>>>>>>>");
-        if (fileList.isEmpty()) {
-            logger.error("This filePath has no file.");
-        } else {
-            for (File file : fileList) {
-                int line = FileUtil.getFileLines(file);
-                logger.info(String.format("[ file ] { %s } , [ line ] { %d }.", file.getAbsolutePath(), line));
-            }
-        }
-        logger.info(String.format(">>>>>>>>>>>>>>>>>>>>>>>>>>>> Total file is [ %s ] >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>", fileList.size()));
-
+        List<File> fileList = FileUtil.showFileList(filePath);
         RawKVClient rawKVClient = tiSession.createRawClient();
+
         BufferedReader bufferedReader = null;
+        BufferedInputStream bufferedInputStream;
+
         for (File file : fileList) {
             try {
-                BufferedInputStream bufferedInputStream = new BufferedInputStream(new FileInputStream(file));
+                bufferedInputStream = new BufferedInputStream(new FileInputStream(file));
                 bufferedReader = new BufferedReader(new InputStreamReader(bufferedInputStream, StandardCharsets.UTF_8));
             } catch (FileNotFoundException e) {
                 e.printStackTrace();
             }
+
             String line;
             ByteString key;
             ByteString value;
+            int lineNum = 0;
+            int skipNum = 0;
+
+            long startTime = System.currentTimeMillis();
+
             try {
                 while ((line = bufferedReader.readLine()) != null) {
+                    lineNum++;
                     if (StringUtils.isBlank(line)) {
                         continue;
                     }
                     try {
                         key = ByteString.copyFromUtf8(line.split("@")[0]);
                         value = ByteString.copyFromUtf8(line.split("@")[1]);
-                        hashMap.put(key, value);
+                        kvPairs.put(key, value);
                     } catch (Exception e) {
-                        logger.error(String.format("Parse file [ %s ] failed!", file.getAbsolutePath()));
-                        return;
+                        logger.error(String.format("Failed to process key@value string, file='%s', line=%s, k@v='%s'", file, lineNum, line));
+                        skipNum++;
+                        continue;
                     }
                 }
-                if (!hashMap.isEmpty()) {
+                if (!kvPairs.isEmpty()) {
                     try {
-                        rawKVClient.batchPut(hashMap);
+                        rawKVClient.batchPut(kvPairs);
                     } catch (Exception e) {
                         logger.error(String.format("Batch put Tikv failed, file is [ %s ]", file.getAbsolutePath()), e);
                     }
-                    hashMap.clear();
+                    kvPairs.clear();
                 }
+                long duration = System.currentTimeMillis() - startTime;
+                logger.info("Import Report: File->[" + file.getAbsolutePath() + "], Total rows->[" + lineNum + "], Imported rows->[" + kvPairs.size() + "], Skip rows->[" + skipNum + "], Duration->[" + duration / 1000 + "s]");
             } catch (IOException e) {
                 e.printStackTrace();
             }

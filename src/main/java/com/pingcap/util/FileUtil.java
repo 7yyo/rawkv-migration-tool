@@ -1,13 +1,10 @@
 package com.pingcap.util;
 
-import com.pingcap.importer.IndexInfoS2T_bak;
-import org.apache.commons.lang.StringUtils;
 import org.apache.log4j.Logger;
 
 import java.io.*;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicLong;
 
 public class FileUtil {
 
@@ -39,7 +36,7 @@ public class FileUtil {
     }
 
     public static int getFileLines(File file) {
-        FileReader in = null;
+        FileReader in;
         int lines = 0;
         try {
             in = new FileReader(file);
@@ -62,18 +59,18 @@ public class FileUtil {
     }
 
     public static List<File> showFileList(String filePath) {
-        logger.info(String.format("Welcome to To_TiKV."));
-        logger.info(String.format("Properties->%s", properties));
+        logger.info("Welcome to to_tikv.");
+        logger.info(String.format("Properties=%s", properties));
         List<File> fileList = FileUtil.loadDirectory(new File(filePath));
         assert fileList != null;
         if (fileList.isEmpty()) {
-            logger.error(String.format("%s has no file.", filePath));
+            logger.error(String.format("The file path [%s] is empty", filePath));
         } else {
             for (int i = 0; i < fileList.size(); i++) {
-                logger.info(String.format("No.%s:'%s'", i, fileList.get(i).getAbsolutePath()));
+                logger.info(String.format("No.%s=%s", i, fileList.get(i).getAbsolutePath()));
             }
         }
-        logger.info(String.format("Need to import the above files, total [%s]", fileList.size()));
+        logger.info(String.format("Need to import the above files, total=%s.", fileList.size()));
         return fileList;
     }
 

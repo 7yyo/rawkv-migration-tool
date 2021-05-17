@@ -82,11 +82,13 @@ class IndexInfoS2TJob implements Runnable {
 
         // Generate ttl type map.
         List<String> ttlTypeList = new ArrayList<>(Arrays.asList(ttlType.split(",")));
-        ConcurrentHashMap<String, Long> ttlTypeCountMap = FileUtil.getTtlTypeMap(ttlTypeList);
+        ConcurrentHashMap<String, Long> ttlTypeCountMap = null;
+        if (!ttlTypeList.isEmpty()) {
+            ttlTypeCountMap = FileUtil.getTtlTypeMap(ttlTypeList);
+        }
 
         // Start the file sub-thread,
         // import the data of the file through the sub-thread, and divide the data in advance according to the number of sub-threads.
-        // -1 for remainder
         File file = new File(filePath);
         int lines = FileUtil.getFileLines(file);
         List<String> threadPerLineList = CountUtil.getPerThreadFileLines(lines, insideThread, file.getAbsolutePath());
@@ -104,10 +106,13 @@ class IndexInfoS2TJob implements Runnable {
         }
 
         long duration = System.currentTimeMillis() - startTime;
-        StringBuilder result = new StringBuilder("Import Report] File->[" + file.getAbsolutePath() + "], Total rows->[" + lines + "], Imported rows->[" + totalLineCount + "], Skip rows->[" + totalSkipCount + "], Duration->[" + duration / 1000 + "s],");
+        StringBuilder result = new StringBuilder("Import Report: File->[" + file.getAbsolutePath() + "], Total rows->[" + lines + "], Imported rows->[" + totalLineCount + "], Skip rows->[" + totalSkipCount + "], Duration->[" + duration / 1000 + "s],");
         result.append(" Skip ttl: ");
-        for (Map.Entry<String, Long> item : ttlTypeCountMap.entrySet()) {
-            result.append(item.getKey()).append("=").append(item.getValue()).append(",");
+        assert ttlTypeCountMap != null;
+        if (!ttlTypeCountMap.isEmpty()) {
+            for (Map.Entry<String, Long> item : ttlTypeCountMap.entrySet()) {
+                result.append(item.getKey()).append("=").append(item.getValue()).append(",");
+            }
         }
         logger.info(result.toString());
 
@@ -204,7 +209,7 @@ class BatchPutIndexInfoJob implements Runnable {
                 // Skip the type that exists in the tty type map.
                 if (ttlTypeList.contains(indexInfoS.getType())) {
                     ttlTypeCountMap.put(indexInfoS.getType(), ttlTypeCountMap.get(indexInfoS.getType()) + 1);
-                    logger.warn(String.format("Skip key: %s in '%s'", indexInfoKey, file.getAbsolutePath()));
+                    logger.warn(String.format("Skip key - ttl: %s in '%s'", indexInfoKey, file.getAbsolutePath()));
                     // TODO
                     rawKVClient.delete(ByteString.copyFromUtf8(indexInfoKey));
                     totalSkipCount.addAndGet(1);
@@ -247,7 +252,7 @@ class BatchPutIndexInfoJob implements Runnable {
                 if (!rawKVClient.get(item.getKey()).isEmpty()) {
                     iterator.remove();
                     totalLineCount.addAndGet(-1);
-                    logger.warn(String.format("Skip key [ %s ], file is [ %s ]", k, file.getAbsolutePath()));
+                    logger.warn(String.format("Skip key - exists: [ %s ], file is [ %s ]", k, file.getAbsolutePath()));
                     totalSkipCount.addAndGet(1);
                 }
             }
