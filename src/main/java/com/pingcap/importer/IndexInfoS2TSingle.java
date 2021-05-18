@@ -64,7 +64,7 @@ public class IndexInfoS2TSingle {
 
 class IndexInfoS2TSJob implements Runnable {
 
-    private static final Logger logger = Logger.getLogger(IndexInfoS2TJob.class);
+    private static final Logger logger = Logger.getLogger(IndexInfoS2TSJob.class);
     private static final String INDEX_INFO_KET_FORMAT = "indexInfo_:_%s_:_%s_:_%s";
 
     private static final Properties properties = PropertiesUtil.getProperties();

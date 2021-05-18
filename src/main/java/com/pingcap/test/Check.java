@@ -42,8 +42,12 @@ public class Check {
             bufferedInputStream = new BufferedInputStream(new FileInputStream(file));
             bufferedReader = new BufferedReader(new InputStreamReader(bufferedInputStream, StandardCharsets.UTF_8));
             while ((line = bufferedReader.readLine()) != null) {
-                jsonObject = JSONObject.parseObject(line);
-                indexInfoS = JSON.toJavaObject(jsonObject, IndexInfoS.class);
+                try {
+                    jsonObject = JSONObject.parseObject(line);
+                    indexInfoS = JSON.toJavaObject(jsonObject, IndexInfoS.class);
+                } catch (Exception e) {
+                    continue;
+                }
                 indexInfoKey = String.format(INDEX_INFO_KET_FORMAT, "1", indexInfoS.getType(), indexInfoS.getId());
                 String result = rawKVClient.get(ByteString.copyFromUtf8(indexInfoKey)).toStringUtf8();
                 System.out.println(result);
