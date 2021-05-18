@@ -14,6 +14,7 @@ import org.tikv.shade.com.google.protobuf.ByteString;
 
 import java.io.*;
 import java.nio.charset.StandardCharsets;
+import java.sql.Time;
 import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -100,6 +101,10 @@ class IndexInfoS2TJob implements Runnable {
         for (String s : threadPerLineList) {
             threadPoolExecutor.execute(new BatchPutIndexInfoJob(totalLineCount, totalSkipCount, totalErrorCount, filePath, ttlTypeList, ttlTypeCountMap, s));
         }
+
+        TimerUtil timerUtil = new TimerUtil(totalLineCount, lines, filePath);
+        timerUtil.run();
+
         threadPoolExecutor.shutdown();
 
         while (true) {

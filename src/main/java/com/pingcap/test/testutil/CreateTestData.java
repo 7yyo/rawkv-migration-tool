@@ -18,9 +18,9 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class CreateTestData {
 
     private static final Logger logger = Logger.getLogger(CreateTestData.class);
-    private static final int INITNUMS = 10000;
+    private static final int INITNUMS = 10000000;
     private static final int EACH_SLICES = 1000;
-    private static final String FILE_PATH = "/Users/weiwei/tmp/out.txt";
+    private static final String FILE_PATH = "/Users/yuyang/IdeaProjects/tikv_importer/src/main/resources/testFile/indexInfoS/import.txt";
 
     private static final String TYPE_A001 = "A001";
     private static final String TYPE_B001 = "B001";
@@ -73,7 +73,7 @@ public class CreateTestData {
                     StringBuilder s = new StringBuilder();
                     long i = startValue;
                     for (; i <= endValue; i++) {
-                        int w_d = r2.nextInt(100000);
+                        int w_d = r2.nextInt(10000000);
                         if(w_d == 1){
                             s.append("123 \n");
                             WRONG.addAndGet(1);
@@ -120,11 +120,11 @@ public class CreateTestData {
                 atc_c.addAndGet(1);
                 type = TYPE_C001;
             } else if (v < 333) {
-                type = TYPE_A001 + r2.nextInt(1000000);
+                type = TYPE_A001 + r2.nextInt(10000000);
             } else if (v < 666) {
-                type = TYPE_B001 + r2.nextInt(1000000);
+                type = TYPE_B001 + r2.nextInt(10000000);
             } else  {
-                type = TYPE_C001 + r2.nextInt(1000000);
+                type = TYPE_C001 + r2.nextInt(10000000);
             }
             return type;
         }
