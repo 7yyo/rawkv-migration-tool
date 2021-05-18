@@ -7,7 +7,7 @@ import org.apache.commons.lang.StringUtils;
 import org.apache.log4j.Logger;
 import org.tikv.common.TiSession;
 import org.tikv.raw.RawKVClient;
-import shade.com.google.protobuf.ByteString;
+import org.tikv.shade.com.google.protobuf.ByteString;
 
 import java.io.*;
 import java.nio.charset.StandardCharsets;

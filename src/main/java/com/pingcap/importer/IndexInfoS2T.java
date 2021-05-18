@@ -10,7 +10,7 @@ import org.apache.commons.lang.StringUtils;
 import org.apache.log4j.Logger;
 import org.tikv.common.TiSession;
 import org.tikv.raw.RawKVClient;
-import shade.com.google.protobuf.ByteString;
+import org.tikv.shade.com.google.protobuf.ByteString;
 
 import java.io.*;
 import java.nio.charset.StandardCharsets;
@@ -72,6 +72,7 @@ class IndexInfoS2TJob implements Runnable {
 
     private final AtomicInteger totalLineCount = new AtomicInteger(0);
     private final AtomicInteger totalSkipCount = new AtomicInteger(0);
+    private final AtomicInteger totalErrorCount = new AtomicInteger(0);
 
     public IndexInfoS2TJob(String filePath) {
         this.filePath = filePath;
@@ -97,7 +98,7 @@ class IndexInfoS2TJob implements Runnable {
 
         ExecutorService threadPoolExecutor = Executors.newFixedThreadPool(insideThread);
         for (String s : threadPerLineList) {
-            threadPoolExecutor.execute(new BatchPutIndexInfoJob(totalLineCount, totalSkipCount, filePath, ttlTypeList, ttlTypeCountMap, s));
+            threadPoolExecutor.execute(new BatchPutIndexInfoJob(totalLineCount, totalSkipCount, totalErrorCount, filePath, ttlTypeList, ttlTypeCountMap, s));
         }
         threadPoolExecutor.shutdown();
 
@@ -108,7 +109,7 @@ class IndexInfoS2TJob implements Runnable {
         }
 
         long duration = System.currentTimeMillis() - startTime;
-        StringBuilder result = new StringBuilder("Import Report: File->[" + file.getAbsolutePath() + "], Total rows->[" + lines + "], Imported rows->[" + totalLineCount + "], Skip rows->[" + totalSkipCount + "], Duration->[" + duration / 1000 + "s],");
+        StringBuilder result = new StringBuilder("Import Report: File[" + file.getAbsolutePath() + "], Total rows[" + lines + "], Imported rows[" + totalLineCount + "], Skip rows[" + totalSkipCount + "],Error count[" + totalErrorCount + "], Duration[" + duration / 1000 + "s],");
         result.append(" Skip ttl: ");
         assert ttlTypeCountMap != null;
         if (!ttlTypeCountMap.isEmpty()) {
@@ -143,10 +144,12 @@ class BatchPutIndexInfoJob implements Runnable {
     private final String fileBlock;
     private final AtomicInteger totalLineCount;
     private final AtomicInteger totalSkipCount;
+    private final AtomicInteger totalErrorCount;
 
-    public BatchPutIndexInfoJob(AtomicInteger totalLineCount, AtomicInteger totalSkipCount, String filePath, List<String> ttlTypeList, ConcurrentHashMap<String, Long> ttlTypeCountMap, String fileBlock) {
+    public BatchPutIndexInfoJob(AtomicInteger totalLineCount, AtomicInteger totalSkipCount, AtomicInteger totalErrorCount, String filePath, List<String> ttlTypeList, ConcurrentHashMap<String, Long> ttlTypeCountMap, String fileBlock) {
         this.totalLineCount = totalLineCount;
         this.totalSkipCount = totalSkipCount;
+        this.totalErrorCount = totalErrorCount;
         this.filePath = filePath;
         this.ttlTypeList = ttlTypeList;
         this.ttlTypeCountMap = ttlTypeCountMap;
@@ -180,9 +183,9 @@ class BatchPutIndexInfoJob implements Runnable {
         int count = 0;
         int totalCount = 0;
         String line;
-        String indexInfoKey = null;
+        String indexInfoKey;
         JSONObject jsonObject;
-        HashMap<ByteString, ByteString> kvPairs = new HashMap<>();
+        ConcurrentHashMap<ByteString, ByteString> kvPairs = new ConcurrentHashMap<>();
         RawKVClient rawKVClient = tiSession.createRawClient();
 
         for (int n = 0; n < todo; n++) {
@@ -194,10 +197,10 @@ class BatchPutIndexInfoJob implements Runnable {
                 assert bufferedReader != null;
                 line = bufferedReader.readLine();
 
-                IndexInfoS indexInfoS = null;
+                IndexInfoS indexInfoS;
                 ServiceTag serviceTag;
-                ByteString key = null;
-                ByteString value = null;
+                ByteString key;
+                ByteString value;
 
                 SimpleDateFormat simpleDateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
                 String time = simpleDateFormat.format(new Date());
@@ -225,8 +228,9 @@ class BatchPutIndexInfoJob implements Runnable {
                             key = ByteString.copyFromUtf8(indexInfoKey);
                             value = ByteString.copyFromUtf8(JSONObject.toJSONString(indexInfoT));
                         } catch (Exception e) {
-                            logger.error(String.format("Failed to parse json, file='%s', line=%s, json='%s'", file, start, line));
-                            PutUtil.batchPut(totalCount, todo, count, batchSize, rawKVClient, kvPairs, file, totalLineCount, totalSkipCount);
+                            logger.error(String.format("Failed to parse json, file='%s', line=%s, json='%s'", file, start + count, line));
+                            totalErrorCount.addAndGet(1);
+                            PutUtil.batchPut(totalCount, todo, count, batchSize, rawKVClient, kvPairs, file, totalLineCount, totalSkipCount, start + count);
                             continue;
                         }
                         break;
@@ -270,13 +274,13 @@ class BatchPutIndexInfoJob implements Runnable {
                         break;
                     default:
                         logger.error(String.format("Illegal format: %s", mode));
-                        break;
+                        return;
                 }
 
                 // Skip the type that exists in the tty type map.
                 if (ttlTypeList.contains(indexInfoS.getType())) {
                     ttlTypeCountMap.put(indexInfoS.getType(), ttlTypeCountMap.get(indexInfoS.getType()) + 1);
-                    logger.warn(String.format("Skip key - ttl: %s in '%s'", indexInfoKey, file.getAbsolutePath()));
+                    logger.warn(String.format("Skip key - ttl: %s in '%s',line = %s", indexInfoKey, file.getAbsolutePath(), start + count));
                     // TODO
                     rawKVClient.delete(ByteString.copyFromUtf8(indexInfoKey));
                     totalSkipCount.addAndGet(1);
@@ -284,9 +288,7 @@ class BatchPutIndexInfoJob implements Runnable {
                 } else {
                     kvPairs.put(key, value);
                 }
-
-                PutUtil.batchPut(totalCount, todo, count, batchSize, rawKVClient, kvPairs, file, totalLineCount, totalSkipCount);
-
+                count = PutUtil.batchPut(totalCount, todo, count, batchSize, rawKVClient, kvPairs, file, totalLineCount, totalSkipCount, start + count);
             } catch (IOException e) {
                 e.printStackTrace();
             }

@@ -1,4 +1,0 @@
-123
-2weq
-{"id":"1111101","type":"1asd","envid":"pf01","appid":"ADP012bfe33b08b","createtime":"2020-11-04T17:12:04Z","servicetag":"{\"ACCT_DTL_TYPE\":\"SP0001\",\"PD_SALE_FTA_CD\":\"99\",\"AR_ID\":\"\",\"CMTRST_CST_ACCNO\":\"\",\"QCRCRD_IND\":\" \",\"BLKMDL_ID\":\"52\",\"CORPPRVT_FLAG\":\"1\"}","targetid":"0037277","updatetime":"2020-11-04T17:12:04Z"}
-1231

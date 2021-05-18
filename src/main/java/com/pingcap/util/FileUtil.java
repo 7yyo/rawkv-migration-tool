@@ -24,7 +24,7 @@ public class FileUtil {
             if (file.isDirectory()) {
                 insideFiles.add(file);
             } else {
-                if (!file.getAbsolutePath().contains("DS")) {
+                if (!file.getAbsolutePath().contains("DS") && !file.getAbsolutePath().contains("import.txt.swp")) {
                     list.add(file);
                 }
             }
@@ -42,7 +42,7 @@ public class FileUtil {
             in = new FileReader(file);
             LineNumberReader reader = new LineNumberReader(in);
             reader.skip(Long.MAX_VALUE);
-            lines = reader.getLineNumber() + 1;
+            lines = reader.getLineNumber();
             reader.close();
         } catch (IOException e) {
             e.printStackTrace();
@@ -62,7 +62,6 @@ public class FileUtil {
         logger.info("Welcome to to_tikv.");
         logger.info(String.format("Properties=%s", properties));
         List<File> fileList = FileUtil.loadDirectory(new File(filePath));
-        assert fileList != null;
         if (fileList.isEmpty()) {
             logger.error(String.format("The file path [%s] is empty", filePath));
         } else {

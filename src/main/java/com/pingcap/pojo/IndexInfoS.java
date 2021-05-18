@@ -1,7 +1,5 @@
 package com.pingcap.pojo;
 
-import shade.com.google.protobuf.ByteString;
-
 public class IndexInfoS {
 
     private String id;

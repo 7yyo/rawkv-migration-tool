@@ -8,7 +8,7 @@ import com.pingcap.util.PropertiesUtil;
 import org.tikv.common.TiConfiguration;
 import org.tikv.common.TiSession;
 import org.tikv.raw.RawKVClient;
-import shade.com.google.protobuf.ByteString;
+import org.tikv.shade.com.google.protobuf.ByteString;
 
 import java.io.*;
 import java.nio.charset.StandardCharsets;

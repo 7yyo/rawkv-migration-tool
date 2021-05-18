@@ -2,24 +2,30 @@ package com.pingcap.util;
 
 import org.apache.log4j.Logger;
 import org.tikv.raw.RawKVClient;
-import shade.com.google.protobuf.ByteString;
+import org.tikv.shade.com.google.protobuf.ByteString;
 
 import java.io.File;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.Map;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class PutUtil {
 
     private static final Logger logger = Logger.getLogger(PutUtil.class);
 
-    public static void batchPut(int totalCount, int todo, int count, int batchSize, RawKVClient rawKVClient, HashMap<ByteString, ByteString> kvPairs, File file, AtomicInteger totalLineCount, AtomicInteger totalSkipCount) {
+    public static int batchPut(int totalCount, int todo, int count, int batchSize, RawKVClient rawKVClient, ConcurrentHashMap<ByteString, ByteString> kvPairs, File file, AtomicInteger totalLineCount, AtomicInteger totalSkipCount, int totalLine) {
         if (totalCount == todo || count == batchSize) {
+
+
             // TODO
+            List<ByteString> list = new ArrayList<>();
             for (Map.Entry<ByteString, ByteString> item : kvPairs.entrySet()) {
-                rawKVClient.delete(item.getKey());
+                list.add(item.getKey());
             }
+            rawKVClient.batchDelete(list);
+            // TODO
+
+
             String k;
             for (Iterator<Map.Entry<ByteString, ByteString>> iterator = kvPairs.entrySet().iterator(); iterator.hasNext(); ) {
                 Map.Entry<ByteString, ByteString> item = iterator.next();
@@ -27,8 +33,7 @@ public class PutUtil {
                 // If the key already exists, do not insert.
                 if (!rawKVClient.get(item.getKey()).isEmpty()) {
                     iterator.remove();
-                    totalLineCount.addAndGet(-1);
-                    logger.warn(String.format("Skip key - exists: [ %s ], file is [ %s ]", k, file.getAbsolutePath()));
+//                    logger.(String.format("Skip key - exists: [ %s ], file is [ %s ], line= %s", k, file.getAbsolutePath(), totalLine));
                     totalSkipCount.addAndGet(1);
                 }
             }
@@ -41,7 +46,9 @@ public class PutUtil {
             }
             totalLineCount.addAndGet(kvPairs.size());
             kvPairs.clear();
+            count = 0;
         }
+        return count;
     }
 
 }
