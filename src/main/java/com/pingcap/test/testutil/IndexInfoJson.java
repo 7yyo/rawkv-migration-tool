@@ -12,7 +12,7 @@ import java.util.concurrent.RecursiveTask;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
-public class CreateTestData {
+public class IndexInfoJson {
 
     private static final long INITNUMS = 100000000;
     private static final long EACH_SLICES = 10000000;
@@ -68,7 +68,7 @@ public class CreateTestData {
         }
 
         protected Long compute() {
-            if (endValue - startValue < CreateTestData.EACH_SLICES) {
+            if (endValue - startValue < IndexInfoJson.EACH_SLICES) {
                 System.out.println(Thread.currentThread().getName() + " startValue {" + startValue + "} endValue {" + endValue + "} ");
                 AtomicInteger atc_a = new AtomicInteger();
                 AtomicInteger atc_b = new AtomicInteger();
@@ -132,9 +132,9 @@ public class CreateTestData {
                 }
                 return startValue;
             }
-            ParallelExecuteCreateDataTask subTask1 = new ParallelExecuteCreateDataTask(startValue, (startValue + CreateTestData.EACH_SLICES - 1));
+            ParallelExecuteCreateDataTask subTask1 = new ParallelExecuteCreateDataTask(startValue, (startValue + IndexInfoJson.EACH_SLICES - 1));
             subTask1.fork();
-            ParallelExecuteCreateDataTask subTask2 = new ParallelExecuteCreateDataTask((startValue + CreateTestData.EACH_SLICES), endValue);
+            ParallelExecuteCreateDataTask subTask2 = new ParallelExecuteCreateDataTask((startValue + IndexInfoJson.EACH_SLICES), endValue);
             subTask2.fork();
             return startValue;
         }
