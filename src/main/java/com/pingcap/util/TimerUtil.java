@@ -24,6 +24,10 @@ public class TimerUtil implements Runnable {
         this.filePath = filePath;
     }
 
+    public static void main(String[] args) {
+        System.out.println(getResult(123,1245));
+    }
+
     public static String getResult(int num1, int num2) {
         java.text.NumberFormat numerator = java.text.NumberFormat.getInstance();
         numerator.setMaximumFractionDigits(2);

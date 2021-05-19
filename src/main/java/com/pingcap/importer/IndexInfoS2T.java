@@ -8,13 +8,13 @@ import com.pingcap.pojo.ServiceTag;
 import com.pingcap.util.*;
 import org.apache.commons.lang.StringUtils;
 import org.apache.log4j.Logger;
+import org.apache.log4j.spi.LoggerFactory;
 import org.tikv.common.TiSession;
 import org.tikv.raw.RawKVClient;
 import org.tikv.shade.com.google.protobuf.ByteString;
 
 import java.io.*;
 import java.nio.charset.StandardCharsets;
-import java.sql.Time;
 import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -233,9 +233,9 @@ class BatchPutIndexInfoJob implements Runnable {
                             key = ByteString.copyFromUtf8(indexInfoKey);
                             value = ByteString.copyFromUtf8(JSONObject.toJSONString(indexInfoT));
                         } catch (Exception e) {
-                            logger.error(String.format("Failed to parse json, file='%s', line=%s, json='%s'", file, start + count, line));
+                            logger.error(String.format("Failed to parse json, file='%s', json='%s',line=%s,", file, line, start + totalCount));
                             totalErrorCount.addAndGet(1);
-                            PutUtil.batchPut(totalCount, todo, count, batchSize, rawKVClient, kvPairs, file, totalLineCount, totalSkipCount, start + count);
+                            PutUtil.batchPut(totalCount, todo, count, batchSize, rawKVClient, kvPairs, file, totalLineCount, totalSkipCount, start + totalCount);
                             continue;
                         }
                         break;
@@ -285,7 +285,7 @@ class BatchPutIndexInfoJob implements Runnable {
                 // Skip the type that exists in the tty type map.
                 if (ttlTypeList.contains(indexInfoS.getType())) {
                     ttlTypeCountMap.put(indexInfoS.getType(), ttlTypeCountMap.get(indexInfoS.getType()) + 1);
-                    logger.warn(String.format("Skip key - ttl: %s in '%s',line = %s", indexInfoKey, file.getAbsolutePath(), start + count));
+                    logger.warn(String.format("Skip key - ttl: %s in '%s',line = %s", indexInfoKey, file.getAbsolutePath(), start + totalCount));
                     // TODO
                     rawKVClient.delete(ByteString.copyFromUtf8(indexInfoKey));
                     totalSkipCount.addAndGet(1);
@@ -293,7 +293,7 @@ class BatchPutIndexInfoJob implements Runnable {
                 } else {
                     kvPairs.put(key, value);
                 }
-                count = PutUtil.batchPut(totalCount, todo, count, batchSize, rawKVClient, kvPairs, file, totalLineCount, totalSkipCount, start + count);
+                count = PutUtil.batchPut(totalCount, todo, count, batchSize, rawKVClient, kvPairs, file, totalLineCount, totalSkipCount, start + totalCount);
             } catch (IOException e) {
                 e.printStackTrace();
             }

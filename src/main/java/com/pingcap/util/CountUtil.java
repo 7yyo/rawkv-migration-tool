@@ -29,7 +29,7 @@ public class CountUtil {
         Integer dangStart = Integer.parseInt(list.get(list.size() - 1).split(",")[0]);
         Integer dangTodo = Integer.parseInt(list.get(list.size() - 1).split(",")[1]);
         list.add((dangStart + dangTodo) + "," + remainder);
-        logger.debug(String.format(threadLog, list.size(), fileName, dangStart + dangTodo, remainder));
+        logger.info(String.format(threadLog, list.size(), fileName, dangStart + dangTodo, remainder));
         return list;
     }
 
