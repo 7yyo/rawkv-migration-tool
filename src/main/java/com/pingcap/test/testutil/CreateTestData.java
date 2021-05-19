@@ -1,8 +1,5 @@
 package com.pingcap.test.testutil;
 
-import com.pingcap.importer.IndexInfoS2T;
-import org.apache.log4j.Logger;
-
 import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
@@ -17,72 +14,101 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 public class CreateTestData {
 
-    private static final Logger logger = Logger.getLogger(CreateTestData.class);
-    private static final int INITNUMS = 10000;
-    private static final int EACH_SLICES = 1000;
-    private static final String FILE_PATH = "/Users/weiwei/tmp/out.txt";
+    private static final long INITNUMS = 100000000;
+    private static final long EACH_SLICES = 10000000;
+    private static final int WRONG_DATA = 5000000;
+    private static final int WRONG_DATA_TYPE = 5000000;
+
+//    private static final long INITNUMS = 100000;
+//    private static final long EACH_SLICES = 20000;
+//    private static final int WRONG_DATA = 5000000;
+//    private static final int WRONG_DATA_TYPE = 5000000;
+
+    private static final String FILE_PATH = "/Users/weiwei/tmp/jianhang/out";
 
     private static final String TYPE_A001 = "A001";
     private static final String TYPE_B001 = "B001";
     private static final String TYPE_C001 = "C001";
 
-    private static AtomicInteger atc_a = new AtomicInteger();
-    private static AtomicInteger atc_b = new AtomicInteger();
-    private static AtomicInteger atc_c = new AtomicInteger();
-    private static AtomicInteger WRONG = new AtomicInteger();
+    private static StringBuffer sb = new StringBuffer();
+
+    private static AtomicInteger fileId = new AtomicInteger();
 
     public static void main(String[] args) {
-        logger.info("Create Test Data begin ");
+        System.out.println("Create Test Data begin ");
         long now = System.currentTimeMillis();
         try {
             ForkJoinPool pool = new ForkJoinPool();
-            ForkJoinTask<Integer> task = pool.submit(new ParallelExecuteCreateDataTask(1, INITNUMS));
+            ForkJoinTask<Long> task = pool.submit(new ParallelExecuteCreateDataTask(1, INITNUMS));
             task.get();
             pool.shutdown();
             pool.awaitTermination(Long.MAX_VALUE, TimeUnit.NANOSECONDS);
         } catch (Exception e) {
-            logger.error("create test data error {} ", e);
+            System.out.println("create test data error {} " + e);
         }
-        logger.info(" create test data end WRONG{"+WRONG+"}  A001{" + atc_a.get() + "} B001{" + atc_b.get() + "}  C001{" + atc_c.get() + "} ");
-        logger.info(" create test data end  size {" + INITNUMS + "} cost time {" + Long.valueOf(System.currentTimeMillis() - now) + "} ");
+        System.out.println(" create test data end  size {" + INITNUMS + "} cost time {" + Long.valueOf(System.currentTimeMillis() - now) + "} ");
+        System.out.println(sb.toString());
     }
 
 
-    private static class ParallelExecuteCreateDataTask extends RecursiveTask<Integer> {
+    private static class ParallelExecuteCreateDataTask extends RecursiveTask<Long> {
 
         private static final long serialVersionUID = 1L;
         private static Random r = new Random();
 
         private static Random r2 = new Random();
 
-        private static final Logger logger = Logger.getLogger(ParallelExecuteCreateDataTask.class);
+        private long startValue;
 
-        private int startValue;
+        private long endValue;
 
-        private int endValue;
-
-        public ParallelExecuteCreateDataTask(int startValue, int endValue) {
+        public ParallelExecuteCreateDataTask(long startValue, long endValue) {
             this.startValue = startValue;
             this.endValue = endValue;
         }
 
-        protected Integer compute() {
+        protected Long compute() {
             if (endValue - startValue < CreateTestData.EACH_SLICES) {
-                logger.info(Thread.currentThread().getName() + " startValue {" + startValue + "} endValue {" + endValue + "} ");
+                System.out.println(Thread.currentThread().getName() + " startValue {" + startValue + "} endValue {" + endValue + "} ");
+                AtomicInteger atc_a = new AtomicInteger();
+                AtomicInteger atc_b = new AtomicInteger();
+                AtomicInteger atc_c = new AtomicInteger();
+                AtomicInteger WRONG = new AtomicInteger();
                 try {
+                    String fileFullPath = FILE_PATH + fileId.getAndAdd(1) + ".txt";
+                    File file = getByName(fileFullPath);
                     StringBuilder s = new StringBuilder();
                     long i = startValue;
                     for (; i <= endValue; i++) {
-                        int w_d = r2.nextInt(100000);
-                        if(w_d == 1){
+                        int w_d = r2.nextInt(WRONG_DATA);
+                        if (w_d == 1) {
                             s.append("123 \n");
                             WRONG.addAndGet(1);
-                        }else{
+                        } else {
+                            int v = r.nextInt(WRONG_DATA_TYPE);
+                            String type = "";
+                            if (v == 1) {
+                                atc_a.addAndGet(1);
+                                type = TYPE_A001;
+                            } else if (v == 2) {
+                                atc_b.addAndGet(1);
+                                type = TYPE_B001;
+                            } else if (v == 3) {
+                                atc_c.addAndGet(1);
+                                type = TYPE_C001;
+                            } else if (v < WRONG_DATA_TYPE * (1 / 3)) {
+                                type = TYPE_A001 + r2.nextInt(1000000);
+                            } else if (v < WRONG_DATA_TYPE * (2 / 3)) {
+                                type = TYPE_B001 + r2.nextInt(1000000);
+                            } else {
+                                type = TYPE_C001 + r2.nextInt(1000000);
+                            }
+
                             s.append("{\"id\":\"" +
                                     ("" + i) +
                                     "\"" +
                                     ",\"type\":\"" +
-                                    difType(r.nextInt(1000)) +
+                                    type +
                                     "\"" +
                                     ",\"envid\":\"pf01\",\"appid\":\"ADP012bfe33b08b\",\"createtime\":\"" +
                                     "2020-11-04T17:12:04Z" +
@@ -90,13 +116,18 @@ public class CreateTestData {
                                     "2020-11-04T17:12:04Z" +
                                     "\"} \n");
                         }
+                        if (i % 10000 == 0) {
+                            writeToFile(file, s.toString());
+                            s = new StringBuilder();
+                        }
                     }
-                    logger.info(Thread.currentThread().getName() + " :  进入");
-                    writeToFile(s.toString());
+                    writeToFile(file, s.toString());
+
+                    sb.append("(" + fileFullPath + ") create test data end WRONG{" + WRONG + "}  A001{" + atc_a.get() + "} B001{" + atc_b.get() + "}  C001{" + atc_c.get() + "} \n");
 
                 } catch (Exception e) {
                     e.printStackTrace();
-                    logger.error(" create test data parallelExecuteCreateDataTask exception {} ", e);
+                    System.out.println(" create test data parallelExecuteCreateDataTask exception {} " + e);
                     throw e;
                 }
                 return startValue;
@@ -107,32 +138,10 @@ public class CreateTestData {
             subTask2.fork();
             return startValue;
         }
-
-        private static String difType(int v) {
-            String type = "";
-            if (v == 1) {
-                atc_a.addAndGet(1);
-                type = TYPE_A001;
-            } else if (v == 2) {
-                atc_b.addAndGet(1);
-                type = TYPE_B001;
-            } else if (v == 3) {
-                atc_c.addAndGet(1);
-                type = TYPE_C001;
-            } else if (v < 333) {
-                type = TYPE_A001 + r2.nextInt(1000000);
-            } else if (v < 666) {
-                type = TYPE_B001 + r2.nextInt(1000000);
-            } else  {
-                type = TYPE_C001 + r2.nextInt(1000000);
-            }
-            return type;
-        }
-
     }
 
-    private synchronized static void writeToFile(String str) {
-        File file = getByName(FILE_PATH);
+
+    private synchronized static void writeToFile(File file, String str) {
         RandomAccessFile fout = null;
         FileChannel fcout = null;
         try {
@@ -149,7 +158,6 @@ public class CreateTestData {
                     Thread.sleep(1000);
                 }
             }
-            logger.info(Thread.currentThread().getName() + " 开始写入文件");
             fout.write(str.getBytes());//将需要写入的内容写入文件
 
             flout.release();
@@ -164,7 +172,6 @@ public class CreateTestData {
 
             if (fcout != null) {
 
-                logger.info(Thread.currentThread().getName() + "fcount != null");
                 try {
                     fcout.close();
                 } catch (IOException e) {
@@ -174,7 +181,6 @@ public class CreateTestData {
             }
             if (fout != null) {
                 try {
-                    logger.info(Thread.currentThread().getName() + "fout != null");
                     fout.close();
                 } catch (IOException e) {
                     e.printStackTrace();
