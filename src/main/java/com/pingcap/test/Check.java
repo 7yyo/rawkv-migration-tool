@@ -18,7 +18,7 @@ import java.util.Properties;
 public class Check {
 
     private static final String PD_ADDRESS = "172.16.4.33:5555,172.16.4.34:5555,172.16.4.35:5555";
-    private static final Properties properties = PropertiesUtil.getProperties();
+    private static final Properties properties = PropertiesUtil.getProperties("");
     private static final String filePath = properties.getProperty("importer.in.filePath");
     private static final String INDEX_INFO_KET_FORMAT = "indexInfo_:_%s_:_%s_:_%s";
 
@@ -36,7 +36,7 @@ public class Check {
         String indexInfoKey;
 
 
-        List<File> fileList = FileUtil.showFileList(filePath);
+        List<File> fileList = FileUtil.showFileList(filePath,false);
 
         for (File file : fileList) {
             bufferedInputStream = new BufferedInputStream(new FileInputStream(file));

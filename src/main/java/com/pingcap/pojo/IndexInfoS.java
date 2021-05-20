@@ -2,14 +2,15 @@ package com.pingcap.pojo;
 
 public class IndexInfoS {
 
-    private String id;
-    private String type;
     private String envId;
+    private String type;
+    private String id;
     private String appId;
-    private String createTime;
     private String serviceTag;
     private String targetId;
+    private String createTime;
     private String updateTime;
+    private int fileLine;
 
     public String getId() {
         return id;
@@ -75,4 +76,11 @@ public class IndexInfoS {
         this.updateTime = updateTime;
     }
 
+    public int getFileLine() {
+        return fileLine;
+    }
+
+    public void setFileLine(int fileLine) {
+        this.fileLine = fileLine;
+    }
 }

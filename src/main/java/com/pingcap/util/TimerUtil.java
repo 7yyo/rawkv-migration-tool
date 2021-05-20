@@ -1,16 +1,18 @@
 package com.pingcap.util;
 
-import com.pingcap.importer.IndexInfoS2T;
 import org.apache.log4j.Logger;
 
 import java.sql.Time;
+import java.util.Properties;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.atomic.AtomicInteger;
 
-public class TimerUtil implements Runnable {
+public class TimerUtil extends Thread {
 
     private static final Logger logger = Logger.getLogger(TimerUtil.class);
+
+    private final Properties properties;
 
     private final AtomicInteger totalFileLine;
     private final int totalLines;
@@ -18,14 +20,11 @@ public class TimerUtil implements Runnable {
     private String logStr = "";
     private static String result = "";
 
-    public TimerUtil(AtomicInteger totalFileLine, int totalLines, String filePath) {
+    public TimerUtil(AtomicInteger totalFileLine, int totalLines, String filePath, Properties properties) {
         this.totalFileLine = totalFileLine;
         this.totalLines = totalLines;
         this.filePath = filePath;
-    }
-
-    public static void main(String[] args) {
-        System.out.println(getResult(123,1245));
+        this.properties = properties;
     }
 
     public static String getResult(int num1, int num2) {
@@ -37,6 +36,7 @@ public class TimerUtil implements Runnable {
 
     @Override
     public void run() {
+        long interval = Long.parseLong(properties.getProperty("importer.timer.interval"));
         Timer timer = new Timer();
         timer.schedule(new TimerTask() {
             @Override
@@ -44,7 +44,7 @@ public class TimerUtil implements Runnable {
                 logStr = String.format("[%s] %s lines has been imported, [%s/%s], progress %s", filePath, totalFileLine, totalFileLine, totalLines, getResult(totalFileLine.get(), totalLines));
                 logger.info(logStr + "%");
             }
-        }, 5000, 10000);
+        }, 5000, interval);
     }
 }
 

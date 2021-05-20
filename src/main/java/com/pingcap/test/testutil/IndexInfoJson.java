@@ -1,7 +1,5 @@
 package com.pingcap.test.testutil;
 
-import org.apache.log4j.Logger;
-
 import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
@@ -16,17 +14,12 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 public class IndexInfoJson {
 
-    private static final long INITNUMS = 100000000;
-    private static final long EACH_SLICES = 10000000;
-    private static final int WRONG_DATA = 5000000;
-    private static final int WRONG_DATA_TYPE = 5000000;
+    private static final long INITNUMS = 1000;
+    private static final long EACH_SLICES = 1000;
+    private static final int WRONG_DATA = 500;
+    private static final int WRONG_DATA_TYPE = 500;
 
-//    private static final long INITNUMS = 100000;
-//    private static final long EACH_SLICES = 20000;
-//    private static final int WRONG_DATA = 5000000;
-//    private static final int WRONG_DATA_TYPE = 5000000;
-
-    private static final String FILE_PATH = "/home/tidb/yuyang/data/import";
+    private static final String FILE_PATH = "src/main/resources/testFile/indexInfoS/import";
 
     private static final String TYPE_A001 = "A001";
     private static final String TYPE_B001 = "B001";

@@ -7,10 +7,8 @@ import java.util.Properties;
 
 public class TiSessionUtil {
 
-    private static final Properties properties = PropertiesUtil.getProperties();
-    private static String pd = properties.getProperty("importer.tikv.pd");
-
-    public static TiSession getTiSession() {
+    public static TiSession getTiSession(Properties properties) {
+        String pd = properties.getProperty("importer.tikv.pd");
         TiConfiguration conf = TiConfiguration.createRawDefault(pd);
         return TiSession.create(conf);
     }

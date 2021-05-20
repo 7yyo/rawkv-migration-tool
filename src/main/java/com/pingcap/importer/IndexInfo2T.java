@@ -8,7 +8,6 @@ import com.pingcap.pojo.ServiceTag;
 import com.pingcap.util.*;
 import org.apache.commons.lang.StringUtils;
 import org.apache.log4j.Logger;
-import org.apache.log4j.spi.LoggerFactory;
 import org.tikv.common.TiSession;
 import org.tikv.raw.RawKVClient;
 import org.tikv.shade.com.google.protobuf.ByteString;
@@ -18,42 +17,38 @@ import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.atomic.AtomicInteger;
 
-public class IndexInfoS2T {
+public class IndexInfo2T {
 
-    private static final Logger logger = Logger.getLogger(IndexInfoS2T.class);
+    private static final Logger logger = Logger.getLogger(IndexInfo2T.class);
 
-    private static final Properties properties = PropertiesUtil.getProperties();
-    private static final String filesPath = properties.getProperty("importer.in.filePath");
-    private static final int corePoolSize = Integer.parseInt(properties.getProperty("importer.tikv.corePoolSize"));
-    private static final int maxPoolSize = Integer.parseInt(properties.getProperty("importer.tikv.maxPoolSize"));
+    public static void RunIndexInfo2T(Properties properties) {
 
-    public static void main(String[] args) {
+        String filesPath = properties.getProperty("importer.in.filePath");
+        int corePoolSize = Integer.parseInt(properties.getProperty("importer.tikv.corePoolSize"));
+        int maxPoolSize = Integer.parseInt(properties.getProperty("importer.tikv.maxPoolSize"));
 
         long startTime = System.currentTimeMillis();
 
         // Traverse all the files that need to be written.
-        List<File> fileList = FileUtil.showFileList(filesPath);
+        List<File> fileList = FileUtil.showFileList(filesPath, false);
 
-        // Start the Main thread for each file.
-        ThreadPoolExecutor threadPoolExecutor = ThreadPoolUtil.startJob(corePoolSize, maxPoolSize);
+        // Start the Main thread for each file.showFileList
+        ThreadPoolExecutor threadPoolExecutor = ThreadPoolUtil.startJob(corePoolSize, maxPoolSize, "");
         for (File file : fileList) {
             logger.debug(String.format("Start running the Main thread for [%s]", file.getAbsolutePath()));
             // Pass in the file to be processed and the ttl map.
             // The ttl map is shared by all file threads, because it is a table for processing, which is summarized here.
-            threadPoolExecutor.execute(new IndexInfoS2TJob(file.getAbsolutePath()));
+            threadPoolExecutor.execute(new IndexInfo2TJob(file.getAbsolutePath(), properties));
         }
         threadPoolExecutor.shutdown();
 
-        // When all threads are over, stop the thread pool.
         while (true) {
             if (threadPoolExecutor.isTerminated()) {
                 long duration = System.currentTimeMillis() - startTime;
-                logger.info(String.format("File import is complete! It takes %s seconds", (duration / 1000)));
+                logger.info(String.format("All files import is complete! It takes [%s] seconds", (duration / 1000)));
                 System.exit(0);
             }
         }
@@ -61,26 +56,28 @@ public class IndexInfoS2T {
     }
 }
 
-class IndexInfoS2TJob implements Runnable {
+class IndexInfo2TJob implements Runnable {
 
-    private static final Logger logger = Logger.getLogger(IndexInfoS2TJob.class);
-
-    private static final Properties properties = PropertiesUtil.getProperties();
-    private static final int insideThread = Integer.parseInt(properties.getProperty("importer.tikv.insideThread"));
-    private static final String ttlType = properties.getProperty("importer.ttl.type");
+    private static final Logger logger = Logger.getLogger(IndexInfo2TJob.class);
 
     private final String filePath;
+    private final Properties properties;
 
-    private final AtomicInteger totalLineCount = new AtomicInteger(0);
+    private final AtomicInteger totalImportCount = new AtomicInteger(0);
     private final AtomicInteger totalSkipCount = new AtomicInteger(0);
-    private final AtomicInteger totalErrorCount = new AtomicInteger(0);
+    private final AtomicInteger totalParseErrorCount = new AtomicInteger(0);
+    private final AtomicInteger totalBatchPutFailCount = new AtomicInteger(0);
 
-    public IndexInfoS2TJob(String filePath) {
+    public IndexInfo2TJob(String filePath, Properties properties) {
         this.filePath = filePath;
+        this.properties = properties;
     }
 
     @Override
     public void run() {
+
+        int insideThread = Integer.parseInt(properties.getProperty("importer.tikv.insideThread"));
+        String ttlType = properties.getProperty("importer.ttl.type");
 
         long startTime = System.currentTimeMillis();
 
@@ -97,13 +94,16 @@ class IndexInfoS2TJob implements Runnable {
         int lines = FileUtil.getFileLines(file);
         List<String> threadPerLineList = CountUtil.getPerThreadFileLines(lines, insideThread, file.getAbsolutePath());
 
-        ExecutorService threadPoolExecutor = Executors.newFixedThreadPool(insideThread);
+        FileUtil.deleteFolder(properties.getProperty("importer.tikv.checkSumFilePath"));
+        FileUtil.deleteFolders(properties.getProperty("importer.tikv.checkSumFilePath"));
+
+        ThreadPoolExecutor threadPoolExecutor = ThreadPoolUtil.startJob(insideThread, insideThread, file.getName());
         for (String s : threadPerLineList) {
-            threadPoolExecutor.execute(new BatchPutIndexInfoJob(totalLineCount, totalSkipCount, totalErrorCount, filePath, ttlTypeList, ttlTypeCountMap, s));
+            threadPoolExecutor.execute(new BatchPutIndexInfoJob(totalImportCount, totalSkipCount, totalParseErrorCount, totalBatchPutFailCount, filePath, ttlTypeList, ttlTypeCountMap, s, properties));
         }
 
-        TimerUtil timerUtil = new TimerUtil(totalLineCount, lines, filePath);
-        timerUtil.run();
+        TimerUtil timerUtil = new TimerUtil(totalImportCount, lines, filePath, properties);
+        timerUtil.start();
 
         threadPoolExecutor.shutdown();
 
@@ -114,16 +114,15 @@ class IndexInfoS2TJob implements Runnable {
         }
 
         long duration = System.currentTimeMillis() - startTime;
-        StringBuilder result = new StringBuilder("Import Report: File[" + file.getAbsolutePath() + "], Total rows[" + lines + "], Imported rows[" + totalLineCount + "], Skip rows[" + totalSkipCount + "],Error count[" + totalErrorCount + "], Duration[" + duration / 1000 + "s],");
-        result.append(" Skip ttl: ");
+        StringBuilder result = new StringBuilder("Import Report: File[" + file.getAbsolutePath() + "], TotalRows[" + lines + "], ImportedRows[" + totalImportCount + "], SkipRows[" + totalSkipCount + "], ParseERROR[" + totalParseErrorCount + "], BatchPutERROR[" + totalBatchPutFailCount + "], Duration[" + duration / 1000 + "s],");
+        result.append(" Skip type=");
         assert ttlTypeCountMap != null;
         if (!ttlTypeCountMap.isEmpty()) {
             for (Map.Entry<String, Long> item : ttlTypeCountMap.entrySet()) {
-                result.append(item.getKey()).append("=").append(item.getValue()).append(",");
+                result.append("<").append(item.getKey()).append(">").append("[").append(item.getValue()).append("]");
             }
         }
         logger.info(result.toString());
-
     }
 }
 
@@ -135,34 +134,40 @@ class BatchPutIndexInfoJob implements Runnable {
 
     private static final Logger logger = Logger.getLogger(BatchPutIndexInfoJob.class);
 
-    private static final Properties properties = PropertiesUtil.getProperties();
-    private static final String envId = properties.getProperty("importer.out.envId");
-    private static final String appId = properties.getProperty("importer.out.appId");
-    private static final String mode = properties.getProperty("importer.in.mode");
-    private static final int batchSize = Integer.parseInt(properties.getProperty("importer.tikv.batchSize"));
-
-    private final TiSession tiSession = TiSessionUtil.getTiSession();
-
     private final String filePath;
     private final List<String> ttlTypeList;
     private final ConcurrentHashMap<String, Long> ttlTypeCountMap;
     private final String fileBlock;
-    private final AtomicInteger totalLineCount;
+    private final AtomicInteger totalImportCount;
     private final AtomicInteger totalSkipCount;
-    private final AtomicInteger totalErrorCount;
+    private final AtomicInteger totalParseErrorCount;
+    private final AtomicInteger totalBatchPutFailCount;
+    private final Properties properties;
 
-    public BatchPutIndexInfoJob(AtomicInteger totalLineCount, AtomicInteger totalSkipCount, AtomicInteger totalErrorCount, String filePath, List<String> ttlTypeList, ConcurrentHashMap<String, Long> ttlTypeCountMap, String fileBlock) {
-        this.totalLineCount = totalLineCount;
+    public BatchPutIndexInfoJob(AtomicInteger totalImportCount, AtomicInteger totalSkipCount, AtomicInteger totalParseErrorCount, AtomicInteger totalBatchPutFailCount, String filePath, List<String> ttlTypeList, ConcurrentHashMap<String, Long> ttlTypeCountMap, String fileBlock, Properties properties) {
+        this.totalImportCount = totalImportCount;
         this.totalSkipCount = totalSkipCount;
-        this.totalErrorCount = totalErrorCount;
+        this.totalParseErrorCount = totalParseErrorCount;
+        this.totalBatchPutFailCount = totalBatchPutFailCount;
         this.filePath = filePath;
         this.ttlTypeList = ttlTypeList;
         this.ttlTypeCountMap = ttlTypeCountMap;
         this.fileBlock = fileBlock;
+        this.properties = properties;
     }
 
     @Override
     public void run() {
+
+        TiSession tiSession = TiSessionUtil.getTiSession(properties);
+
+        String envId = properties.getProperty("importer.out.envId");
+        String appId = properties.getProperty("importer.out.appId");
+        String mode = properties.getProperty("importer.in.mode");
+        int batchSize = Integer.parseInt(properties.getProperty("importer.tikv.batchSize"));
+        String delimiter_1 = properties.getProperty("importer.in.delimiter_1");
+        String delimiter_2 = properties.getProperty("importer.in.delimiter_2");
+        int checkSumCount = Integer.parseInt(properties.getProperty("importer.tikv.checkSumPercentage"));
 
         File file = new File(filePath);
         BufferedReader bufferedReader = null;
@@ -175,10 +180,17 @@ class BatchPutIndexInfoJob implements Runnable {
 
         int start = Integer.parseInt(fileBlock.split(",")[0]);
         int todo = Integer.parseInt(fileBlock.split(",")[1]);
+        if (todo == 0) {
+            return;
+        }
+
+        String checkSumFilePath = properties.getProperty("importer.tikv.checkSumFilePath");
+        String fp = checkSumFilePath.replaceAll("\"", "") + "/" + file.getName().replaceAll("\\.", "") + "/" + Thread.currentThread().getId() + ".txt";
+        File checkSumFile = new File(fp);
+        BufferedWriter bufferedWriter = CheckSumUtil.initCheckSumLog(properties, file, checkSumFile);
 
         for (int m = 0; m < start; m++) {
             try {
-                assert bufferedReader != null;
                 bufferedReader.readLine();
             } catch (IOException e) {
                 e.printStackTrace();
@@ -188,10 +200,11 @@ class BatchPutIndexInfoJob implements Runnable {
         int count = 0;
         int totalCount = 0;
         String line;
-        String indexInfoKey;
+        String indexInfoKey = "";
         JSONObject jsonObject;
         ConcurrentHashMap<ByteString, ByteString> kvPairs = new ConcurrentHashMap<>();
         RawKVClient rawKVClient = tiSession.createRawClient();
+        String checkSumDelimiter = "";
 
         for (int n = 0; n < todo; n++) {
             try {
@@ -227,23 +240,31 @@ class BatchPutIndexInfoJob implements Runnable {
                             if (StringUtils.isNotBlank(indexInfoS.getServiceTag())) {
                                 indexInfoT.setServiceTag(indexInfoS.getServiceTag());
                             }
-                            indexInfoT.setUpdateTime(indexInfoS.getCreateTime().replaceAll("T", " ").replaceAll("Z", ""));
+                            indexInfoT.setUpdateTime(time);
+                            indexInfoT.setCreateTime(indexInfoS.getCreateTime().replaceAll("T", " ").replaceAll("Z", ""));
                             logger.debug(String.format(" File: %s - Thread - %s , K: {%s}, V: {%s}", file.getAbsolutePath(), Thread.currentThread().getId(), indexInfoKey, JSONObject.toJSONString(indexInfoT)));
+
+                            checkSumDelimiter = properties.getProperty("importer.tikv.checkSumDelimiter");
+                            if (totalCount % checkSumCount == 0) {
+                                bufferedWriter.write(indexInfoKey + checkSumDelimiter + (start + totalCount) + "\n");
+                            }
 
                             key = ByteString.copyFromUtf8(indexInfoKey);
                             value = ByteString.copyFromUtf8(JSONObject.toJSONString(indexInfoT));
+
                         } catch (Exception e) {
                             logger.error(String.format("Failed to parse json, file='%s', json='%s',line=%s,", file, line, start + totalCount));
-                            totalErrorCount.addAndGet(1);
-                            PutUtil.batchPut(totalCount, todo, count, batchSize, rawKVClient, kvPairs, file, totalLineCount, totalSkipCount, start + totalCount);
+                            bufferedWriter.write("Parse ERROR line = [" + line + "]" + checkSumDelimiter + (start + totalCount) + "\n");
+                            totalParseErrorCount.addAndGet(1);
                             continue;
                         }
                         break;
+
                     case ORIGINAL_FORMAT:
 
-                        String envId = line.split("\\|")[0];
-                        String type = line.split("\\|")[1];
-                        String targetId = line.split("\\|")[2].split("##")[0];
+                        envId = line.split(delimiter_1)[0];
+                        String type = line.split(delimiter_1)[1];
+                        String targetId = line.split(delimiter_1)[2].split(delimiter_2)[0];
 
                         indexInfoS = new IndexInfoS();
                         indexInfoS.setType(type);
@@ -255,14 +276,14 @@ class BatchPutIndexInfoJob implements Runnable {
                         }
 
                         // TODO
-                        String st = line.split("\\|")[2];
+                        String st = line.split(delimiter_1)[2];
                         serviceTag = new ServiceTag();
-                        serviceTag.setBLKMDL_ID(st.split("##")[1]);
-                        serviceTag.setPD_SALE_FTA_CD(st.split("##")[2]);
-                        serviceTag.setACCT_DTL_TYPE(st.split("##")[3]);
-                        serviceTag.setTu_FLAG(st.split("##")[4]);
-                        serviceTag.setCMTRST_CST_ACCNO(st.split("##")[5]);
-                        serviceTag.setAR_ID(st.split("##")[6]);
+                        serviceTag.setBLKMDL_ID(st.split(delimiter_2)[1]);
+                        serviceTag.setPD_SALE_FTA_CD(st.split(delimiter_2)[2]);
+                        serviceTag.setACCT_DTL_TYPE(st.split(delimiter_2)[3]);
+                        serviceTag.setTu_FLAG(st.split(delimiter_2)[4]);
+                        serviceTag.setCMTRST_CST_ACCNO(st.split(delimiter_2)[5]);
+                        serviceTag.setAR_ID(st.split(delimiter_2)[6]);
                         serviceTag.setQCRCRD_IND("");
 
                         String serviceTagJson = JSON.toJSONString(serviceTag);
@@ -286,18 +307,26 @@ class BatchPutIndexInfoJob implements Runnable {
                 if (ttlTypeList.contains(indexInfoS.getType())) {
                     ttlTypeCountMap.put(indexInfoS.getType(), ttlTypeCountMap.get(indexInfoS.getType()) + 1);
                     logger.warn(String.format("Skip key - ttl: %s in '%s',line = %s", indexInfoKey, file.getAbsolutePath(), start + totalCount));
-                    // TODO
-                    rawKVClient.delete(ByteString.copyFromUtf8(indexInfoKey));
                     totalSkipCount.addAndGet(1);
                     continue;
                 } else {
                     kvPairs.put(key, value);
                 }
-                count = PutUtil.batchPut(totalCount, todo, count, batchSize, rawKVClient, kvPairs, file, totalLineCount, totalSkipCount, start + totalCount);
+
+                count = PutUtil.batchPut(totalCount, todo, count, batchSize, rawKVClient, kvPairs, file, totalImportCount, totalSkipCount, totalBatchPutFailCount, start + totalCount);
+
             } catch (IOException e) {
                 e.printStackTrace();
             }
         }
+        try {
+            bufferedWriter.flush();
+            bufferedWriter.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        CheckSumUtil.checkSumIndexInfo(fp, properties.getProperty("importer.tikv.checkSumDelimiter"), tiSession, ttlTypeList.toString(), file);
 
     }
 

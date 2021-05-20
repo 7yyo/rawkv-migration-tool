@@ -8,7 +8,9 @@ public class IndexInfoT {
     private String appId;
     private String serviceTag;
     private String targetId;
+    private String createTime;
     private String updateTime;
+    private int fileLine;
 
     public String getEnvId() {
         return envId;
@@ -64,5 +66,21 @@ public class IndexInfoT {
 
     public void setUpdateTime(String updateTime) {
         this.updateTime = updateTime;
+    }
+
+    public String getCreateTime() {
+        return createTime;
+    }
+
+    public void setCreateTime(String createTime) {
+        this.createTime = createTime;
+    }
+
+    public int getFileLine() {
+        return fileLine;
+    }
+
+    public void setFileLine(int fileLine) {
+        this.fileLine = fileLine;
     }
 }

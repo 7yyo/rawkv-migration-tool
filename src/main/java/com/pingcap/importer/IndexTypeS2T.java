@@ -22,12 +22,12 @@ public class IndexTypeS2T {
     private static final Properties properties = PropertiesUtil.getProperties();
     private static final String filePath = properties.getProperty("importer.in.filePath");
 
-    private static final TiSession tiSession = TiSessionUtil.getTiSession();
+    private static final TiSession tiSession = TiSessionUtil.getTiSession(properties);
     private static final HashMap<ByteString, ByteString> kvPairs = new HashMap<>();
 
     public static void main(String[] args) {
 
-        List<File> fileList = FileUtil.showFileList(filePath);
+        List<File> fileList = FileUtil.showFileList(filePath,false);
         RawKVClient rawKVClient = tiSession.createRawClient();
 
         BufferedReader bufferedReader = null;

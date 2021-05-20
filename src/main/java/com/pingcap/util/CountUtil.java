@@ -1,6 +1,6 @@
 package com.pingcap.util;
 
-import com.pingcap.importer.IndexInfoS2T;
+import com.pingcap.importer.IndexInfo2T;
 import org.apache.log4j.Logger;
 
 import java.util.ArrayList;
@@ -8,7 +8,7 @@ import java.util.List;
 
 public class CountUtil {
 
-    private static final Logger logger = Logger.getLogger(IndexInfoS2T.class);
+    private static final Logger logger = Logger.getLogger(IndexInfo2T.class);
     private static final String totalLog = " The total number of lines in the '%s' is %s, and each thread processes %s, and the remainder is %s";
     private static final String threadLog = " Thread-%s Processing '%s' from line %s, need to process %s.";
 
