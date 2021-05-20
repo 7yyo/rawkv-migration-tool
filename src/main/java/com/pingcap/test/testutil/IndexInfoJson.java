@@ -2,9 +2,11 @@ package com.pingcap.test.testutil;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.RandomAccessFile;
 import java.nio.channels.FileChannel;
 import java.nio.channels.FileLock;
+import java.util.Properties;
 import java.util.Random;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.ForkJoinTask;
@@ -12,19 +14,39 @@ import java.util.concurrent.RecursiveTask;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
+/**
+ * IndexInfoJson.nums= 100000000
+ * IndexInfoJson.eachSlices= 10000000
+ * IndexInfoJson.wrongData= 5000000
+ * IndexInfoJson.jumpType= 5000000
+ * IndexInfoJson.filePathWithOutSuffix= "/Users/weiwei/tmp/jianhang/out";
+ */
 public class IndexInfoJson {
 
-    private static final long INITNUMS = 100000000;
-    private static final long EACH_SLICES = 10000000;
-    private static final int WRONG_DATA = 5000000;
-    private static final int WRONG_DATA_TYPE = 5000000;
+    private static long nums;
+    private static long eachSlices;
+    private static int wrongData;
+    private static int jumpType;
+    private static String filePathWithOutSuffix;
 
-//    private static final long INITNUMS = 100000;
-//    private static final long EACH_SLICES = 20000;
-//    private static final int WRONG_DATA = 5000000;
-//    private static final int WRONG_DATA_TYPE = 5000000;
+    static {
+        try {
+            Properties properties = new Properties();
+            InputStream input = IndexInfoJson.class.getClassLoader().getResourceAsStream("Test.properties");
+            properties.load(input);
+            nums = Long.valueOf(properties.getProperty("IndexInfoJson.nums", "1000000"));
+            eachSlices = Long.valueOf(properties.getProperty("IndexInfoJson.eachSlices", "100000"));
+            wrongData = Integer.parseInt(properties.getProperty("IndexInfoJson.wrongData", "10000"));
+            jumpType = Integer.parseInt(properties.getProperty("IndexInfoJson.jumpType", "10000"));
+            filePathWithOutSuffix = properties.getProperty("IndexInfoJson.filePathWithOutSuffix", "/import");
 
-    private static final String FILE_PATH = "/Users/weiwei/tmp/jianhang/out";
+            System.out.printf("nums: %d \n eachSilices: %d \n wrongData: %d \n jumpType: %d \n filePathWithOutSuffix: %s \n ",
+                    nums,eachSlices,wrongData,jumpType,filePathWithOutSuffix);
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
 
     private static final String TYPE_A001 = "A001";
     private static final String TYPE_B001 = "B001";
@@ -39,14 +61,14 @@ public class IndexInfoJson {
         long now = System.currentTimeMillis();
         try {
             ForkJoinPool pool = new ForkJoinPool();
-            ForkJoinTask<Long> task = pool.submit(new ParallelExecuteCreateDataTask(1, INITNUMS));
+            ForkJoinTask<Long> task = pool.submit(new ParallelExecuteCreateDataTask(1, nums));
             task.get();
             pool.shutdown();
             pool.awaitTermination(Long.MAX_VALUE, TimeUnit.NANOSECONDS);
         } catch (Exception e) {
             System.out.println("create test data error {} " + e);
         }
-        System.out.println(" create test data end  size {" + INITNUMS + "} cost time {" + Long.valueOf(System.currentTimeMillis() - now) + "} ");
+        System.out.println(" create test data end  size {" + nums + "} cost time {" + Long.valueOf(System.currentTimeMillis() - now) + "} ");
         System.out.println(sb.toString());
     }
 
@@ -68,24 +90,24 @@ public class IndexInfoJson {
         }
 
         protected Long compute() {
-            if (endValue - startValue < IndexInfoJson.EACH_SLICES) {
+            if (endValue - startValue < IndexInfoJson.eachSlices) {
                 System.out.println(Thread.currentThread().getName() + " startValue {" + startValue + "} endValue {" + endValue + "} ");
                 AtomicInteger atc_a = new AtomicInteger();
                 AtomicInteger atc_b = new AtomicInteger();
                 AtomicInteger atc_c = new AtomicInteger();
                 AtomicInteger WRONG = new AtomicInteger();
                 try {
-                    String fileFullPath = FILE_PATH + fileId.getAndAdd(1) + ".txt";
+                    String fileFullPath = filePathWithOutSuffix + fileId.getAndAdd(1) + ".txt";
                     File file = getByName(fileFullPath);
                     StringBuilder s = new StringBuilder();
                     long i = startValue;
                     for (; i <= endValue; i++) {
-                        int w_d = r2.nextInt(WRONG_DATA);
+                        int w_d = r2.nextInt(wrongData);
                         if (w_d == 1) {
                             s.append("123 \n");
                             WRONG.addAndGet(1);
                         } else {
-                            int v = r.nextInt(WRONG_DATA_TYPE);
+                            int v = r.nextInt(jumpType);
                             String type = "";
                             if (v == 1) {
                                 atc_a.addAndGet(1);
@@ -96,9 +118,9 @@ public class IndexInfoJson {
                             } else if (v == 3) {
                                 atc_c.addAndGet(1);
                                 type = TYPE_C001;
-                            } else if (v < WRONG_DATA_TYPE * (1 / 3)) {
+                            } else if (v < jumpType * (1 / 3)) {
                                 type = TYPE_A001 + r2.nextInt(1000000);
-                            } else if (v < WRONG_DATA_TYPE * (2 / 3)) {
+                            } else if (v < jumpType * (2 / 3)) {
                                 type = TYPE_B001 + r2.nextInt(1000000);
                             } else {
                                 type = TYPE_C001 + r2.nextInt(1000000);
@@ -132,9 +154,9 @@ public class IndexInfoJson {
                 }
                 return startValue;
             }
-            ParallelExecuteCreateDataTask subTask1 = new ParallelExecuteCreateDataTask(startValue, (startValue + IndexInfoJson.EACH_SLICES - 1));
+            ParallelExecuteCreateDataTask subTask1 = new ParallelExecuteCreateDataTask(startValue, (startValue + IndexInfoJson.eachSlices - 1));
             subTask1.fork();
-            ParallelExecuteCreateDataTask subTask2 = new ParallelExecuteCreateDataTask((startValue + IndexInfoJson.EACH_SLICES), endValue);
+            ParallelExecuteCreateDataTask subTask2 = new ParallelExecuteCreateDataTask((startValue + IndexInfoJson.eachSlices), endValue);
             subTask2.fork();
             return startValue;
         }
