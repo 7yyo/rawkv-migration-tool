@@ -8,7 +8,7 @@
 `importer.out.envId` 环境 id  
 `importer.out.appId` appId  
 `importer.ttl.type` 包含的类型数据不插入 TiKV  
-`importer.ttl.day` TiKV 数据过期时间，单位为高庙
+`importer.ttl.day` TiKV 数据过期时间，单位为 ms
 `importer.tikv.batchSize` 一次 batch put 的数据量
 `importer.tikv.insideThread` 子线程数量
 `importer.tikv.corePoolSize` 主线程核心线程数量  
@@ -16,8 +16,8 @@
 `importer.tikv.checkSumFilePath` checkSum 文件存在的路径  
 `importer.tikv.checkSumDelimiter` checkSum 文件的分隔符，不需要改动  
 `importer.tikv.pd` pd ip 和 port  
-`importer.tikv.checkSumPercentage` checkSum 抽样数据比例，计算公式为 （数据量 / checkSumPercentage）
-`importer.tikv.enabledCheckSum` 是否 checksum，非 0 为checkSum  
+`importer.tikv.checkSumPercentage` checkSum 抽样数据比例，计算公式：数据量/checkSumPercentage。 取余
+`importer.tikv.enabledCheckSum` 是否 checksum，非 0 为 checkSum  
 `importer.timer.interval` 导入进度打印频率，单位为 ms  
 
 # 示例
