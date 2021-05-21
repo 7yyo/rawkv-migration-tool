@@ -1,10 +1,9 @@
-package com.pingcap.test.testutil;
+package com.pingcap.util.dataUtil;
 
-import java.io.File;
-import java.io.IOException;
-import java.io.RandomAccessFile;
+import java.io.*;
 import java.nio.channels.FileChannel;
 import java.nio.channels.FileLock;
+import java.util.Properties;
 import java.util.Random;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.ForkJoinTask;
@@ -12,18 +11,30 @@ import java.util.concurrent.RecursiveTask;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
-public class IndexInfoJson {
+public class TempIndexInfoJsonUtil {
 
-    private static final long INITNUMS = 100000;
-    private static final long EACH_SLICES = 10000;
-    private static final int WRONG_DATA = 5000;
-    private static final int WRONG_DATA_TYPE = 5000;
+    private static long nums;
+    private static long eachSlices;
+    private static int wrongData;
+    private static String filePathWithOutSuffix;
 
-    private static final String FILE_PATH = "src/main/resources/testFile/indexInfoS/import";
+    static {
+        try {
+            Properties properties = new Properties();
+            InputStream input = TempIndexInfoJsonUtil.class.getClassLoader().getResourceAsStream("Test.properties");
+            properties.load(input);
+            nums = Long.valueOf(properties.getProperty("TempIndexInfoTest.nums", "1000000"));
+            eachSlices = Long.valueOf(properties.getProperty("TempIndexInfoTest.eachSlices", "100000"));
+            wrongData = Integer.parseInt(properties.getProperty("TempIndexInfoTest.wrongData", "10000"));
+            filePathWithOutSuffix = properties.getProperty("TempIndexInfoTest.filePathWithOutSuffix", "/tempIndex");
 
-    private static final String TYPE_A001 = "A001";
-    private static final String TYPE_B001 = "B001";
-    private static final String TYPE_C001 = "C001";
+            System.out.printf("nums: %d \n eachSilices: %d \n wrongData: %d \n filePathWithOutSuffix: %s \n ",
+                    nums, eachSlices, wrongData, filePathWithOutSuffix);
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
 
     private static StringBuffer sb = new StringBuffer();
 
@@ -34,14 +45,14 @@ public class IndexInfoJson {
         long now = System.currentTimeMillis();
         try {
             ForkJoinPool pool = new ForkJoinPool();
-            ForkJoinTask<Long> task = pool.submit(new ParallelExecuteCreateDataTask(1, INITNUMS));
+            ForkJoinTask<Long> task = pool.submit(new ParallelExecuteCreateDataTask(1, nums));
             task.get();
             pool.shutdown();
             pool.awaitTermination(Long.MAX_VALUE, TimeUnit.NANOSECONDS);
         } catch (Exception e) {
             System.out.println("create test data error {} " + e);
         }
-        System.out.println(" create test data end  size {" + INITNUMS + "} cost time {" + Long.valueOf(System.currentTimeMillis() - now) + "} ");
+        System.out.println(" create test data end  size {" + nums + "} cost time {" + Long.valueOf(System.currentTimeMillis() - now) + "} ");
         System.out.println(sb.toString());
     }
 
@@ -50,8 +61,6 @@ public class IndexInfoJson {
 
         private static final long serialVersionUID = 1L;
         private static Random r = new Random();
-
-        private static Random r2 = new Random();
 
         private long startValue;
 
@@ -63,53 +72,23 @@ public class IndexInfoJson {
         }
 
         protected Long compute() {
-            if (endValue - startValue < IndexInfoJson.EACH_SLICES) {
+            if (endValue - startValue < TempIndexInfoJsonUtil.eachSlices) {
                 System.out.println(Thread.currentThread().getName() + " startValue {" + startValue + "} endValue {" + endValue + "} ");
-                AtomicInteger atc_a = new AtomicInteger();
-                AtomicInteger atc_b = new AtomicInteger();
-                AtomicInteger atc_c = new AtomicInteger();
                 AtomicInteger WRONG = new AtomicInteger();
                 try {
-                    String fileFullPath = FILE_PATH + fileId.getAndAdd(1) + ".txt";
+                    String fileFullPath = filePathWithOutSuffix + fileId.getAndAdd(1) + ".txt";
                     File file = getByName(fileFullPath);
                     StringBuilder s = new StringBuilder();
                     long i = startValue;
                     for (; i <= endValue; i++) {
-                        int w_d = r2.nextInt(WRONG_DATA);
+                        int w_d = r.nextInt(wrongData);
                         if (w_d == 1) {
-                            s.append("123 \n");
+                            s.append("tempIndexWrongData \n");
                             WRONG.addAndGet(1);
                         } else {
-                            int v = r.nextInt(WRONG_DATA_TYPE);
-                            String type = "";
-                            if (v == 1) {
-                                atc_a.addAndGet(1);
-                                type = TYPE_A001;
-                            } else if (v == 2) {
-                                atc_b.addAndGet(1);
-                                type = TYPE_B001;
-                            } else if (v == 3) {
-                                atc_c.addAndGet(1);
-                                type = TYPE_C001;
-                            } else if (v < WRONG_DATA_TYPE * (1 / 3)) {
-                                type = TYPE_A001 + r2.nextInt(1000000);
-                            } else if (v < WRONG_DATA_TYPE * (2 / 3)) {
-                                type = TYPE_B001 + r2.nextInt(1000000);
-                            } else {
-                                type = TYPE_C001 + r2.nextInt(1000000);
-                            }
-
                             s.append("{\"id\":\"" +
-                                    ("" + i) +
-                                    "\"" +
-                                    ",\"type\":\"" +
-                                    type +
-                                    "\"" +
-                                    ",\"envid\":\"pf01\",\"appid\":\"ADP012bfe33b08b\",\"createtime\":\"" +
-                                    "2020-11-04T17:12:04Z" +
-                                    "\",\"servicetag\":\"{\\\"ACCT_DTL_TYPE\\\":\\\"SP0001\\\",\\\"PD_SALE_FTA_CD\\\":\\\"99\\\",\\\"AR_ID\\\":\\\"\\\",\\\"CMTRST_CST_ACCNO\\\":\\\"\\\",\\\"QCRCRD_IND\\\":\\\" \\\",\\\"BLKMDL_ID\\\":\\\"52\\\",\\\"CORPPRVT_FLAG\\\":\\\"1\\\"}\",\"targetid\":\"0037277\",\"updatetime\":\"" +
-                                    "2020-11-04T17:12:04Z" +
-                                    "\"} \n");
+                                    i +
+                                    "\",\"envid\":\"pf01\",\"appid\":\"APD01\",\"targetid\":\"0037033%%ROOM1_APD01_pkax37!!dataSource0\"} \n");
                         }
                         if (i % 10000 == 0) {
                             writeToFile(file, s.toString());
@@ -118,7 +97,7 @@ public class IndexInfoJson {
                     }
                     writeToFile(file, s.toString());
 
-                    sb.append("(" + fileFullPath + ") create test data end WRONG{" + WRONG + "}  A001{" + atc_a.get() + "} B001{" + atc_b.get() + "}  C001{" + atc_c.get() + "} \n");
+                    sb.append("(" + fileFullPath + ") create test data end WRONG{" + WRONG + "}  \n");
 
                 } catch (Exception e) {
                     e.printStackTrace();
@@ -127,9 +106,9 @@ public class IndexInfoJson {
                 }
                 return startValue;
             }
-            ParallelExecuteCreateDataTask subTask1 = new ParallelExecuteCreateDataTask(startValue, (startValue + IndexInfoJson.EACH_SLICES - 1));
+            ParallelExecuteCreateDataTask subTask1 = new ParallelExecuteCreateDataTask(startValue, (startValue + TempIndexInfoJsonUtil.eachSlices - 1));
             subTask1.fork();
-            ParallelExecuteCreateDataTask subTask2 = new ParallelExecuteCreateDataTask((startValue + IndexInfoJson.EACH_SLICES), endValue);
+            ParallelExecuteCreateDataTask subTask2 = new ParallelExecuteCreateDataTask((startValue + TempIndexInfoJsonUtil.eachSlices), endValue);
             subTask2.fork();
             return startValue;
         }
@@ -202,4 +181,5 @@ public class IndexInfoJson {
 
         return file;
     }
+
 }
