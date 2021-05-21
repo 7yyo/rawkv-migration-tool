@@ -1,7 +1,5 @@
 package com.pingcap.util;
 
-import org.apache.log4j.Logger;
-
 import java.io.*;
 import java.util.Properties;
 

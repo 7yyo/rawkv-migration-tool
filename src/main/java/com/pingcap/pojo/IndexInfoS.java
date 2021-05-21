@@ -83,4 +83,14 @@ public class IndexInfoS {
     public void setFileLine(int fileLine) {
         this.fileLine = fileLine;
     }
+
+    public boolean equals(IndexInfoT indexInfoT) {
+        boolean idC = this.id.equals(indexInfoT.getId());
+        String createTime = indexInfoT.getCreateTime().replaceAll("T", " ").replaceAll("Z", "");
+        boolean createTimeC = this.createTime.equals(createTime);
+        boolean serviceTagC = this.serviceTag.trim().equals(indexInfoT.getServiceTag().trim());
+        boolean targetIdC = this.targetId.equals(indexInfoT.getTargetId());
+        boolean typeC = this.type.equals(indexInfoT.getType());
+        return idC & createTimeC && serviceTagC && targetIdC && typeC;
+    }
 }

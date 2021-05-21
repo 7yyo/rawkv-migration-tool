@@ -1,6 +1,7 @@
 package com.pingcap.util;
 
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.*;
 import java.util.*;
@@ -8,7 +9,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public class FileUtil {
 
-    private static final Logger logger = Logger.getLogger(FileUtil.class);
+    private static final Logger logger = LoggerFactory.getLogger("logBackLog");
 
     private static final List<File> list = new ArrayList<>();
     private static final List<File> checkSumList = new ArrayList<>();

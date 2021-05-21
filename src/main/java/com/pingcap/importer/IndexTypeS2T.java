@@ -4,7 +4,8 @@ import com.pingcap.util.FileUtil;
 import com.pingcap.util.PropertiesUtil;
 import com.pingcap.util.TiSessionUtil;
 import org.apache.commons.lang.StringUtils;
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.tikv.common.TiSession;
 import org.tikv.raw.RawKVClient;
 import org.tikv.shade.com.google.protobuf.ByteString;
@@ -17,7 +18,7 @@ import java.util.Properties;
 
 public class IndexTypeS2T {
 
-    private static final Logger logger = Logger.getLogger(IndexTypeS2T.class);
+    private static final Logger logger = LoggerFactory.getLogger("logBackLog");
 
     private static final Properties properties = PropertiesUtil.getProperties();
     private static final String filePath = properties.getProperty("importer.in.filePath");
@@ -62,7 +63,6 @@ public class IndexTypeS2T {
                     } catch (Exception e) {
                         logger.error(String.format("Failed to process key@value string, file='%s', line=%s, k@v='%s'", file, lineNum, line));
                         skipNum++;
-                        continue;
                     }
                 }
                 if (!kvPairs.isEmpty()) {

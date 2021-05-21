@@ -3,7 +3,8 @@ package com.pingcap;
 import com.pingcap.importer.IndexInfo2T;
 import com.pingcap.util.PropertiesUtil;
 import org.apache.commons.lang.StringUtils;
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.Properties;
 
@@ -11,7 +12,7 @@ public class Main {
 
     //    private static final String propertiesPath = System.getProperty("p");
     private static final String propertiesPath = "src/main/resources/importer.properties";
-    private static final Logger logger = Logger.getLogger(Main.class);
+    private static final Logger logger = LoggerFactory.getLogger("logBackLog");
 
     public static void main(String[] args) {
 

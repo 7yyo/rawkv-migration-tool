@@ -7,7 +7,8 @@ import com.pingcap.pojo.IndexInfoT;
 import com.pingcap.pojo.ServiceTag;
 import com.pingcap.util.*;
 import org.apache.commons.lang.StringUtils;
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.tikv.common.TiSession;
 import org.tikv.raw.RawKVClient;
 import org.tikv.shade.com.google.protobuf.ByteString;
@@ -22,7 +23,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 public class IndexInfo2T {
 
-    private static final Logger logger = Logger.getLogger(IndexInfo2T.class);
+    private static final Logger logger = LoggerFactory.getLogger("logBackLog");
 
     public static void RunIndexInfo2T(Properties properties) {
 
@@ -35,10 +36,12 @@ public class IndexInfo2T {
         // Traverse all the files that need to be written.
         List<File> fileList = FileUtil.showFileList(filesPath, false);
 
+        FileUtil.deleteFolder(properties.getProperty("importer.tikv.checkSumFilePath"));
+        FileUtil.deleteFolders(properties.getProperty("importer.tikv.checkSumFilePath"));
+
         // Start the Main thread for each file.showFileList
         ThreadPoolExecutor threadPoolExecutor = ThreadPoolUtil.startJob(corePoolSize, maxPoolSize, "");
         for (File file : fileList) {
-            logger.debug(String.format("Start running the Main thread for [%s]", file.getAbsolutePath()));
             // Pass in the file to be processed and the ttl map.
             // The ttl map is shared by all file threads, because it is a table for processing, which is summarized here.
             threadPoolExecutor.execute(new IndexInfo2TJob(file.getAbsolutePath(), properties));
@@ -58,7 +61,7 @@ public class IndexInfo2T {
 
 class IndexInfo2TJob implements Runnable {
 
-    private static final Logger logger = Logger.getLogger(IndexInfo2TJob.class);
+    private static final Logger logger = LoggerFactory.getLogger("logBackLog");
 
     private final String filePath;
     private final Properties properties;
@@ -93,9 +96,6 @@ class IndexInfo2TJob implements Runnable {
         File file = new File(filePath);
         int lines = FileUtil.getFileLines(file);
         List<String> threadPerLineList = CountUtil.getPerThreadFileLines(lines, insideThread, file.getAbsolutePath());
-
-        FileUtil.deleteFolder(properties.getProperty("importer.tikv.checkSumFilePath"));
-        FileUtil.deleteFolders(properties.getProperty("importer.tikv.checkSumFilePath"));
 
         ThreadPoolExecutor threadPoolExecutor = ThreadPoolUtil.startJob(insideThread, insideThread, file.getName());
         for (String s : threadPerLineList) {
@@ -132,7 +132,8 @@ class BatchPutIndexInfoJob implements Runnable {
     private static final String JSON_FORMAT = "json";
     private static final String ORIGINAL_FORMAT = "original";
 
-    private static final Logger logger = Logger.getLogger(BatchPutIndexInfoJob.class);
+    private static final Logger logger = LoggerFactory.getLogger("logBackLog");
+    private static final Logger auditLog = LoggerFactory.getLogger("auditLog");
 
     private final String filePath;
     private final List<String> ttlTypeList;
@@ -187,10 +188,12 @@ class BatchPutIndexInfoJob implements Runnable {
         String checkSumFilePath = properties.getProperty("importer.tikv.checkSumFilePath");
         String fp = checkSumFilePath.replaceAll("\"", "") + "/" + file.getName().replaceAll("\\.", "") + "/" + Thread.currentThread().getId() + ".txt";
         File checkSumFile = new File(fp);
+
         BufferedWriter bufferedWriter = CheckSumUtil.initCheckSumLog(properties, file, checkSumFile);
 
         for (int m = 0; m < start; m++) {
             try {
+                assert bufferedReader != null;
                 bufferedReader.readLine();
             } catch (IOException e) {
                 e.printStackTrace();
@@ -200,7 +203,7 @@ class BatchPutIndexInfoJob implements Runnable {
         int count = 0;
         int totalCount = 0;
         String line;
-        String indexInfoKey = "";
+        String indexInfoKey;
         JSONObject jsonObject;
         ConcurrentHashMap<ByteString, ByteString> kvPairs = new ConcurrentHashMap<>();
         RawKVClient rawKVClient = tiSession.createRawClient();
@@ -235,7 +238,6 @@ class BatchPutIndexInfoJob implements Runnable {
                                 indexInfoKey = String.format(INDEX_INFO_KET_FORMAT, indexInfoS.getEnvId(), indexInfoS.getType(), indexInfoS.getId());
                             }
                             IndexInfoT indexInfoT = new IndexInfoT();
-                            indexInfoT.setAppId(appId);
                             indexInfoT.setTargetId(indexInfoS.getTargetId());
                             if (StringUtils.isNotBlank(indexInfoS.getServiceTag())) {
                                 indexInfoT.setServiceTag(indexInfoS.getServiceTag());
@@ -245,18 +247,18 @@ class BatchPutIndexInfoJob implements Runnable {
                             logger.debug(String.format(" File: %s - Thread - %s , K: {%s}, V: {%s}", file.getAbsolutePath(), Thread.currentThread().getId(), indexInfoKey, JSONObject.toJSONString(indexInfoT)));
 
                             checkSumDelimiter = properties.getProperty("importer.tikv.checkSumDelimiter");
-                            if (totalCount % checkSumCount == 0) {
-                                bufferedWriter.write(indexInfoKey + checkSumDelimiter + (start + totalCount) + "\n");
-                            }
 
                             key = ByteString.copyFromUtf8(indexInfoKey);
                             value = ByteString.copyFromUtf8(JSONObject.toJSONString(indexInfoT));
 
                         } catch (Exception e) {
                             logger.error(String.format("Failed to parse json, file='%s', json='%s',line=%s,", file, line, start + totalCount));
-                            bufferedWriter.write("Parse ERROR line = [" + line + "]" + checkSumDelimiter + (start + totalCount) + "\n");
+                            bufferedWriter.write("PARSE ERROR line = [" + line + "]" + checkSumDelimiter + (start + totalCount) + "\n");
                             totalParseErrorCount.addAndGet(1);
+                            // if todo_ == totalCount is json failed, batch put
+                            count = PutUtil.batchPut(totalCount, todo, count, batchSize, rawKVClient, kvPairs, file, totalImportCount, totalSkipCount, totalBatchPutFailCount, start + totalCount, mode);
                             continue;
+
                         }
                         break;
 
@@ -264,26 +266,26 @@ class BatchPutIndexInfoJob implements Runnable {
 
                         envId = line.split(delimiter_1)[0];
                         String type = line.split(delimiter_1)[1];
-                        String targetId = line.split(delimiter_1)[2].split(delimiter_2)[0];
+                        String id = line.split(delimiter_1)[2].split(delimiter_2)[0];
 
                         indexInfoS = new IndexInfoS();
-                        indexInfoS.setType(type);
 
                         if (envId != null) {
-                            indexInfoKey = String.format(INDEX_INFO_KET_FORMAT, envId, type, targetId);
+                            indexInfoKey = String.format(INDEX_INFO_KET_FORMAT, envId, type, id);
                         } else {
-                            indexInfoKey = String.format(INDEX_INFO_KET_FORMAT, indexInfoS.getEnvId(), indexInfoS.getType(), indexInfoS.getId());
+                            indexInfoKey = String.format(INDEX_INFO_KET_FORMAT, indexInfoS.getEnvId(), type, id);
                         }
 
                         // TODO
-                        String st = line.split(delimiter_1)[2];
+                        String v = line.split(delimiter_1)[2];
+                        String targetId = v.split(delimiter_2)[0];
                         serviceTag = new ServiceTag();
-                        serviceTag.setBLKMDL_ID(st.split(delimiter_2)[1]);
-                        serviceTag.setPD_SALE_FTA_CD(st.split(delimiter_2)[2]);
-                        serviceTag.setACCT_DTL_TYPE(st.split(delimiter_2)[3]);
-                        serviceTag.setTu_FLAG(st.split(delimiter_2)[4]);
-                        serviceTag.setCMTRST_CST_ACCNO(st.split(delimiter_2)[5]);
-                        serviceTag.setAR_ID(st.split(delimiter_2)[6]);
+                        serviceTag.setBLKMDL_ID(v.split(delimiter_2)[1]);
+                        serviceTag.setPD_SALE_FTA_CD(v.split(delimiter_2)[2]);
+                        serviceTag.setACCT_DTL_TYPE(v.split(delimiter_2)[3]);
+                        serviceTag.setTu_FLAG(v.split(delimiter_2)[4]);
+                        serviceTag.setCMTRST_CST_ACCNO(v.split(delimiter_2)[5]);
+                        serviceTag.setAR_ID(v.split(delimiter_2)[6]);
                         serviceTag.setQCRCRD_IND("");
 
                         String serviceTagJson = JSON.toJSONString(serviceTag);
@@ -303,17 +305,22 @@ class BatchPutIndexInfoJob implements Runnable {
                         return;
                 }
 
+                // Sampling data is written into the check sum file
+                if (totalCount % checkSumCount == 0) {
+                    bufferedWriter.write(indexInfoKey + checkSumDelimiter + (start + totalCount) + "\n");
+                }
+
                 // Skip the type that exists in the tty type map.
                 if (ttlTypeList.contains(indexInfoS.getType())) {
                     ttlTypeCountMap.put(indexInfoS.getType(), ttlTypeCountMap.get(indexInfoS.getType()) + 1);
-                    logger.warn(String.format("Skip key - ttl: %s in '%s',line = %s", indexInfoKey, file.getAbsolutePath(), start + totalCount));
+                    auditLog.warn(String.format("Skip key - ttl: %s in '%s',line = %s", indexInfoKey, file.getAbsolutePath(), start + totalCount));
                     totalSkipCount.addAndGet(1);
                     continue;
                 } else {
                     kvPairs.put(key, value);
                 }
 
-                count = PutUtil.batchPut(totalCount, todo, count, batchSize, rawKVClient, kvPairs, file, totalImportCount, totalSkipCount, totalBatchPutFailCount, start + totalCount);
+                count = PutUtil.batchPut(totalCount, todo, count, batchSize, rawKVClient, kvPairs, file, totalImportCount, totalSkipCount, totalBatchPutFailCount, start + totalCount, mode);
 
             } catch (IOException e) {
                 e.printStackTrace();
@@ -326,7 +333,7 @@ class BatchPutIndexInfoJob implements Runnable {
             e.printStackTrace();
         }
 
-        CheckSumUtil.checkSumIndexInfo(fp, properties.getProperty("importer.tikv.checkSumDelimiter"), tiSession, ttlTypeList.toString(), file);
+        CheckSumUtil.checkSumIndexInfo(fp, checkSumDelimiter, tiSession, file, mode, properties);
 
     }
 

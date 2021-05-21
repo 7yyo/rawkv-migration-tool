@@ -1,6 +1,7 @@
 package com.pingcap.util;
 
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.sql.Time;
 import java.util.Properties;
@@ -10,7 +11,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 public class TimerUtil extends Thread {
 
-    private static final Logger logger = Logger.getLogger(TimerUtil.class);
+    private static final Logger logger = LoggerFactory.getLogger("logBackLog");
 
     private final Properties properties;
 
@@ -18,7 +19,6 @@ public class TimerUtil extends Thread {
     private final int totalLines;
     private final String filePath;
     private String logStr = "";
-    private static String result = "";
 
     public TimerUtil(AtomicInteger totalFileLine, int totalLines, String filePath, Properties properties) {
         this.totalFileLine = totalFileLine;
