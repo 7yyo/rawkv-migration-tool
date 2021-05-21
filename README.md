@@ -1,10 +1,10 @@
 # To Raw KV
 
 `importer.in.filePath`导入文件的文件夹路径  
-`importer.in.mode`导入文件的格式，有 json 和 original 两种  
+`importer.in.mode`导入文件的格式，有 json 和 csv 两种  
 `importer.in.scenes`导入文件的业务，目前有 indexInfo 和 tmpIndexInfo  
-`importer.in.delimiter_1` original 文件的第一类分隔符，不需要改动  
-`importer.in.delimiter_2` original 文件的第二类分隔符，不需要改动  
+`importer.in.delimiter_1` csv 文件的第一类分隔符，不需要改动  
+`importer.in.delimiter_2` csv 文件的第二类分隔符，不需要改动  
 `importer.out.envId` 环境 id  
 `importer.out.appId` appId  
 `importer.ttl.type` 包含的类型数据不插入 TiKV  
