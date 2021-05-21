@@ -2,10 +2,10 @@ package com.pingcap.importer;
 
 import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONObject;
+import com.pingcap.enums.Model;
 import com.pingcap.pojo.IndexInfo;
-import com.pingcap.pojo.ServiceTag;
+import com.pingcap.pojo.TempIndexInfo;
 import com.pingcap.util.*;
-import org.apache.commons.lang.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.tikv.common.TiSession;
@@ -127,10 +127,6 @@ class IndexInfo2TJob implements Runnable {
 
 class BatchPutIndexInfoJob implements Runnable {
 
-    private static final String INDEX_INFO_KET_FORMAT = "indexInfo_:_%s_:_%s_:_%s";
-    private static final String JSON_FORMAT = "json";
-    private static final String ORIGINAL_FORMAT = "original";
-
     private static final Logger logger = LoggerFactory.getLogger("logBackLog");
     private static final Logger auditLog = LoggerFactory.getLogger("auditLog");
 
@@ -181,15 +177,11 @@ class BatchPutIndexInfoJob implements Runnable {
 
         int start = Integer.parseInt(fileBlock.split(",")[0]);
         int todo = Integer.parseInt(fileBlock.split(",")[1]);
-        if (todo == 0) {
-            return;
-        }
 
         String checkSumFilePath = properties.getProperty("importer.tikv.checkSumFilePath");
         String fp = checkSumFilePath.replaceAll("\"", "") + "/" + file.getName().replaceAll("\\.", "") + "/" + Thread.currentThread().getId() + ".txt";
-        File checkSumFile = new File(fp);
 
-        BufferedWriter bufferedWriter = CheckSumUtil.initCheckSumLog(properties, file, checkSumFile);
+        BufferedWriter bufferedWriter = CheckSumUtil.initCheckSumLog(properties, file);
 
         for (int m = 0; m < start; m++) {
             try {
@@ -217,7 +209,6 @@ class BatchPutIndexInfoJob implements Runnable {
 
                 assert bufferedReader != null;
                 line = bufferedReader.readLine();
-                ServiceTag serviceTag;
                 ByteString key = null;
                 ByteString value = null;
 
@@ -225,7 +216,7 @@ class BatchPutIndexInfoJob implements Runnable {
                 String time = simpleDateFormat.format(new Date());
 
                 switch (mode) {
-                    case JSON_FORMAT:
+                    case Model.JSON_FORMAT:
                         checkSumDelimiter = properties.getProperty("importer.tikv.checkSumDelimiter");
                         try {
                             jsonObject = JSONObject.parseObject(line);
@@ -233,12 +224,11 @@ class BatchPutIndexInfoJob implements Runnable {
                             logger.error(String.format("Failed to parse json, file='%s', json='%s',line=%s,", file, line, start + totalCount));
                             totalParseErrorCount.addAndGet(1);
                             // if _todo_ == totalCount in json failed, batch put.
-                            count = PutUtil.batchPut(totalCount, todo, count, batchSize, rawKVClient, kvPairs, file, totalImportCount, totalSkipCount, totalBatchPutFailCount, start + totalCount, mode);
+                            count = PutUtil.batchPut(totalCount, todo, count, batchSize, rawKVClient, kvPairs, file, totalImportCount, totalSkipCount, totalBatchPutFailCount, start + totalCount, properties);
                             continue;
                         }
                         switch (scenes) {
-                            case "indexInfo":
-                                // original indexInfo
+                            case Model.INDEX_INFO:
                                 IndexInfo indexInfoS = JSON.toJavaObject(jsonObject, IndexInfo.class);
                                 // Skip the type that exists in the tty type map.
                                 if (ttlTypeList.contains(indexInfoS.getType())) {
@@ -248,9 +238,9 @@ class BatchPutIndexInfoJob implements Runnable {
                                     continue;
                                 }
                                 if (envId != null) {
-                                    indexInfoKey = String.format(INDEX_INFO_KET_FORMAT, envId, indexInfoS.getType(), indexInfoS.getId());
+                                    indexInfoKey = String.format(IndexInfo.INDEX_INFO_KET_FORMAT, envId, indexInfoS.getType(), indexInfoS.getId());
                                 } else {
-                                    indexInfoKey = String.format(INDEX_INFO_KET_FORMAT, indexInfoS.getEnvId(), indexInfoS.getType(), indexInfoS.getId());
+                                    indexInfoKey = String.format(IndexInfo.INDEX_INFO_KET_FORMAT, indexInfoS.getEnvId(), indexInfoS.getType(), indexInfoS.getId());
                                 }
                                 indexInfoS.setUpdateTime(time);
                                 // TiKV indexInfo
@@ -258,9 +248,25 @@ class BatchPutIndexInfoJob implements Runnable {
                                 key = ByteString.copyFromUtf8(indexInfoKey);
                                 value = ByteString.copyFromUtf8(JSONObject.toJSONString(indexInfoT));
                                 logger.debug(String.format("[%s], K=%s, V={%s}", file.getAbsolutePath(), indexInfoKey, JSONObject.toJSONString(indexInfoT)));
+                                break;
+                            case Model.TEMP_INDEX_INFO:
+                                TempIndexInfo tempIndexInfos = JSON.toJavaObject(jsonObject, TempIndexInfo.class);
+                                if (envId != null) {
+                                    indexInfoKey = String.format(TempIndexInfo.TEMP_INDEX_INFO_KEY_FORMAT, envId, tempIndexInfos.getId());
+                                } else {
+                                    indexInfoKey = String.format(TempIndexInfo.TEMP_INDEX_INFO_KEY_FORMAT, tempIndexInfos.getEnvId(), tempIndexInfos.getId());
+                                }
+                                tempIndexInfos.setAppId(appId);
+                                tempIndexInfos.setTargetId(tempIndexInfos.getTargetId());
+                                // TiKV tempIndexInfo
+                                TempIndexInfo tempIndexInfoT = TempIndexInfo.initTempIndexInfo(tempIndexInfos);
+                                key = ByteString.copyFromUtf8(indexInfoKey);
+                                value = ByteString.copyFromUtf8(JSONObject.toJSONString(tempIndexInfoT));
+                                logger.debug(String.format("[%s], K=%s, V={%s}", file.getAbsolutePath(), indexInfoKey, JSONObject.toJSONString(tempIndexInfoT)));
+                                break;
                         }
                         break;
-                    case ORIGINAL_FORMAT:
+                    case Model.ORIGINAL_FORMAT:
 //                        envId = line.split(delimiter_1)[0];
 //                        String type = line.split(delimiter_1)[1];
 //                        String id = line.split(delimiter_1)[2].split(delimiter_2)[0];
@@ -300,9 +306,10 @@ class BatchPutIndexInfoJob implements Runnable {
                     bufferedWriter.write(indexInfoKey + checkSumDelimiter + (start + totalCount) + "\n");
                 }
 
+                assert key != null;
                 kvPairs.put(key, value);
 
-                count = PutUtil.batchPut(totalCount, todo, count, batchSize, rawKVClient, kvPairs, file, totalImportCount, totalSkipCount, totalBatchPutFailCount, start + totalCount, mode);
+                count = PutUtil.batchPut(totalCount, todo, count, batchSize, rawKVClient, kvPairs, file, totalImportCount, totalSkipCount, totalBatchPutFailCount, start + totalCount, properties);
 
             } catch (IOException e) {
                 e.printStackTrace();
@@ -315,17 +322,27 @@ class BatchPutIndexInfoJob implements Runnable {
             e.printStackTrace();
         }
 
-        switch (scenes) {
-            case "indexInfo":
-                CheckSumUtil.checkSumIndexInfo(fp, checkSumDelimiter, tiSession, file, mode, properties);
-                break;
-            case "tempIndexInfo":
-                System.out.println();
-                break;
-            default:
-                throw new IllegalStateException("Unexpected value: " + scenes);
+        if (!"0".equals(properties.getProperty("importer.tikv.enabledCheckSum"))) {
+            switch (mode) {
+                case Model.JSON_FORMAT:
+                    switch (scenes) {
+                        case Model.INDEX_INFO:
+                            CheckSumUtil.checkSumIndexInfoJson(fp, checkSumDelimiter, tiSession, file);
+                            break;
+                        case Model.TEMP_INDEX_INFO:
+                            CheckSumUtil.checkSumTmpIndexInfoJson(fp, checkSumDelimiter, tiSession, file);
+                            break;
+                        default:
+                            throw new IllegalStateException("Unexpected value: " + scenes);
+                    }
+                    break;
+                case Model.TEMP_INDEX_INFO:
+                    System.out.println();
+                    break;
+                default:
+                    throw new IllegalStateException("Unexpected value: " + mode);
+            }
         }
-
 
     }
 

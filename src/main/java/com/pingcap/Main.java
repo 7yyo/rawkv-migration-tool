@@ -1,5 +1,6 @@
 package com.pingcap;
 
+import com.pingcap.enums.Model;
 import com.pingcap.importer.IndexInfo2T;
 import com.pingcap.util.PropertiesUtil;
 import org.apache.commons.lang.StringUtils;
@@ -17,19 +18,20 @@ public class Main {
     public static void main(String[] args) {
 
         Properties properties = PropertiesUtil.getProperties(propertiesPath);
-        String scenes = properties.getProperty("importer.in.scenes");
-        if (StringUtils.isNotBlank(scenes)) {
-            switch (scenes) {
-                case "indexInfo":
+        String mode = properties.getProperty("importer.in.mode");
+
+        if (StringUtils.isNotBlank(mode)) {
+            switch (mode) {
+                case Model.JSON_FORMAT:
                     IndexInfo2T.RunIndexInfo2T(properties);
                     break;
                 case "tmpIndexInfo":
 
                 default:
-                    logger.error(String.format("Illegal scene [%s]", scenes));
+                    logger.error(String.format("Illegal scene [%s]", mode));
             }
         } else {
-            logger.error("[importer.in.scenes] must not be null!");
+            logger.error("[importer.in.mode] must not be null!");
         }
 
 

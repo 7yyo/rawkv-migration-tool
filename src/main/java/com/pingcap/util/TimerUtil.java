@@ -41,7 +41,7 @@ public class TimerUtil extends Thread {
         timer.schedule(new TimerTask() {
             @Override
             public void run() {
-                logStr = String.format("[%s] %s lines has been imported, [%s/%s], progress %s", filePath, totalFileLine, totalFileLine, totalLines, getResult(totalFileLine.get(), totalLines));
+                logStr = String.format("[%s] [%s/%s], Insert ratio %s", filePath, totalFileLine, totalLines, getResult(totalFileLine.get(), totalLines));
                 logger.info(logStr + "%");
             }
         }, 5000, interval);

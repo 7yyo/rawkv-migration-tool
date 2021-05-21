@@ -4,6 +4,8 @@ import org.apache.commons.lang.StringUtils;
 
 public class IndexInfo {
 
+    public static final String INDEX_INFO_KET_FORMAT = "indexInfo_:_%s_:_%s_:_%s";
+
     private String envId;
     private String type;
     private String id;
@@ -73,6 +75,7 @@ public class IndexInfo {
     public String getUpdateTime() {
         return updateTime;
     }
+
 
     public void setUpdateTime(String updateTime) {
         this.updateTime = updateTime;
