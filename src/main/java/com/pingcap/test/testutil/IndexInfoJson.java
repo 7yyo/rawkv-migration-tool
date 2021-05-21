@@ -14,8 +14,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 public class IndexInfoJson {
 
-    private static final long INITNUMS = 10000;
-    private static final long EACH_SLICES = 1000;
+    private static final long INITNUMS = 100000;
+    private static final long EACH_SLICES = 10000;
     private static final int WRONG_DATA = 5000;
     private static final int WRONG_DATA_TYPE = 5000;
 

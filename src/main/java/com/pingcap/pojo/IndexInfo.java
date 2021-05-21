@@ -1,6 +1,8 @@
 package com.pingcap.pojo;
 
-public class IndexInfoS {
+import org.apache.commons.lang.StringUtils;
+
+public class IndexInfo {
 
     private String envId;
     private String type;
@@ -84,13 +86,22 @@ public class IndexInfoS {
         this.fileLine = fileLine;
     }
 
-    public boolean equals(IndexInfoT indexInfoT) {
-        boolean idC = this.id.equals(indexInfoT.getId());
-        String createTime = indexInfoT.getCreateTime().replaceAll("T", " ").replaceAll("Z", "");
-        boolean createTimeC = this.createTime.equals(createTime);
-        boolean serviceTagC = this.serviceTag.trim().equals(indexInfoT.getServiceTag().trim());
-        boolean targetIdC = this.targetId.equals(indexInfoT.getTargetId());
-        boolean typeC = this.type.equals(indexInfoT.getType());
-        return idC & createTimeC && serviceTagC && targetIdC && typeC;
+    public boolean equals(IndexInfo indexInfo) {
+        boolean idC = this.id.equals(indexInfo.getId());
+        boolean serviceTagC = this.serviceTag.trim().equals(indexInfo.getServiceTag().trim());
+        boolean targetIdC = this.targetId.equals(indexInfo.getTargetId());
+        boolean typeC = this.type.equals(indexInfo.getType());
+        return idC && serviceTagC && targetIdC && typeC;
+    }
+
+    public static IndexInfo initIndexInfoT(IndexInfo indexInfoS, String time) {
+        IndexInfo indexInfo = new IndexInfo();
+        indexInfo.setTargetId(indexInfoS.getTargetId());
+        indexInfo.setAppId(indexInfo.getAppId());
+        if (StringUtils.isNotBlank(indexInfoS.getServiceTag())) {
+            indexInfo.setServiceTag(indexInfoS.getServiceTag());
+        }
+        indexInfo.setUpdateTime(time);
+        return indexInfo;
     }
 }

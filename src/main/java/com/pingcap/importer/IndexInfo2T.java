@@ -2,8 +2,7 @@ package com.pingcap.importer;
 
 import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONObject;
-import com.pingcap.pojo.IndexInfoS;
-import com.pingcap.pojo.IndexInfoT;
+import com.pingcap.pojo.IndexInfo;
 import com.pingcap.pojo.ServiceTag;
 import com.pingcap.util.*;
 import org.apache.commons.lang.StringUtils;
@@ -165,6 +164,7 @@ class BatchPutIndexInfoJob implements Runnable {
         String envId = properties.getProperty("importer.out.envId");
         String appId = properties.getProperty("importer.out.appId");
         String mode = properties.getProperty("importer.in.mode");
+        String scenes = properties.getProperty("importer.in.scenes");
         int batchSize = Integer.parseInt(properties.getProperty("importer.tikv.batchSize"));
         String delimiter_1 = properties.getProperty("importer.in.delimiter_1");
         String delimiter_2 = properties.getProperty("importer.in.delimiter_2");
@@ -203,7 +203,7 @@ class BatchPutIndexInfoJob implements Runnable {
         int count = 0;
         int totalCount = 0;
         String line;
-        String indexInfoKey;
+        String indexInfoKey = null;
         JSONObject jsonObject;
         ConcurrentHashMap<ByteString, ByteString> kvPairs = new ConcurrentHashMap<>();
         RawKVClient rawKVClient = tiSession.createRawClient();
@@ -217,89 +217,79 @@ class BatchPutIndexInfoJob implements Runnable {
 
                 assert bufferedReader != null;
                 line = bufferedReader.readLine();
-
-                IndexInfoS indexInfoS;
                 ServiceTag serviceTag;
-                ByteString key;
-                ByteString value;
+                ByteString key = null;
+                ByteString value = null;
 
                 SimpleDateFormat simpleDateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
                 String time = simpleDateFormat.format(new Date());
 
                 switch (mode) {
                     case JSON_FORMAT:
+                        checkSumDelimiter = properties.getProperty("importer.tikv.checkSumDelimiter");
                         try {
                             jsonObject = JSONObject.parseObject(line);
-                            indexInfoS = JSON.toJavaObject(jsonObject, IndexInfoS.class);
-                            indexInfoS.setUpdateTime(time);
-                            if (envId != null) {
-                                indexInfoKey = String.format(INDEX_INFO_KET_FORMAT, envId, indexInfoS.getType(), indexInfoS.getId());
-                            } else {
-                                indexInfoKey = String.format(INDEX_INFO_KET_FORMAT, indexInfoS.getEnvId(), indexInfoS.getType(), indexInfoS.getId());
-                            }
-                            IndexInfoT indexInfoT = new IndexInfoT();
-                            indexInfoT.setTargetId(indexInfoS.getTargetId());
-                            if (StringUtils.isNotBlank(indexInfoS.getServiceTag())) {
-                                indexInfoT.setServiceTag(indexInfoS.getServiceTag());
-                            }
-                            indexInfoT.setUpdateTime(time);
-                            indexInfoT.setCreateTime(indexInfoS.getCreateTime().replaceAll("T", " ").replaceAll("Z", ""));
-                            logger.debug(String.format(" File: %s - Thread - %s , K: {%s}, V: {%s}", file.getAbsolutePath(), Thread.currentThread().getId(), indexInfoKey, JSONObject.toJSONString(indexInfoT)));
-
-                            checkSumDelimiter = properties.getProperty("importer.tikv.checkSumDelimiter");
-
-                            key = ByteString.copyFromUtf8(indexInfoKey);
-                            value = ByteString.copyFromUtf8(JSONObject.toJSONString(indexInfoT));
-
                         } catch (Exception e) {
                             logger.error(String.format("Failed to parse json, file='%s', json='%s',line=%s,", file, line, start + totalCount));
-                            bufferedWriter.write("PARSE ERROR line = [" + line + "]" + checkSumDelimiter + (start + totalCount) + "\n");
                             totalParseErrorCount.addAndGet(1);
-                            // if todo_ == totalCount is json failed, batch put
+                            // if _todo_ == totalCount in json failed, batch put.
                             count = PutUtil.batchPut(totalCount, todo, count, batchSize, rawKVClient, kvPairs, file, totalImportCount, totalSkipCount, totalBatchPutFailCount, start + totalCount, mode);
                             continue;
-
+                        }
+                        switch (scenes) {
+                            case "indexInfo":
+                                // original indexInfo
+                                IndexInfo indexInfoS = JSON.toJavaObject(jsonObject, IndexInfo.class);
+                                // Skip the type that exists in the tty type map.
+                                if (ttlTypeList.contains(indexInfoS.getType())) {
+                                    ttlTypeCountMap.put(indexInfoS.getType(), ttlTypeCountMap.get(indexInfoS.getType()) + 1);
+                                    auditLog.warn(String.format("Skip key - ttl: %s in '%s',line = %s", indexInfoKey, file.getAbsolutePath(), start + totalCount));
+                                    totalSkipCount.addAndGet(1);
+                                    continue;
+                                }
+                                if (envId != null) {
+                                    indexInfoKey = String.format(INDEX_INFO_KET_FORMAT, envId, indexInfoS.getType(), indexInfoS.getId());
+                                } else {
+                                    indexInfoKey = String.format(INDEX_INFO_KET_FORMAT, indexInfoS.getEnvId(), indexInfoS.getType(), indexInfoS.getId());
+                                }
+                                indexInfoS.setUpdateTime(time);
+                                // TiKV indexInfo
+                                IndexInfo indexInfoT = IndexInfo.initIndexInfoT(indexInfoS, time);
+                                key = ByteString.copyFromUtf8(indexInfoKey);
+                                value = ByteString.copyFromUtf8(JSONObject.toJSONString(indexInfoT));
+                                logger.debug(String.format("[%s], K=%s, V={%s}", file.getAbsolutePath(), indexInfoKey, JSONObject.toJSONString(indexInfoT)));
                         }
                         break;
-
                     case ORIGINAL_FORMAT:
-
-                        envId = line.split(delimiter_1)[0];
-                        String type = line.split(delimiter_1)[1];
-                        String id = line.split(delimiter_1)[2].split(delimiter_2)[0];
-
-                        indexInfoS = new IndexInfoS();
-
-                        if (envId != null) {
-                            indexInfoKey = String.format(INDEX_INFO_KET_FORMAT, envId, type, id);
-                        } else {
-                            indexInfoKey = String.format(INDEX_INFO_KET_FORMAT, indexInfoS.getEnvId(), type, id);
-                        }
-
-                        // TODO
-                        String v = line.split(delimiter_1)[2];
-                        String targetId = v.split(delimiter_2)[0];
-                        serviceTag = new ServiceTag();
-                        serviceTag.setBLKMDL_ID(v.split(delimiter_2)[1]);
-                        serviceTag.setPD_SALE_FTA_CD(v.split(delimiter_2)[2]);
-                        serviceTag.setACCT_DTL_TYPE(v.split(delimiter_2)[3]);
-                        serviceTag.setTu_FLAG(v.split(delimiter_2)[4]);
-                        serviceTag.setCMTRST_CST_ACCNO(v.split(delimiter_2)[5]);
-                        serviceTag.setAR_ID(v.split(delimiter_2)[6]);
-                        serviceTag.setQCRCRD_IND("");
-
-                        String serviceTagJson = JSON.toJSONString(serviceTag);
-
-                        IndexInfoT indexInfoT = new IndexInfoT();
-                        indexInfoT.setAppId(appId);
-                        indexInfoT.setServiceTag(serviceTagJson);
-                        indexInfoT.setTargetId(targetId);
-                        indexInfoT.setUpdateTime(time);
-
-                        key = ByteString.copyFromUtf8(indexInfoKey);
-                        value = ByteString.copyFromUtf8(JSONObject.toJSONString(indexInfoT));
-
-                        break;
+//                        envId = line.split(delimiter_1)[0];
+//                        String type = line.split(delimiter_1)[1];
+//                        String id = line.split(delimiter_1)[2].split(delimiter_2)[0];
+//                        indexInfoS = new IndexInfo();
+//                        if (envId != null) {
+//                            indexInfoKey = String.format(INDEX_INFO_KET_FORMAT, envId, type, id);
+//                        } else {
+//                            indexInfoKey = String.format(INDEX_INFO_KET_FORMAT, indexInfoS.getEnvId(), type, id);
+//                        }
+//                        // TODO
+//                        String v = line.split(delimiter_1)[2];
+//                        String targetId = v.split(delimiter_2)[0];
+//                        serviceTag = new ServiceTag();
+//                        serviceTag.setBLKMDL_ID(v.split(delimiter_2)[1]);
+//                        serviceTag.setPD_SALE_FTA_CD(v.split(delimiter_2)[2]);
+//                        serviceTag.setACCT_DTL_TYPE(v.split(delimiter_2)[3]);
+//                        serviceTag.setTu_FLAG(v.split(delimiter_2)[4]);
+//                        serviceTag.setCMTRST_CST_ACCNO(v.split(delimiter_2)[5]);
+//                        serviceTag.setAR_ID(v.split(delimiter_2)[6]);
+//                        serviceTag.setQCRCRD_IND("");
+//                        String serviceTagJson = JSON.toJSONString(serviceTag);
+//                        IndexInfo indexInfoT = new IndexInfo();
+//                        indexInfoT.setAppId(appId);
+//                        indexInfoT.setServiceTag(serviceTagJson);
+//                        indexInfoT.setTargetId(targetId);
+//                        indexInfoT.setUpdateTime(time);
+//                        key = ByteString.copyFromUtf8(indexInfoKey);
+//                        value = ByteString.copyFromUtf8(JSONObject.toJSONString(indexInfoT));
+//                        break;
                     default:
                         logger.error(String.format("Illegal format: %s", mode));
                         return;
@@ -310,15 +300,7 @@ class BatchPutIndexInfoJob implements Runnable {
                     bufferedWriter.write(indexInfoKey + checkSumDelimiter + (start + totalCount) + "\n");
                 }
 
-                // Skip the type that exists in the tty type map.
-                if (ttlTypeList.contains(indexInfoS.getType())) {
-                    ttlTypeCountMap.put(indexInfoS.getType(), ttlTypeCountMap.get(indexInfoS.getType()) + 1);
-                    auditLog.warn(String.format("Skip key - ttl: %s in '%s',line = %s", indexInfoKey, file.getAbsolutePath(), start + totalCount));
-                    totalSkipCount.addAndGet(1);
-                    continue;
-                } else {
-                    kvPairs.put(key, value);
-                }
+                kvPairs.put(key, value);
 
                 count = PutUtil.batchPut(totalCount, todo, count, batchSize, rawKVClient, kvPairs, file, totalImportCount, totalSkipCount, totalBatchPutFailCount, start + totalCount, mode);
 
@@ -333,7 +315,17 @@ class BatchPutIndexInfoJob implements Runnable {
             e.printStackTrace();
         }
 
-        CheckSumUtil.checkSumIndexInfo(fp, checkSumDelimiter, tiSession, file, mode, properties);
+        switch (scenes) {
+            case "indexInfo":
+                CheckSumUtil.checkSumIndexInfo(fp, checkSumDelimiter, tiSession, file, mode, properties);
+                break;
+            case "tempIndexInfo":
+                System.out.println();
+                break;
+            default:
+                throw new IllegalStateException("Unexpected value: " + scenes);
+        }
+
 
     }
 
