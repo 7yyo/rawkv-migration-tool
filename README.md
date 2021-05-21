@@ -1,58 +1,45 @@
-# Cassandra -> TiKV 数据迁移工具
+# To Raw KV
 
-## 格式需求
+`importer.in.filePath`导入文件的文件夹路径  
+`importer.in.mode`导入文件的格式，有 json 和 original 两种  
+`importer.in.scenes`导入文件的业务，目前有 indexInfo 和 tmpIndexInfo  
+`importer.in.delimiter_1` original 文件的第一类分隔符，不需要改动  
+`importer.in.delimiter_2` original 文件的第二类分隔符，不需要改动  
+`importer.out.envId` 环境 id  
+`importer.out.appId` appId  
+`importer.ttl.type` 包含的类型数据不插入 TiKV  
+`importer.ttl.day` TiKV 数据过期时间，单位为高庙
+`importer.tikv.batchSize` 一次 batch put 的数据量
+`importer.tikv.insideThread` 子线程数量
+`importer.tikv.corePoolSize` 主线程核心线程数量  
+`importer.tikv.maxPoolSize` 主线程最大线程数量    
+`importer.tikv.checkSumFilePath` checkSum 文件存在的路径  
+`importer.tikv.checkSumDelimiter` checkSum 文件的分隔符，不需要改动  
+`importer.tikv.pd` pd ip 和 port  
+`importer.tikv.checkSumPercentage` checkSum 抽样数据比例，计算公式为 （数据量 / checkSumPercentage）
+`importer.tikv.enabledCheckSum` 是否 checksum，非 0 为checkSum  
+`importer.timer.interval` 导入进度打印频率，单位为 ms  
 
-### indexInfo
-#### 导出格式
-```json
-{"id":"1111101","type":"B001","envid":"pf01","appid":"ADP012bfe33b08b","createtime":"2020-11-04T17:12:04Z","servicetag":"{\"ACCT_DTL_TYPE\":\"SP0001\",\"PD_SALE_FTA_CD\":\"99\",\"AR_ID\":\"\",\"CMTRST_CST_ACCNO\":\"\",\"QCRCRD_IND\":\" \",\"BLKMDL_ID\":\"52\",\"CORPPRVT_FLAG\":\"1\"}","targetid":"0037277","updatetime":"2020-11-04T17:12:04Z"}
-```
-#### 导入格式
-```json
-{indexInfo_:_1_:_A00007_:_1111135}
+# 示例
 
-{"appId":"123","serviceTag":"{\"ACCT_DTL_TYPE\":\"SP0006\",\"PD_SALE_FTA_CD\":\"99\",\"AR_ID\":\"\",\"CMTRST_CST_ACCNO\":\"\",\"QCRCRD_IND\":\" \",\"BLKMDL_ID\":\"52\",\"CORPPRVT_FLAG\":\"1\"}","targetId":"0037277","updateTime":"2020-11-04 17:12:04"}
-```
-
-## 配置文件
-### importer.properties
-
-`importer.in.filePath`           导入文件夹路径  
-`importer.out.envId`             如果有配置则覆盖数据文件的 envId  
-`importer.out.appId`             赋值给导入 json  
-`importer.ttl.type`              包含的 ttl type 不会被导入  
-`importer.tikv.corePoolSize`     主线程数量  
-`importer.tikv.maxPoolSize`      主线程数量  
-`importer.tikv.batchSize`        批量插入的数据量  
-`importer.tikv.insideThread`     单个文件内部线程数量  
-`importer.tikv.pd`               pd 的 IP 和端口   
-#### 示例
 ```properties
-importer.in.filePath=src/main/resources/testFile
-importer.out.envId=1
-importer.out.appId=123
+importer.in.filePath=/Users/yuyang/IdeaProjects/tikv_importer/src/Main/resources/testFile/tempIndexInfoJson
+importer.in.mode=json
+importer.in.scenes=tempIndexInfo
+importer.in.delimiter_1=|
+importer.in.delimiter_2=##
+importer.out.envId=00998877
+importer.out.appId=123456789
 importer.ttl.type=A001,B001,C001
-importer.tikv.batchSize=100
-importer.tikv.insideThread=4
+importer.ttl.day=604800000
+importer.tikv.batchSize=200
+importer.tikv.insideThread=10
 importer.tikv.corePoolSize=10
 importer.tikv.maxPoolSize=10
-importer.tikv.pd=172.16.4.33:5555,172.16.4.34:5555,172.16.4.35:5555
-```
-
-## 功能点
-1. TTL Type 跳过导入
-```log
-[2021-05-17 12:12:02.275] [WARN] [BatchPutIndexInfoJob.java:207] [Skip key - ttl: indexInfo_:_1_:_B001_:_1111129 in '/Users/yuyang/IdeaProjects/tikv_importer/src/main/resources/testFile/import.txt']
-```
-2. 已存在数据跳过导入
-```log
-[2021-05-17 12:15:03.434] [WARN] [BatchPutIndexInfoJob.java:250] [Skip key - exists: [ indexInfo_:_1_:_A00006_:_1111148 ], file is [ /Users/yuyang/IdeaProjects/tikv_importer/src/main/resources/testFile/import.txt ]]
-```
-3. JSON 解析失败，打印错误日志，跳过该行继续导入
-```log
-[2021-05-17 12:15:39.023] [ERROR] [BatchPutIndexInfoJob.java:191] [Failed to parse json, file='/Users/yuyang/IdeaProjects/tikv_importer/src/main/resources/testFile/import2.txt', line=1, json='2weq']
-```
-4. 导入完成统计信息，文件总行数，导入行数，跳过行数，导入时间，跳过 ttl 数量
-```log
-[2021-05-17 12:15:40.083] [INFO] [IndexInfoS2TJob.java:112] [Import Report] File->[/Users/yuyang/IdeaProjects/tikv_importer/src/main/resources/testFile/import.txt], Total rows->[50], Imported rows->[43], Skip rows->[7], Duration->[1s], Skip ttl: B001=4,C001=3,A001=0,]
+importer.tikv.checkSumFilePath=/Users/yuyang/checkSum
+importer.tikv.checkSumDelimiter=@#@#@
+importer.tikv.pd=172.16.4.32:5555,172.16.4.33:5555,172.16.4.34:5555,172.16.4.35:5555
+importer.tikv.checkSumPercentage=1
+importer.tikv.enabledCheckSum=0
+importer.timer.interval=20000
 ```
