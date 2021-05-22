@@ -33,7 +33,7 @@ public class IndexInfo2T {
         long startTime = System.currentTimeMillis();
 
         // Traverse all the files that need to be written.
-        List<File> fileList = FileUtil.showFileList(filesPath, false);
+        List<File> fileList = FileUtil.showFileList(filesPath, false, properties);
 
         FileUtil.deleteFolder(properties.getProperty("importer.tikv.checkSumFilePath"));
         FileUtil.deleteFolders(properties.getProperty("importer.tikv.checkSumFilePath"));
@@ -101,7 +101,7 @@ class IndexInfo2TJob implements Runnable {
             threadPoolExecutor.execute(new BatchPutIndexInfoJob(totalImportCount, totalSkipCount, totalParseErrorCount, totalBatchPutFailCount, filePath, ttlTypeList, ttlTypeCountMap, s, properties));
         }
 
-        TimerUtil timerUtil = new TimerUtil(totalImportCount, lines, filePath, properties);
+        ImportTimer timerUtil = new ImportTimer(totalImportCount, lines, filePath, properties);
         timerUtil.start();
 
         threadPoolExecutor.shutdown();
@@ -162,15 +162,18 @@ class BatchPutIndexInfoJob implements Runnable {
         String mode = properties.getProperty("importer.in.mode");
         String scenes = properties.getProperty("importer.in.scenes");
         int batchSize = Integer.parseInt(properties.getProperty("importer.tikv.batchSize"));
-        String delimiter_1 = properties.getProperty("importer.in.delimiter_1");
-        String delimiter_2 = properties.getProperty("importer.in.delimiter_2");
         int checkSumCount = Integer.parseInt(properties.getProperty("importer.tikv.checkSumPercentage"));
+        int isCheckSum = Integer.parseInt(properties.getProperty("importer.tikv.enabledCheckSum"));
 
         File file = new File(filePath);
         BufferedReader bufferedReader = null;
+        FileInputStream fileInputStream = null;
+        BufferedInputStream bufferedInputStream = null;
 
         try {
-            bufferedReader = new BufferedReader(new InputStreamReader(new BufferedInputStream(new FileInputStream(file)), StandardCharsets.UTF_8));
+            fileInputStream = new FileInputStream(file);
+            bufferedInputStream = new BufferedInputStream(fileInputStream);
+            bufferedReader = new BufferedReader(new InputStreamReader(bufferedInputStream, StandardCharsets.UTF_8));
         } catch (FileNotFoundException e) {
             e.printStackTrace();
         }
@@ -181,7 +184,10 @@ class BatchPutIndexInfoJob implements Runnable {
         String checkSumFilePath = properties.getProperty("importer.tikv.checkSumFilePath");
         String fp = checkSumFilePath.replaceAll("\"", "") + "/" + file.getName().replaceAll("\\.", "") + "/" + Thread.currentThread().getId() + ".txt";
 
-        BufferedWriter bufferedWriter = CheckSumUtil.initCheckSumLog(properties, file);
+        BufferedWriter bufferedWriter = null;
+        if (0 != isCheckSum) {
+            bufferedWriter = CheckSumUtil.initCheckSumLog(properties, file);
+        }
 
         for (int m = 0; m < start; m++) {
             try {
@@ -266,7 +272,9 @@ class BatchPutIndexInfoJob implements Runnable {
                                 break;
                         }
                         break;
-                    case Model.ORIGINAL_FORMAT:
+                    case Model.CSV_FORMAT:
+                        String delimiter_1 = properties.getProperty("importer.in.delimiter_1");
+                        String delimiter_2 = properties.getProperty("importer.in.delimiter_2");
 //                        envId = line.split(delimiter_1)[0];
 //                        String type = line.split(delimiter_1)[1];
 //                        String id = line.split(delimiter_1)[2].split(delimiter_2)[0];
@@ -302,8 +310,10 @@ class BatchPutIndexInfoJob implements Runnable {
                 }
 
                 // Sampling data is written into the check sum file
-                if (totalCount % checkSumCount == 0) {
-                    bufferedWriter.write(indexInfoKey + checkSumDelimiter + (start + totalCount) + "\n");
+                if (0 != isCheckSum) {
+                    if (totalCount % checkSumCount == 0) {
+                        bufferedWriter.write(indexInfoKey + checkSumDelimiter + (start + totalCount) + "\n");
+                    }
                 }
 
                 assert key != null;
@@ -316,8 +326,14 @@ class BatchPutIndexInfoJob implements Runnable {
             }
         }
         try {
-            bufferedWriter.flush();
-            bufferedWriter.close();
+            if (0 != isCheckSum) {
+                bufferedWriter.flush();
+                bufferedWriter.close();
+            }
+            assert bufferedReader != null;
+            bufferedReader.close();
+            fileInputStream.close();
+            bufferedInputStream.close();
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -327,10 +343,10 @@ class BatchPutIndexInfoJob implements Runnable {
                 case Model.JSON_FORMAT:
                     switch (scenes) {
                         case Model.INDEX_INFO:
-                            CheckSumUtil.checkSumIndexInfoJson(fp, checkSumDelimiter, tiSession, file);
+                            CheckSumUtil.checkSumIndexInfoJson(fp, checkSumDelimiter, tiSession, file, properties);
                             break;
                         case Model.TEMP_INDEX_INFO:
-                            CheckSumUtil.checkSumTmpIndexInfoJson(fp, checkSumDelimiter, tiSession, file);
+                            CheckSumUtil.checkSumTmpIndexInfoJson(fp, checkSumDelimiter, tiSession, file, properties);
                             break;
                         default:
                             throw new IllegalStateException("Unexpected value: " + scenes);

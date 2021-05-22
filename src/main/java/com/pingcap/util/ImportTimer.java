@@ -9,7 +9,7 @@ import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.atomic.AtomicInteger;
 
-public class TimerUtil extends Thread {
+public class ImportTimer extends Thread {
 
     private static final Logger logger = LoggerFactory.getLogger("logBackLog");
 
@@ -20,17 +20,11 @@ public class TimerUtil extends Thread {
     private final String filePath;
     private String logStr = "";
 
-    public TimerUtil(AtomicInteger totalFileLine, int totalLines, String filePath, Properties properties) {
+    public ImportTimer(AtomicInteger totalFileLine, int totalLines, String filePath, Properties properties) {
         this.totalFileLine = totalFileLine;
         this.totalLines = totalLines;
         this.filePath = filePath;
         this.properties = properties;
-    }
-
-    public static String getResult(int num1, int num2) {
-        java.text.NumberFormat numerator = java.text.NumberFormat.getInstance();
-        numerator.setMaximumFractionDigits(2);
-        return numerator.format((float) num1 / (float) num2 * 100);
     }
 
 
@@ -41,7 +35,7 @@ public class TimerUtil extends Thread {
         timer.schedule(new TimerTask() {
             @Override
             public void run() {
-                logStr = String.format("[%s] [%s/%s], Insert ratio %s", filePath, totalFileLine, totalLines, getResult(totalFileLine.get(), totalLines));
+                logStr = String.format("[%s] [%s/%s], Insert ratio %s", filePath, totalFileLine, totalLines, CountUtil.getPercentage(totalFileLine.get(), totalLines));
                 logger.info(logStr + "%");
             }
         }, 5000, interval);

@@ -15,9 +15,9 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class IndexInfoJsonUtil {
 
     private static final long INITNUMS = 100000;
-    private static final long EACH_SLICES = 10000;
-    private static final int WRONG_DATA = 5000;
-    private static final int WRONG_DATA_TYPE = 5000;
+    private static final long EACH_SLICES = 50000;
+    private static final int WRONG_DATA = 10000;
+    private static final int WRONG_DATA_TYPE = 10000;
 
     private static final String FILE_PATH = "src/main/resources/testFile/indexInfoS/import";
 

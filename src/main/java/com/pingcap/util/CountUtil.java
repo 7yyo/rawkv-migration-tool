@@ -6,6 +6,7 @@ import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class CountUtil {
 
@@ -36,6 +37,12 @@ public class CountUtil {
 //        list.add((dangStart + dangTodo) + "," + remainder);
 //        logger.info(String.format(threadLog, list.size(), fileName, dangStart + dangTodo, remainder));
         return list;
+    }
+
+    public static String getPercentage(int num1, int num2) {
+        java.text.NumberFormat numerator = java.text.NumberFormat.getInstance();
+        numerator.setMaximumFractionDigits(2);
+        return numerator.format((float) num1 / (float) num2 * 100);
     }
 
 }

@@ -12,9 +12,8 @@ import org.tikv.shade.com.google.protobuf.ByteString;
 
 import java.io.*;
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Properties;
+import java.util.*;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class CheckSumUtil {
 
@@ -41,17 +40,21 @@ public class CheckSumUtil {
 
     }
 
-    public static void checkSumIndexInfoJson(String checkSumFilePath, String checkSumDelimiter, TiSession tiSession, File originalFile) {
+    public static void checkSumIndexInfoJson(String checkSumFilePath, String checkSumDelimiter, TiSession tiSession, File originalFile, Properties properties) {
 
-        int totalCheckNum = 0;
-        int checkParseErrorNum = 0;
-        int checkNotInsertErrorNum = 0;
-        int checkFailNum = 0;
-//        checkSumLog.info(String.format("************ Start data verification for [%s] ************", originalFile));
+        checkSumLog.info(String.format("************ Start data verification for [%s] ************", checkSumFilePath));
+
         File checkSumFile = new File(checkSumFilePath);
         BufferedReader originalBufferedReader;
         BufferedReader checkSumBufferedReader;
         RawKVClient rawKVClient = tiSession.createRawClient();
+
+        int checkParseErrorNum = 0;
+        int checkNotInsertErrorNum = 0;
+        int checkFailNum = 0;
+        AtomicInteger totalCheckNum = new AtomicInteger(0);
+
+        int checkSumFileLineNum = FileUtil.getFileLines(checkSumFile);
 
         try {
             // checkSum file buffer reader
@@ -64,8 +67,7 @@ public class CheckSumUtil {
         }
 
         String originalLine = null;
-        ByteString key;
-        int fileLine;
+        ByteString key = null;
         String value;
         JSONObject jsonObject;
         String evnId;
@@ -73,94 +75,112 @@ public class CheckSumUtil {
         String id;
 
 //        checkSumBufferedReader.readLine();
-        int checkSumFileLineNum = FileUtil.getFileLines(checkSumFile);
         int lastFileLine = 0;
 
-        String checkSumFileLine = "";
+        CheckSumTimer checkSumTimer = new CheckSumTimer(checkSumFilePath, totalCheckNum, checkSumFileLineNum, properties);
+        checkSumTimer.start();
 
-        List<IndexInfo> indexInfoSList = new ArrayList<>();
+        String csFileLine = "";
 
-        // Calculate the number of rows span.
-        for (int i = 0; i < checkSumFileLineNum; i++) {
-            // check sum file line
-            try {
-                checkSumFileLine = checkSumBufferedReader.readLine();
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-            totalCheckNum++;
-            key = ByteString.copyFromUtf8(checkSumFileLine.split(checkSumDelimiter)[0]); // key
-            fileLine = Integer.parseInt(checkSumFileLine.split(checkSumDelimiter)[1]); // line in original file
-            // get value from tikv by key
-            value = rawKVClient.get(key).toStringUtf8();
-            if (value.isEmpty()) {
-                checkSumLog.warn(String.format("The key [%s] is not be inserted! Please confirm whether it is incremental data.", key.toStringUtf8()));
-                checkNotInsertErrorNum++;
-                continue;
-            }
-            String keyString = key.toStringUtf8();
-            evnId = keyString.split("_:_")[1];
-            type = keyString.split("_:_")[2];
-            id = keyString.split("_:_")[3];
-            jsonObject = JSONObject.parseObject(value);
-            IndexInfo indexInfo_checkSum = JSON.toJavaObject(jsonObject, IndexInfo.class);
-            indexInfo_checkSum.setEnvId(evnId);
-            indexInfo_checkSum.setType(type);
-            indexInfo_checkSum.setId(id);
-            // row span
-            indexInfo_checkSum.setFileLine(fileLine - lastFileLine);
-            indexInfoSList.add(indexInfo_checkSum);
-            lastFileLine = fileLine;
-        }
+        try {
 
-        for (IndexInfo indexInfo : indexInfoSList) {
-            for (int i = 0; i < indexInfo.getFileLine(); i++) {
-                try {
-                    // read originalLine by rows span
+            int csFileLineNum = 0;
+            String csKey = "";
+
+            for (int i = 0; i < checkSumFileLineNum; i++) {
+                totalCheckNum.addAndGet(1);
+                csFileLine = checkSumBufferedReader.readLine();
+                csKey = csFileLine.split(checkSumDelimiter)[0];
+                csFileLineNum = Integer.parseInt(csFileLine.split(checkSumDelimiter)[1]);
+                int n = csFileLineNum - lastFileLine;
+                for (int j = 0; j < n; j++) {
                     originalLine = originalBufferedReader.readLine();
-                } catch (IOException e) {
-                    e.printStackTrace();
+                }
+                lastFileLine = Integer.parseInt(csFileLine.split(checkSumDelimiter)[1]);
+
+                value = rawKVClient.get(ByteString.copyFromUtf8(csKey)).toStringUtf8();
+
+                if (value.isEmpty()) {
+                    checkSumLog.warn(String.format("The key [%s] is not be inserted! Please confirm whether it is incremental data.", key.toStringUtf8()));
+                    checkNotInsertErrorNum++;
+                    continue;
+                }
+
+                evnId = csKey.split("_:_")[1];
+                type = csKey.split("_:_")[2];
+                id = csKey.split("_:_")[3];
+
+                jsonObject = JSONObject.parseObject(value);
+                IndexInfo indexInfo_checkSum = JSON.toJavaObject(jsonObject, IndexInfo.class);
+                indexInfo_checkSum.setEnvId(evnId);
+                indexInfo_checkSum.setType(type);
+                indexInfo_checkSum.setId(id);
+
+                IndexInfo indexInfo_original;
+                try {
+                    jsonObject = JSONObject.parseObject(originalLine);
+                    indexInfo_original = JSON.toJavaObject(jsonObject, IndexInfo.class);
+                } catch (Exception e) {
+                    checkSumLog.error(String.format("Parse failed! Json = %s", originalLine));
+                    checkParseErrorNum++;
+                    break;
+                }
+                if (!indexInfo_checkSum.equals(indexInfo_original)) {
+                    checkSumLog.error(String.format("Check sum failed! Line = %s", originalLine));
+                    checkFailNum++;
                 }
             }
-            IndexInfo indexInfo_original;
+        } catch (Exception e) {
+            e.printStackTrace();
+        } finally {
             try {
-                jsonObject = JSONObject.parseObject(originalLine);
-                indexInfo_original = JSON.toJavaObject(jsonObject, IndexInfo.class);
-            } catch (Exception e) {
-                checkSumLog.error(String.format("Parse failed! Json = %s", originalLine));
-                checkParseErrorNum++;
-                break;
-            }
-            if (!indexInfo.equals(indexInfo_original)) {
-                checkSumLog.error(String.format("Check sum failed! Line = %s", originalLine));
-                checkFailNum++;
+                originalBufferedReader.close();
+                checkSumBufferedReader.close();
+            } catch (IOException e) {
+                e.printStackTrace();
             }
         }
         checkSumLog.info(String.format("[%s] check sum over! TotalCheckNum[%s], TotalNotInsertNum[%s], TotalParseErrorNum[%s], TotalCheckFailNum[%s]", checkSumFilePath, totalCheckNum, checkNotInsertErrorNum, checkParseErrorNum, checkFailNum));
     }
 
 
-    public static void checkSumTmpIndexInfoJson(String checkSumFilePath, String checkSumDelimiter, TiSession tiSession, File originalFile) {
+    public static void checkSumTmpIndexInfoJson(String checkSumFilePath, String checkSumDelimiter, TiSession
+            tiSession, File originalFile, Properties properties) {
 
         int totalCheckNum = 0;
         int checkParseErrorNum = 0;
         int checkNotInsertErrorNum = 0;
         int checkFailNum = 0;
-//        checkSumLog.info(String.format("************ Start data verification for [%s] ************", originalFile));
+
+        checkSumLog.info(String.format("************ Start data verification for [%s] ************", originalFile));
         File checkSumFile = new File(checkSumFilePath);
         BufferedReader originalBufferedReader;
         BufferedReader checkSumBufferedReader;
         RawKVClient rawKVClient = tiSession.createRawClient();
 
+        FileInputStream checkSumFileInputStream = null;
+        FileInputStream originalFileInputStream = null;
+        BufferedInputStream checkSumBufferedInputStream = null;
+        BufferedInputStream originalBufferedInputStream = null;
+        InputStreamReader checkSumInputStreamReader = null;
+        InputStreamReader originalInputStreamReader = null;
+
         try {
-            // checkSum file buffer reader
-            checkSumBufferedReader = new BufferedReader(new InputStreamReader(new BufferedInputStream(new FileInputStream(checkSumFile)), StandardCharsets.UTF_8));
-            // original file buffer reader
-            originalBufferedReader = new BufferedReader(new InputStreamReader(new BufferedInputStream(new FileInputStream(originalFile)), StandardCharsets.UTF_8));
+            checkSumFileInputStream = new FileInputStream(checkSumFile);
+            originalFileInputStream = new FileInputStream(originalFile);
+            checkSumBufferedInputStream = new BufferedInputStream(checkSumFileInputStream);
+            originalBufferedInputStream = new BufferedInputStream(originalFileInputStream);
+            checkSumInputStreamReader = new InputStreamReader(checkSumBufferedInputStream);
+            originalInputStreamReader = new InputStreamReader(originalBufferedInputStream);
+
         } catch (FileNotFoundException e) {
-            checkSumLog.error("Failed to read the original/checkSum file");
-            return;
+            e.printStackTrace();
         }
+
+        // checkSum file buffer reader
+        checkSumBufferedReader = new BufferedReader(checkSumInputStreamReader);
+        // original file buffer reader
+        originalBufferedReader = new BufferedReader(originalInputStreamReader);
 
         String originalLine = null;
         ByteString key;
@@ -234,6 +254,18 @@ public class CheckSumUtil {
             }
         }
         checkSumLog.info(String.format("[%s] check sum over! TotalCheckNum[%s], TotalNotInsertNum[%s], TotalParseErrorNum[%s], TotalCheckFailNum[%s]", checkSumFilePath, totalCheckNum, checkNotInsertErrorNum, checkParseErrorNum, checkFailNum));
+        try {
+            checkSumFileInputStream.close();
+            originalFileInputStream.close();
+            checkSumBufferedInputStream.close();
+            originalBufferedInputStream.close();
+            checkSumInputStreamReader.close();
+            originalInputStreamReader.close();
+            checkSumBufferedReader.close();
+            originalBufferedReader.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 
 }

@@ -15,8 +15,6 @@ public class FileUtil {
     private static final List<File> checkSumList = new ArrayList<>();
     private static final List<File> deleteFileList = new ArrayList<>();
 
-    private static final Properties properties = PropertiesUtil.getProperties();
-
     public static List<File> loadDirectory(File fileList, boolean isCheckSum) {
         File[] files = fileList.listFiles();
         if (files == null) {
@@ -70,7 +68,7 @@ public class FileUtil {
         return ttlTypeCountMap;
     }
 
-    public static List<File> showFileList(String filePath, boolean isCheckSum) {
+    public static List<File> showFileList(String filePath, boolean isCheckSum, Properties properties) {
         if (!isCheckSum) {
             logger.info("Welcome to to_tikv.");
             logger.info(String.format("Properties=%s", properties));

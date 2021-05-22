@@ -2,6 +2,7 @@ package com.pingcap;
 
 import com.pingcap.enums.Model;
 import com.pingcap.importer.IndexInfo2T;
+import com.pingcap.importer.IndexType2T;
 import com.pingcap.util.PropertiesUtil;
 import org.apache.commons.lang.StringUtils;
 import org.slf4j.Logger;
@@ -25,8 +26,11 @@ public class Main {
                 case Model.JSON_FORMAT:
                     IndexInfo2T.RunIndexInfo2T(properties);
                     break;
-                case "tmpIndexInfo":
-
+                case Model.TEMP_INDEX_INFO:
+                    logger.info("tmpIndexInfo");
+                    break;
+                case Model.INDEX_TYPE:
+                    IndexType2T.RunIndexInfo2T(properties);
                 default:
                     logger.error(String.format("Illegal scene [%s]", mode));
             }

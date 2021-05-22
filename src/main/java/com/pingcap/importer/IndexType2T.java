@@ -16,19 +16,17 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Properties;
 
-public class IndexTypeS2T {
+public class IndexType2T {
 
     private static final Logger logger = LoggerFactory.getLogger("logBackLog");
-
-    private static final Properties properties = PropertiesUtil.getProperties();
-    private static final String filePath = properties.getProperty("importer.in.filePath");
-
-    private static final TiSession tiSession = TiSessionUtil.getTiSession(properties);
     private static final HashMap<ByteString, ByteString> kvPairs = new HashMap<>();
 
-    public static void main(String[] args) {
+    public static void RunIndexInfo2T(Properties properties) {
 
-        List<File> fileList = FileUtil.showFileList(filePath,false);
+        String filePath = properties.getProperty("importer.in.filePath");
+        TiSession tiSession = TiSessionUtil.getTiSession(properties);
+
+        List<File> fileList = FileUtil.showFileList(filePath, false, properties);
         RawKVClient rawKVClient = tiSession.createRawClient();
 
         BufferedReader bufferedReader = null;
