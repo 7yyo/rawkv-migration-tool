@@ -3,14 +3,14 @@
 
     <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
         <encoder>
-            <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+            <pattern>%d{HH:mm:ss.SSS} %-5level %logger{36} - %msg%n</pattern>
         </encoder>
     </appender>
 
     <!-- mac -->
-    <appender name="logBack" class="ch.qos.logback.core.rolling.RollingFileAppender">
+    <appender name="log" class="ch.qos.logback.core.rolling.RollingFileAppender">
         <encoder>
-            <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+            <pattern>%d{HH:mm:ss.SSS} %-5level %logger{36} - %msg%n</pattern>
             <charset>utf-8</charset>
         </encoder>
         <file>/Users/yuyang/log/toTiKV.log</file>
@@ -23,7 +23,7 @@
     </appender>
     <appender name="audit" class="ch.qos.logback.core.rolling.RollingFileAppender">
         <encoder>
-            <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+            <pattern>%d{HH:mm:ss.SSS} %-5level %logger{36} - %msg%n</pattern>
             <charset>utf-8</charset>
         </encoder>
         <file>/Users/yuyang/log/audit.log</file>
@@ -36,7 +36,7 @@
     </appender>
     <appender name="checkSum" class="ch.qos.logback.core.rolling.RollingFileAppender">
         <encoder>
-            <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+            <pattern>%d{HH:mm:ss.SSS} %-5level %logger{36} - %msg%n</pattern>
             <charset>utf-8</charset>
         </encoder>
         <file>/Users/yuyang/log/checkSum.log</file>
@@ -50,7 +50,7 @@
 
 
     <!-- linux -->
-    <!--<appender name="logBack" class="ch.qos.logback.core.rolling.RollingFileAppender">
+    <!--<appender name="log" class="ch.qos.logback.core.rolling.RollingFileAppender">
         <encoder>
             <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
             <charset>utf-8</charset>
@@ -90,8 +90,8 @@
         </triggeringPolicy>
     </appender>-->
 
-    <logger name="logBackLog" level="INFO" additivity="true">
-        <appender-ref ref="logBack"/>
+    <logger name="logger" level="INFO" additivity="true">
+        <appender-ref ref="log"/>
     </logger>
 
     <logger name="auditLog" level="INFO" additivity="true">

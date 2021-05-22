@@ -2,6 +2,7 @@ package com.pingcap.util;
 
 import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONObject;
+import com.pingcap.enums.Model;
 import com.pingcap.pojo.IndexInfo;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.LineIterator;
@@ -17,130 +18,154 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 public class CheckSumUtil {
 
-    private static final Logger logger = LoggerFactory.getLogger("logBackLog");
-    private static final Logger checkSumLog = LoggerFactory.getLogger("checkSumLog");
+    private static final Logger logger = LoggerFactory.getLogger(Model.LOG);
+    private static final Logger checkSumLog = LoggerFactory.getLogger(Model.CHECK_SUM_LOG);
 
-    public static BufferedWriter initCheckSumLog(Properties properties, File file) {
+    public static BufferedWriter initCheckSumLog(Properties properties, File originalFile) {
 
-        String checkSumFilePath = properties.getProperty("importer.tikv.checkSumFilePath");
+        String checkSumFilePath = properties.getProperty(Model.CHECK_SUM_FILE_PATH);
         BufferedWriter bufferedWriter = null;
+        String checkSumFileName = checkSumFilePath.replaceAll("\"", "") + "/" + originalFile.getName().replaceAll("\\.", "") + "/" + Thread.currentThread().getId() + ".txt";
+        File checkSumFile = new File(checkSumFileName);
 
         try {
-            String fp = checkSumFilePath.replaceAll("\"", "") + "/" + file.getName().replaceAll("\\.", "") + "/" + Thread.currentThread().getId() + ".txt";
-            File f = new File(fp);
-            f.getParentFile().mkdirs();
-            f.createNewFile();
-            FileWriter fileWriter = new FileWriter(f, true);
+            checkSumFile.getParentFile().mkdirs();
+            checkSumFile.createNewFile();
+            FileWriter fileWriter = new FileWriter(checkSumFile, true);
             bufferedWriter = new BufferedWriter(fileWriter);
-//            bufferedWriter.write(file.getAbsolutePath() + "\n");
+            bufferedWriter.write(originalFile.getAbsolutePath() + "\n");
             bufferedWriter.flush();
         } catch (IOException e) {
             e.printStackTrace();
         }
         return bufferedWriter;
-
     }
 
-    public static void checkSumIndexInfoJson(String checkSumFilePath, String checkSumDelimiter, TiSession tiSession, File originalFile, Properties properties) {
+    public static void checkSumIndexInfoJson(String checkSumFilePath, String checkSumDelimiter, TiSession tiSession, Properties properties) {
 
         logger.info(String.format("************ Start data verification for [%s] ************", checkSumFilePath));
+
         int checkParseErrorNum = 0;
         int checkNotInsertErrorNum = 0;
         int checkFailNum = 0;
+        long interval = Long.parseLong(properties.getProperty(Model.TIMER_INTERVAL));
 
         File checkSumFile = new File(checkSumFilePath);
+
         RawKVClient rawKVClient = tiSession.createRawClient();
         AtomicInteger totalCheckNum = new AtomicInteger(0);
 
+        Timer timer = new Timer();
         int checkSumFileLineNum = FileUtil.getFileLines(checkSumFile);
+        CheckSumTimer checkSumTimer = new CheckSumTimer(checkSumFilePath, totalCheckNum, checkSumFileLineNum - 1);
+        timer.schedule(checkSumTimer, 5000, interval);
 
-        String originalLine = null;
-        String value;
+        String originalFilePath = "";
+        LineIterator checkSumFileIt = null;
+        try {
+            checkSumFileIt = FileUtils.lineIterator(checkSumFile, "UTF-8");
+            if (checkSumFileIt.hasNext()) {
+                // The first line of the check sum file is the path of the corresponding original data file.
+                originalFilePath = checkSumFileIt.nextLine();
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        LineIterator originalFileIt = null;
+        File originalFile = new File(originalFilePath);
+        try {
+            originalFileIt = FileUtils.lineIterator(originalFile, "UTF-8");
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+
         JSONObject jsonObject;
         String evnId;
         String type;
         String id;
 
-        int lastFileLine = 0;
 
-        Timer timer = new Timer();
-        CheckSumTimer checkSumTimer = new CheckSumTimer(checkSumFilePath, totalCheckNum, checkSumFileLineNum);
-        timer.schedule(checkSumTimer, 5000, Long.parseLong(properties.getProperty("importer.timer.interval")));
-
+        String originalLine = "";
         String csFileLine = "";
-
-        try {
-
-            int csFileLineNum = 0;
-            String csKey = "";
-
-            LineIterator checkSumFileIt = FileUtils.lineIterator(checkSumFile, "UTF-8");
-            LineIterator originalFileIt = FileUtils.lineIterator(originalFile, "UTF-8");
+        String csKey;
+        int csFileLineNum;
+        int lastFileLine = 0;
+        String value;
+        while (checkSumFileIt.hasNext()) {
+            int originalLineNum = 0;
+            // Total check num
+            totalCheckNum.addAndGet(1);
             try {
-                while (checkSumFileIt.hasNext()) {
-                    int originalLineNum = 0;
-                    totalCheckNum.addAndGet(1);
-                    try {
-                        csFileLine = checkSumFileIt.nextLine();
-                        csKey = csFileLine.split(checkSumDelimiter)[0];
-                        csFileLineNum = Integer.parseInt(csFileLine.split(checkSumDelimiter)[1]);
-                    } catch (Exception e) {
-                        checkParseErrorNum++;
-                        checkSumLog.error(String.format("Parse failed! Line = %s", csFileLine));
-                        continue;
-                    }
-
-                    int n = csFileLineNum - lastFileLine;
-                    while (originalFileIt.hasNext()) {
-                        originalLine = originalFileIt.nextLine();
-                        if (++originalLineNum == n) {
-                            break;
-                        }
-                    }
-
-                    lastFileLine = Integer.parseInt(csFileLine.split(checkSumDelimiter)[1]);
-                    value = rawKVClient.get(ByteString.copyFromUtf8(csKey)).toStringUtf8();
-
-                    if (value.isEmpty()) {
-                        checkSumLog.warn(String.format("The key [%s] is not be inserted! Please confirm whether it is incremental data.", csKey));
-                        checkNotInsertErrorNum++;
-                        continue;
-                    }
-
-                    evnId = csKey.split("_:_")[1];
-                    type = csKey.split("_:_")[2];
-                    id = csKey.split("_:_")[3];
-
-                    jsonObject = JSONObject.parseObject(value);
-                    IndexInfo indexInfo_checkSum = JSON.toJavaObject(jsonObject, IndexInfo.class);
-                    indexInfo_checkSum.setEnvId(evnId);
-                    indexInfo_checkSum.setType(type);
-                    indexInfo_checkSum.setId(id);
-
-                    IndexInfo indexInfo_original;
-                    try {
-                        jsonObject = JSONObject.parseObject(originalLine);
-                        indexInfo_original = JSON.toJavaObject(jsonObject, IndexInfo.class);
-                    } catch (Exception e) {
-                        checkSumLog.error(String.format("Parse failed! Line = %s", originalLine));
-                        checkParseErrorNum++;
-                        continue;
-                    }
-                    if (!indexInfo_checkSum.equals(indexInfo_original)) {
-                        checkSumLog.error(String.format("Check sum failed! Line = %s", originalLine));
-                        checkFailNum++;
-                    }
-
-                }
-            } finally {
-                LineIterator.closeQuietly(checkSumFileIt);
-                LineIterator.closeQuietly(originalFileIt);
+                csFileLine = checkSumFileIt.nextLine();
+                csKey = csFileLine.split(checkSumDelimiter)[0];
+                csFileLineNum = Integer.parseInt(csFileLine.split(checkSumDelimiter)[1]);
+            } catch (Exception e) {
+                // Illegal format
+                checkParseErrorNum++;
+                checkSumLog.error(String.format("The check sum file data line has an illegal format! Line=%s", csFileLine));
+                continue;
             }
-            timer.cancel();
-            logger.info(String.format("[%s] check sum over! TotalCheckNum[%s], TotalNotInsertNum[%s], TotalParseErrorNum[%s], TotalCheckFailNum[%s]", checkSumFilePath, totalCheckNum, checkNotInsertErrorNum, checkParseErrorNum, checkFailNum));
-        } catch (IOException e) {
-            e.printStackTrace();
+
+            int rowSpan = csFileLineNum - lastFileLine;
+
+            while (originalFileIt.hasNext()) {
+                originalLine = originalFileIt.nextLine();
+                if (++originalLineNum == rowSpan) {
+                    break;
+                }
+            }
+
+            lastFileLine = Integer.parseInt(csFileLine.split(checkSumDelimiter)[1]);
+            // Get value by key
+            value = rawKVClient.get(ByteString.copyFromUtf8(csKey)).toStringUtf8();
+            if (value.isEmpty()) {
+                checkSumLog.warn(String.format("The key [%s] is not be inserted! Please confirm whether it is incremental data.", csKey));
+                checkNotInsertErrorNum++;
+                continue;
+            }
+
+            evnId = csKey.split("_:_")[1];
+            type = csKey.split("_:_")[2];
+            id = csKey.split("_:_")[3];
+
+            IndexInfo indexInfo_checkSum;
+            try {
+                jsonObject = JSONObject.parseObject(value);
+                indexInfo_checkSum = JSON.toJavaObject(jsonObject, IndexInfo.class);
+            } catch (Exception e) {
+                checkSumLog.error(String.format("Parse failed! Line = %s", value));
+                checkParseErrorNum++;
+                continue;
+            }
+            IndexInfo indexInfo_original;
+            try {
+                jsonObject = JSONObject.parseObject(originalLine);
+                indexInfo_original = JSON.toJavaObject(jsonObject, IndexInfo.class);
+            } catch (Exception e) {
+                checkSumLog.error(String.format("Parse failed! Line = %s", originalLine));
+                checkParseErrorNum++;
+                continue;
+            }
+
+            indexInfo_checkSum.setEnvId(evnId);
+            indexInfo_checkSum.setType(type);
+            indexInfo_checkSum.setId(id);
+
+            if (!indexInfo_checkSum.equals(indexInfo_original)) {
+                checkSumLog.error(String.format("Check sum failed! Line = %s", originalLine));
+                checkFailNum++;
+            }
+
         }
+
+        LineIterator.closeQuietly(checkSumFileIt);
+        LineIterator.closeQuietly(originalFileIt);
+
+        timer.cancel();
+
+        logger.info(String.format("[%s] check sum over! TotalCheckNum[%s], TotalNotInsertNum[%s], TotalParseErrorNum[%s], TotalCheckFailNum[%s]", checkSumFilePath, totalCheckNum, checkNotInsertErrorNum, checkParseErrorNum, checkFailNum));
     }
 
 

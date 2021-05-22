@@ -14,12 +14,12 @@ public class Main {
 
     //    private static final String propertiesPath = System.getProperty("p");
     private static final String propertiesPath = "src/main/resources/importer.properties";
-    private static final Logger logger = LoggerFactory.getLogger("logBackLog");
+    private static final Logger logger = LoggerFactory.getLogger(Model.LOG);
 
     public static void main(String[] args) {
 
         Properties properties = PropertiesUtil.getProperties(propertiesPath);
-        String mode = properties.getProperty("importer.in.mode");
+        String mode = properties.getProperty(Model.MODE);
 
         if (StringUtils.isNotBlank(mode)) {
             switch (mode) {
@@ -37,7 +37,6 @@ public class Main {
         } else {
             logger.error("[importer.in.mode] must not be null!");
         }
-
 
     }
 

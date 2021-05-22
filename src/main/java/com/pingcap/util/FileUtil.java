@@ -1,5 +1,6 @@
 package com.pingcap.util;
 
+import com.pingcap.enums.Model;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -9,11 +10,10 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public class FileUtil {
 
-    private static final Logger logger = LoggerFactory.getLogger("logBackLog");
+    private static final Logger logger = LoggerFactory.getLogger(Model.LOG);
 
     private static final List<File> list = new ArrayList<>();
     private static final List<File> checkSumList = new ArrayList<>();
-    private static final List<File> deleteFileList = new ArrayList<>();
 
     public static List<File> loadDirectory(File fileList, boolean isCheckSum) {
         File[] files = fileList.listFiles();

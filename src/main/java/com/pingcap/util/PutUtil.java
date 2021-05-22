@@ -14,22 +14,21 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 public class PutUtil {
 
-    private static final Logger logger = LoggerFactory.getLogger("logBackLog");
-    private static final Logger auditLog = LoggerFactory.getLogger("auditLog");
+    private static final Logger logger = LoggerFactory.getLogger(Model.LOG);
+    private static final Logger auditLog = LoggerFactory.getLogger(Model.AUDIT_LOG);
 
     public static int batchPut(int totalCount, int todo, int count, int batchSize, RawKVClient rawKVClient, ConcurrentHashMap<ByteString, ByteString> kvPairs, File file, AtomicInteger totalLineCount, AtomicInteger totalSkipCount, AtomicInteger totalBatchPutFailCount, int totalLine, Properties properties) {
 
         if (totalCount == todo || count == batchSize) {
 
-            String mode = properties.getProperty("importer.in.mode");
-            String scenes = properties.getProperty("importer.in.scenes");
-            Long ttl = Long.valueOf(properties.getProperty("importer.ttl.day"));
+            String mode = properties.getProperty(Model.MODE);
+            String scenes = properties.getProperty(Model.SCENES);
+            long ttl = Long.parseLong(properties.getProperty(Model.TTL_DAY));
 
             if (Model.JSON_FORMAT.equals(mode)) { // Only json file skip exists key.
 
                 List<ByteString> list = new ArrayList<>();
-
-                if ("1".equals(properties.getProperty("importer.tikv.deleteForTest"))) {
+                if ("1".equals(properties.getProperty(Model.DELETE_FOR_TEST))) {
                     for (Map.Entry<ByteString, ByteString> item : kvPairs.entrySet()) {
                         list.add(item.getKey());
                     }

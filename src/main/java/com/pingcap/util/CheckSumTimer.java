@@ -1,5 +1,6 @@
 package com.pingcap.util;
 
+import com.pingcap.enums.Model;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -8,9 +9,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 public class CheckSumTimer extends TimerTask {
 
-    private static final Logger logger = LoggerFactory.getLogger("checkSumLog");
-
-    private String logStr = "";
+    private static final Logger logger = LoggerFactory.getLogger(Model.LOG);
 
     private final String filePath;
     private final AtomicInteger totalCheckNum;
@@ -23,7 +22,7 @@ public class CheckSumTimer extends TimerTask {
     }
 
     public void run() {
-        logStr = String.format("[%s] [%s/%s], Check sum ratio %s", filePath, totalCheckNum, totalFileNum, CountUtil.getPercentage(totalCheckNum.get(), totalFileNum));
+        String logStr = String.format("[%s] [%s/%s], Check sum ratio [%s]", filePath, totalCheckNum, totalFileNum, CountUtil.getPercentage(totalCheckNum.get(), totalFileNum));
         logger.info(logStr + "%");
     }
 
