@@ -27,13 +27,14 @@ public class PutUtil {
 
             if (Model.JSON_FORMAT.equals(mode)) { // Only json file skip exists key.
 
-                // Just for test
                 List<ByteString> list = new ArrayList<>();
-                for (Map.Entry<ByteString, ByteString> item : kvPairs.entrySet()) {
-                    list.add(item.getKey());
+
+                if ("1".equals(properties.getProperty("importer.tikv.deleteForTest"))) {
+                    for (Map.Entry<ByteString, ByteString> item : kvPairs.entrySet()) {
+                        list.add(item.getKey());
+                    }
+                    rawKVClient.batchDelete(list);
                 }
-                rawKVClient.batchDelete(list);
-                // Just for test
 
                 List<Kvrpcpb.KvPair> haveList = rawKVClient.batchGet(list);
                 for (Kvrpcpb.KvPair kv : haveList) {

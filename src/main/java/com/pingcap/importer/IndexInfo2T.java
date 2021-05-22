@@ -96,13 +96,14 @@ class IndexInfo2TJob implements Runnable {
         int lines = FileUtil.getFileLines(file);
         List<String> threadPerLineList = CountUtil.getPerThreadFileLines(lines, insideThread, file.getAbsolutePath());
 
+        Timer timer = new Timer();
+        ImportTimer importTimer = new ImportTimer(totalImportCount, lines, filePath, properties);
+        timer.schedule(importTimer, 5000, Long.parseLong(properties.getProperty("importer.timer.interval")));
+
         ThreadPoolExecutor threadPoolExecutor = ThreadPoolUtil.startJob(insideThread, insideThread, file.getName());
         for (String s : threadPerLineList) {
             threadPoolExecutor.execute(new BatchPutIndexInfoJob(totalImportCount, totalSkipCount, totalParseErrorCount, totalBatchPutFailCount, filePath, ttlTypeList, ttlTypeCountMap, s, properties));
         }
-
-        ImportTimer timerUtil = new ImportTimer(totalImportCount, lines, filePath, properties);
-        timerUtil.start();
 
         threadPoolExecutor.shutdown();
 
@@ -113,12 +114,13 @@ class IndexInfo2TJob implements Runnable {
         }
 
         long duration = System.currentTimeMillis() - startTime;
-        StringBuilder result = new StringBuilder("Import Report: File[" + file.getAbsolutePath() + "], TotalRows[" + lines + "], ImportedRows[" + totalImportCount + "], SkipRows[" + totalSkipCount + "], ParseERROR[" + totalParseErrorCount + "], BatchPutERROR[" + totalBatchPutFailCount + "], Duration[" + duration / 1000 + "s],");
-        result.append(" Skip type=");
+        StringBuilder result = new StringBuilder("[Import Report] File[" + file.getAbsolutePath() + "], TotalRows[" + lines + "], ImportedRows[" + totalImportCount + "], SkipRows[" + totalSkipCount + "], ParseERROR[" + totalParseErrorCount + "], BatchPutERROR[" + totalBatchPutFailCount + "], Duration[" + duration / 1000 + "s],");
+        result.append(" Skip type[");
+
         assert ttlTypeCountMap != null;
         if (!ttlTypeCountMap.isEmpty()) {
             for (Map.Entry<String, Long> item : ttlTypeCountMap.entrySet()) {
-                result.append("<").append(item.getKey()).append(">").append("[").append(item.getValue()).append("]");
+                result.append("<").append(item.getKey()).append(">").append("[").append(item.getValue()).append("]").append("]");
             }
         }
         logger.info(result.toString());
@@ -243,6 +245,7 @@ class BatchPutIndexInfoJob implements Runnable {
                                     ttlTypeCountMap.put(indexInfoS.getType(), ttlTypeCountMap.get(indexInfoS.getType()) + 1);
                                     auditLog.warn(String.format("Skip key - ttl: %s in '%s',line = %s", indexInfoKey, file.getAbsolutePath(), start + totalCount));
                                     totalSkipCount.addAndGet(1);
+                                    count = PutUtil.batchPut(totalCount, todo, count, batchSize, rawKVClient, kvPairs, file, totalImportCount, totalSkipCount, totalBatchPutFailCount, start + totalCount, properties);
                                     continue;
                                 }
                                 if (envId != null) {
@@ -349,7 +352,7 @@ class BatchPutIndexInfoJob implements Runnable {
                             CheckSumUtil.checkSumIndexInfoJson(fp, checkSumDelimiter, tiSession, file, properties);
                             break;
                         case Model.TEMP_INDEX_INFO:
-                            CheckSumUtil.checkSumTmpIndexInfoJson(fp, checkSumDelimiter, tiSession, file, properties);
+//                            CheckSumUtil.checkSumTmpIndexInfoJson(fp, checkSumDelimiter, tiSession, file, properties);
                             break;
                         default:
                             throw new IllegalStateException("Unexpected value: " + scenes);
