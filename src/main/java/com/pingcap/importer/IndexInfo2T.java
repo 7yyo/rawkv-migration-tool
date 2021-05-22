@@ -162,7 +162,7 @@ class BatchPutIndexInfoJob implements Runnable {
         String mode = properties.getProperty("importer.in.mode");
         String scenes = properties.getProperty("importer.in.scenes");
         int batchSize = Integer.parseInt(properties.getProperty("importer.tikv.batchSize"));
-        int checkSumCount = Integer.parseInt(properties.getProperty("importer.tikv.checkSumPercentage"));
+        int checkSumPercentage = Integer.parseInt(properties.getProperty("importer.tikv.checkSumPercentage"));
         int isCheckSum = Integer.parseInt(properties.getProperty("importer.tikv.enabledCheckSum"));
 
         File file = new File(filePath);
@@ -206,6 +206,8 @@ class BatchPutIndexInfoJob implements Runnable {
         ConcurrentHashMap<ByteString, ByteString> kvPairs = new ConcurrentHashMap<>();
         RawKVClient rawKVClient = tiSession.createRawClient();
         String checkSumDelimiter = "";
+
+        Random random = new Random();
 
         for (int n = 0; n < todo; n++) {
             try {
@@ -311,7 +313,8 @@ class BatchPutIndexInfoJob implements Runnable {
 
                 // Sampling data is written into the check sum file
                 if (0 != isCheckSum) {
-                    if (totalCount % checkSumCount == 0) {
+                    int nn = random.nextInt(100 / checkSumPercentage) + 1;
+                    if (nn == 1) {
                         bufferedWriter.write(indexInfoKey + checkSumDelimiter + (start + totalCount) + "\n");
                     }
                 }

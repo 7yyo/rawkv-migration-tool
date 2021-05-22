@@ -89,9 +89,16 @@ public class CheckSumUtil {
 
             for (int i = 0; i < checkSumFileLineNum; i++) {
                 totalCheckNum.addAndGet(1);
-                csFileLine = checkSumBufferedReader.readLine();
-                csKey = csFileLine.split(checkSumDelimiter)[0];
-                csFileLineNum = Integer.parseInt(csFileLine.split(checkSumDelimiter)[1]);
+                try {
+                    csFileLine = checkSumBufferedReader.readLine();
+                    csKey = csFileLine.split(checkSumDelimiter)[0];
+                    csFileLineNum = Integer.parseInt(csFileLine.split(checkSumDelimiter)[1]);
+                } catch (Exception e) {
+                    checkParseErrorNum++;
+                    checkSumLog.error(String.format("Parse failed! Line = %s"), csFileLine);
+                    continue;
+                }
+
                 int n = csFileLineNum - lastFileLine;
                 for (int j = 0; j < n; j++) {
                     originalLine = originalBufferedReader.readLine();
@@ -101,7 +108,7 @@ public class CheckSumUtil {
                 value = rawKVClient.get(ByteString.copyFromUtf8(csKey)).toStringUtf8();
 
                 if (value.isEmpty()) {
-                    checkSumLog.warn(String.format("The key [%s] is not be inserted! Please confirm whether it is incremental data.", key.toStringUtf8()));
+                    checkSumLog.warn(String.format("The key [%s] is not be inserted! Please confirm whether it is incremental data.", csKey));
                     checkNotInsertErrorNum++;
                     continue;
                 }
@@ -121,9 +128,9 @@ public class CheckSumUtil {
                     jsonObject = JSONObject.parseObject(originalLine);
                     indexInfo_original = JSON.toJavaObject(jsonObject, IndexInfo.class);
                 } catch (Exception e) {
-                    checkSumLog.error(String.format("Parse failed! Json = %s", originalLine));
+                    checkSumLog.error(String.format("Parse failed! Line = %s", originalLine));
                     checkParseErrorNum++;
-                    break;
+                    continue;
                 }
                 if (!indexInfo_checkSum.equals(indexInfo_original)) {
                     checkSumLog.error(String.format("Check sum failed! Line = %s", originalLine));

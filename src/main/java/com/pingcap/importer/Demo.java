@@ -1,5 +1,8 @@
 package com.pingcap.importer;
 
+import java.io.RandomAccessFile;
+import java.util.Random;
+
 public class Demo {
 
     static int[] fileLines = {2, 7, 13, 16, 19};
@@ -10,14 +13,18 @@ public class Demo {
     static int fileLine = 0;
 
     public static void main(String[] args) {
-        int sum = 0;
-        for (int i = 0; i < fileLines.length; i++) {
-            fileLine = fileLines[i];
-            int n = fileLine - lastFileLine;
-            for (int j = 0; j < n; j++) {
-                System.out.println(file[sum++]);
-            }
-            lastFileLine = fileLine;
+//        int sum = 0;
+//        for (int i = 0; i < fileLines.length; i++) {
+//            fileLine = fileLines[i];
+//            int n = fileLine - lastFileLine;
+//            for (int j = 0; j < n; j++) {
+//                System.out.println(file[sum++]);
+//            }
+//            lastFileLine = fileLine;
+//        }
+        Random random = new Random();
+        for (int i = 0; i < 1000; i++) {
+            System.out.println(random.nextInt(100));
         }
     }
 }
