@@ -1,45 +1,43 @@
-# To Raw KV
-
-`importer.in.filePath`导入文件的文件夹路径  
-`importer.in.mode`导入文件的格式，有 json 和 csv 两种  
-`importer.in.scenes`导入文件的业务，目前有 indexInfo 和 tmpIndexInfo  
-`importer.in.delimiter_1` csv 文件的第一类分隔符，不需要改动  
-`importer.in.delimiter_2` csv 文件的第二类分隔符，不需要改动  
-`importer.out.envId` 环境 id  
-`importer.out.appId` appId  
-`importer.ttl.type` 包含的类型数据不插入 TiKV  
-`importer.ttl.day` TiKV 数据过期时间，单位为 ms   
-`importer.tikv.batchSize` 一次 batch put 的数据量  
-`importer.tikv.insideThread` 子线程数量  
-`importer.tikv.corePoolSize` 主线程核心线程数量    
-`importer.tikv.maxPoolSize` 主线程最大线程数量    
-`importer.tikv.checkSumFilePath` checkSum 文件存在的路径  
-`importer.tikv.checkSumDelimiter` checkSum 文件的分隔符，不需要改动  
-`importer.tikv.pd` pd ip 和 port  
-`importer.tikv.checkSumPercentage` checkSum 抽样数据比例，计算公式：数据量/checkSumPercentage。 取余
-`importer.tikv.enabledCheckSum` 是否 checksum，非 0 为 checkSum  
-`importer.timer.interval` 导入进度打印频率，单位为 ms  
-
-# 示例
-
 ```properties
-importer.in.filePath=/Users/yuyang/IdeaProjects/tikv_importer/src/Main/resources/testFile/tempIndexInfoJson
+# pd address
+importer.tikv.pd=172.16.4.32:5555,172.16.4.33:5555,172.16.4.34:5555,172.16.4.35:5555
+# File processing main thread's internal thread pool size
+importer.tikv.internalThreadNum=10
+# File processing main thread core thread pool size
+importer.tikv.corePoolSize=5
+# File processing main thread maximum thread pool size
+importer.tikv.maxPoolSize=5
+# Batch size for each insertion
+importer.tikv.batchSize=10000
+# Whether to delete the existing data before inserting, for testing purposes. 1 means to delete, 0 means not to delete.
+importer.tikv.deleteForTest=1
+# check sum switch, 0 is off check sum
+importer.checkSum.enabledCheckSum=1
+# check sum the number of threads
+importer.checkSum.checkSumThreadNum=5
+# check sum file storage path, it is recommended to put it on the best disk
+importer.checkSum.checkSumFilePath=/Users/yuyang/checkSum
+# check sum file separator, if not necessary, no need to modify
+importer.checkSum.checkSumDelimiter=@#@#@
+# check sum Sampling percentage, 100 is 100%
+importer.checkSum.checkSumPercentage=100
+# The storage path of the imported data file
+importer.in.filePath=/resources/testFile/tempIndexInfoJson
+# Import data file format, there are two kinds of json and csv
 importer.in.mode=json
+# The format of the imported data, currently there are indexInfo, tempIndexInfo, indexType three
 importer.in.scenes=tempIndexInfo
+# The first delimiter of csv file
 importer.in.delimiter_1=|
+# The second delimiter of csv file
 importer.in.delimiter_2=##
+# key separator
+importer.in.keyDelimiter=_:_
 importer.out.envId=00998877
 importer.out.appId=123456789
 importer.ttl.type=A001,B001,C001
+# TTL expiration time, the unit is ms
 importer.ttl.day=604800000
-importer.tikv.batchSize=200
-importer.tikv.insideThread=10
-importer.tikv.corePoolSize=10
-importer.tikv.maxPoolSize=10
-importer.tikv.checkSumFilePath=/Users/yuyang/checkSum
-importer.tikv.checkSumDelimiter=@#@#@
-importer.tikv.pd=172.16.4.32:5555,172.16.4.33:5555,172.16.4.34:5555,172.16.4.35:5555
-importer.tikv.checkSumPercentage=1
-importer.tikv.enabledCheckSum=0
-importer.timer.interval=20000
+# The statistical interval of import and checkSum progress, the unit is ms
+importer.timer.interval=30000
 ```
