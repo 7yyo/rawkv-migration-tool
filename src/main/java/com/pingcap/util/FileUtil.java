@@ -15,10 +15,28 @@ public class FileUtil {
     private static final List<File> list = new ArrayList<>();
     private static final List<File> checkSumList = new ArrayList<>();
 
+    public static List<File> showFileList(String filePath, boolean isCheckSum, Properties properties) {
+        if (!isCheckSum) {
+            logger.info("Welcome to To_TiKV.");
+            logger.info(String.format("Properties=%s", properties));
+        }
+        List<File> fileList = FileUtil.loadDirectory(new File(filePath), isCheckSum);
+        if (fileList.isEmpty()) {
+            logger.warn(String.format("There are no files in this path [%s]", filePath));
+            return null;
+        } else {
+            for (int i = 0; i < fileList.size(); i++) {
+                logger.info(String.format("No.%s-[%s]", i + 1, fileList.get(i).getAbsolutePath()));
+            }
+        }
+        logger.info(String.format("Need to process the above files, total=[%s]", fileList.size()));
+        return fileList;
+    }
+
     public static List<File> loadDirectory(File fileList, boolean isCheckSum) {
         File[] files = fileList.listFiles();
         if (files == null) {
-            logger.error("Files is not exists!");
+            logger.error("There is no file in this file path!");
             return null;
         }
         List<File> insideFiles = new ArrayList<>();
@@ -66,23 +84,6 @@ public class FileUtil {
             ttlTypeCountMap.put(ttlType, 0L);
         }
         return ttlTypeCountMap;
-    }
-
-    public static List<File> showFileList(String filePath, boolean isCheckSum, Properties properties) {
-        if (!isCheckSum) {
-            logger.info("Welcome to to_tikv.");
-            logger.info(String.format("Properties=%s", properties));
-        }
-        List<File> fileList = FileUtil.loadDirectory(new File(filePath), isCheckSum);
-        if (fileList.isEmpty()) {
-            logger.error(String.format("The file path [%s] is empty", filePath));
-        } else {
-            for (int i = 0; i < fileList.size(); i++) {
-                logger.info(String.format("No.%s=%s", i, fileList.get(i).getAbsolutePath()));
-            }
-        }
-        logger.info(String.format("Need to process the above files, total=%s.", fileList.size()));
-        return fileList;
     }
 
     public static void deleteFolder(String checkSumFilePath) {

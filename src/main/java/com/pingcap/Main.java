@@ -19,23 +19,25 @@ public class Main {
     public static void main(String[] args) {
 
         Properties properties = PropertiesUtil.getProperties(propertiesPath);
-        String mode = properties.getProperty(Model.MODE);
+        String importMode = properties.getProperty(Model.MODE);
+        String scenes = properties.getProperty(Model.SCENES);
 
-        if (StringUtils.isNotBlank(mode)) {
-            switch (mode) {
+        if (StringUtils.isNotBlank(importMode)) {
+            if (Model.INDEX_TYPE.equals(scenes)) {
+                IndexType2T.RunIndexInfo2T(properties);
+                return;
+            }
+            switch (importMode) {
                 case Model.JSON_FORMAT:
                     IndexInfo2T.RunIndexInfo2T(properties);
                     break;
-                case Model.TEMP_INDEX_INFO:
-                    logger.info("tmpIndexInfo");
-                    break;
-                case Model.INDEX_TYPE:
-                    IndexType2T.RunIndexInfo2T(properties);
+                case Model.CSV_FORMAT:
+                    logger.info("CSV");
                 default:
-                    logger.error(String.format("Illegal scene [%s]", mode));
+                    logger.error(String.format("Illegal scene [%s]", importMode));
             }
         } else {
-            logger.error("[importer.in.mode] must not be null!");
+            logger.error(String.format("The configuration parameter [%s] must not be empty!", Model.MODE));
         }
 
     }

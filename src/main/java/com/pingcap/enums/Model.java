@@ -29,6 +29,7 @@ public class Model {
     public static final String SCENES = "importer.in.scenes";
     public static final String DELIMITER_1 = "importer.in.delimiter_1";
     public static final String DELIMITER_2 = "importer.in.delimiter_2";
+    public static final String KEY_DELIMITER = "importer.in.keyDelimiter";
     public static final String ENV_ID = "importer.out.envId";
     public static final String APP_ID = "importer.out.appId";
     public static final String TTL_TYPE = "importer.ttl.type";

@@ -1,5 +1,6 @@
 package com.pingcap.importer;
 
+import com.pingcap.enums.Model;
 import com.pingcap.util.FileUtil;
 import com.pingcap.util.PropertiesUtil;
 import com.pingcap.util.TiSessionUtil;
@@ -18,12 +19,12 @@ import java.util.Properties;
 
 public class IndexType2T {
 
-    private static final Logger logger = LoggerFactory.getLogger("logBackLog");
+    private static final Logger logger = LoggerFactory.getLogger(Model.LOG);
     private static final HashMap<ByteString, ByteString> kvPairs = new HashMap<>();
 
     public static void RunIndexInfo2T(Properties properties) {
 
-        String filePath = properties.getProperty("importer.in.filePath");
+        String filePath = properties.getProperty(Model.FILE_PATH);
         TiSession tiSession = TiSessionUtil.getTiSession(properties);
 
         List<File> fileList = FileUtil.showFileList(filePath, false, properties);

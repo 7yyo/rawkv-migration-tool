@@ -42,4 +42,9 @@ public class CountUtil {
         return numerator.format((float) num1 / (float) num2 * 100);
     }
 
+    public static String getRowSpanLine() {
+
+        return "";
+    }
+
 }

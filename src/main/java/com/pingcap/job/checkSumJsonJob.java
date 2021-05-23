@@ -5,14 +5,14 @@ import org.tikv.common.TiSession;
 
 import java.util.Properties;
 
-public class checkSumIndexInfoJsonJob implements Runnable {
+public class checkSumJsonJob implements Runnable {
 
     private final String checkSumFilePath;
     private final String checkSumDelimiter;
     private final TiSession tiSession;
     private final Properties properties;
 
-    public checkSumIndexInfoJsonJob(String checkSumFilePath, String checkSumDelimiter, TiSession tiSession, Properties properties) {
+    public checkSumJsonJob(String checkSumFilePath, String checkSumDelimiter, TiSession tiSession, Properties properties) {
         this.checkSumFilePath = checkSumFilePath;
         this.checkSumDelimiter = checkSumDelimiter;
         this.tiSession = tiSession;
