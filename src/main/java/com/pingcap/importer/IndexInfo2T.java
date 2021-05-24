@@ -8,6 +8,8 @@ import com.pingcap.pojo.IndexInfo;
 import com.pingcap.pojo.TempIndexInfo;
 import com.pingcap.timer.ImportTimer;
 import com.pingcap.util.*;
+import org.apache.commons.io.FileUtils;
+import org.apache.commons.io.LineIterator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.tikv.common.TiSession;
@@ -385,7 +387,10 @@ class BatchPutIndexInfoJob implements Runnable {
             fileInputStream.close();
             bufferedInputStream.close();
             rawKVClient.close();
+            tiSession.close();
         } catch (IOException e) {
+            e.printStackTrace();
+        } catch (Exception e) {
             e.printStackTrace();
         }
 
