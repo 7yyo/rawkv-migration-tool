@@ -5,8 +5,8 @@ import com.alibaba.fastjson.JSONObject;
 import com.pingcap.enums.Model;
 import com.pingcap.job.checkSumJsonJob;
 import com.pingcap.pojo.IndexInfo;
-import com.pingcap.pojo.ServiceTag;
 import com.pingcap.pojo.TempIndexInfo;
+import com.pingcap.timer.ImportTimer;
 import com.pingcap.util.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -32,8 +32,6 @@ public class IndexInfo2T {
         String filesPath = properties.getProperty(Model.FILE_PATH);
         int corePoolSize = Integer.parseInt(properties.getProperty(Model.CORE_POOL_SIZE));
         int maxPoolSize = Integer.parseInt(properties.getProperty(Model.MAX_POOL_SIZE));
-        String mode = properties.getProperty(Model.MODE);
-        String scenes = properties.getProperty(Model.SCENES);
         String checkSumDelimiter = properties.getProperty(Model.CHECK_SUM_DELIMITER);
         String checkSumFilePath = properties.getProperty(Model.CHECK_SUM_FILE_PATH);
         TiSession tiSession = TiSessionUtil.getTiSession(properties);
@@ -47,8 +45,8 @@ public class IndexInfo2T {
         FileUtil.deleteFolders(properties.getProperty(Model.CHECK_SUM_FILE_PATH));
 
         // Start the Main thread for each file.showFileList
-        ThreadPoolExecutor threadPoolExecutor = ThreadPoolUtil.startJob(corePoolSize, maxPoolSize);
-        if (!Objects.requireNonNull(fileList).isEmpty()) {
+        ThreadPoolExecutor threadPoolExecutor = ThreadPoolUtil.startJob(corePoolSize, maxPoolSize, properties);
+        if (!fileList.isEmpty()) {
             for (File file : fileList) {
                 // Pass in the file to be processed and the ttl map.
                 // The ttl map is shared by all file threads, because it is a table for processing, which is summarized here.
@@ -73,20 +71,20 @@ public class IndexInfo2T {
         int checkSumThreadNum = Integer.parseInt(properties.getProperty(Model.CHECK_SUM_THREAD_NUM));
 
         ThreadPoolExecutor checkSumThreadPoolExecutor;
-        if (!"0".equals(properties.getProperty(Model.ENABLE_CHECK_SUM))) {
+        if (!Model.OFF.equals(properties.getProperty(Model.ENABLE_CHECK_SUM))) {
             List<File> checkSumFileList = FileUtil.showFileList(checkSumFilePath, true, properties);
-            checkSumThreadPoolExecutor = ThreadPoolUtil.startJob(checkSumThreadNum, checkSumThreadNum);
+            checkSumThreadPoolExecutor = ThreadPoolUtil.startJob(checkSumThreadNum, checkSumThreadNum, properties);
             if (!checkSumFileList.isEmpty()) {
                 for (File checkSumFile : checkSumFileList) {
-                    switch (mode) {
-                        case Model.JSON_FORMAT:
-                            checkSumThreadPoolExecutor.execute(new checkSumJsonJob(checkSumFile.getAbsolutePath(), checkSumDelimiter, tiSession, properties));
-                            break;
-                        case Model.CSV_FORMAT:
-                            logger.info("CSV");
-                        default:
-                            throw new IllegalStateException("Unexpected value: " + scenes);
-                    }
+//                    switch (mode) {
+//                        case Model.JSON_FORMAT:
+                    checkSumThreadPoolExecutor.execute(new checkSumJsonJob(checkSumFile.getAbsolutePath(), checkSumDelimiter, tiSession, properties));
+//                            break;
+//                        case Model.CSV_FORMAT:
+//                            logger.info("CSV");
+//                        default:
+//                            throw new IllegalStateException("Unexpected value: " + scenes);
+//                    }
                 }
                 checkSumThreadPoolExecutor.shutdown();
             } else {
@@ -148,9 +146,9 @@ class IndexInfo2TJob implements Runnable {
 
         Timer timer = new Timer();
         ImportTimer importTimer = new ImportTimer(totalImportCount, lines, filePath);
-        timer.schedule(importTimer, 5000, Long.parseLong(properties.getProperty("importer.timer.interval")));
+        timer.schedule(importTimer, 5000, Long.parseLong(properties.getProperty(Model.TIMER_INTERVAL)));
 
-        ThreadPoolExecutor threadPoolExecutor = ThreadPoolUtil.startJob(insideThread, insideThread);
+        ThreadPoolExecutor threadPoolExecutor = ThreadPoolUtil.startJob(insideThread, insideThread, properties);
         for (String s : threadPerLineList) {
             threadPoolExecutor.execute(new BatchPutIndexInfoJob(totalImportCount, totalSkipCount, totalParseErrorCount, totalBatchPutFailCount, filePath, ttlTypeList, ttlTypeCountMap, s, properties));
         }
@@ -217,6 +215,8 @@ class BatchPutIndexInfoJob implements Runnable {
         int batchSize = Integer.parseInt(properties.getProperty(Model.BATCH_SIZE));
         int checkSumPercentage = Integer.parseInt(properties.getProperty(Model.CHECK_SUM_PERCENTAGE));
         int isCheckSum = Integer.parseInt(properties.getProperty(Model.ENABLE_CHECK_SUM));
+        String delimiter_1 = properties.getProperty(Model.DELIMITER_1);
+        String delimiter_2 = properties.getProperty(Model.DELIMITER_2);
 
         File file = new File(filePath);
         BufferedReader bufferedReader = null;
@@ -258,6 +258,16 @@ class BatchPutIndexInfoJob implements Runnable {
         String checkSumDelimiter = properties.getProperty(Model.CHECK_SUM_DELIMITER);
 
         Random random = new Random();
+        ByteString key;
+        ByteString value;
+        SimpleDateFormat simpleDateFormat;
+        String time;
+        IndexInfo indexInfoS;
+        IndexInfo indexInfoT;
+        TempIndexInfo tempIndexInfoS;
+        TempIndexInfo tempIndexInfoT;
+        String id;
+        String type;
 
         for (int n = 0; n < todo; n++) {
             try {
@@ -267,11 +277,15 @@ class BatchPutIndexInfoJob implements Runnable {
 
                 assert bufferedReader != null;
                 line = bufferedReader.readLine();
-                ByteString key = null;
-                ByteString value = null;
+                if (line == null || "".equals(line)) {
+                    logger.warn(String.format("This is blank in file=%s, line=%s", file.getAbsolutePath(), start + totalCount));
+                    continue;
+                }
+                key = null;
+                value = null;
 
-                SimpleDateFormat simpleDateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
-                String time = simpleDateFormat.format(new Date());
+                simpleDateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+                time = simpleDateFormat.format(new Date());
 
                 switch (importMode) {
                     case Model.JSON_FORMAT:
@@ -286,7 +300,7 @@ class BatchPutIndexInfoJob implements Runnable {
                         }
                         switch (scenes) {
                             case Model.INDEX_INFO:
-                                IndexInfo indexInfoS = JSON.toJavaObject(jsonObject, IndexInfo.class);
+                                indexInfoS = JSON.toJavaObject(jsonObject, IndexInfo.class);
                                 // Skip the type that exists in the tty type map.
                                 if (ttlTypeList.contains(indexInfoS.getType())) {
                                     ttlTypeCountMap.put(indexInfoS.getType(), ttlTypeCountMap.get(indexInfoS.getType()) + 1);
@@ -301,20 +315,20 @@ class BatchPutIndexInfoJob implements Runnable {
                                     indexInfoKey = String.format(IndexInfo.INDEX_INFO_KET_FORMAT, indexInfoS.getEnvId(), indexInfoS.getType(), indexInfoS.getId());
                                 }
                                 // TiKV indexInfo
-                                IndexInfo indexInfoT = IndexInfo.initIndexInfoT(indexInfoS, time);
+                                indexInfoT = IndexInfo.initIndexInfoT(indexInfoS, time);
                                 key = ByteString.copyFromUtf8(indexInfoKey);
                                 value = ByteString.copyFromUtf8(JSONObject.toJSONString(indexInfoT));
                                 logger.debug(String.format("[%s], K=%s, V={%s}", file.getAbsolutePath(), indexInfoKey, JSONObject.toJSONString(indexInfoT)));
                                 break;
                             case Model.TEMP_INDEX_INFO:
-                                TempIndexInfo tempIndexInfos = JSON.toJavaObject(jsonObject, TempIndexInfo.class);
+                                tempIndexInfoS = JSON.toJavaObject(jsonObject, TempIndexInfo.class);
                                 if (envId != null) {
-                                    indexInfoKey = String.format(TempIndexInfo.TEMP_INDEX_INFO_KEY_FORMAT, envId, tempIndexInfos.getId());
+                                    indexInfoKey = String.format(TempIndexInfo.TEMP_INDEX_INFO_KEY_FORMAT, envId, tempIndexInfoS.getId());
                                 } else {
-                                    indexInfoKey = String.format(TempIndexInfo.TEMP_INDEX_INFO_KEY_FORMAT, tempIndexInfos.getEnvId(), tempIndexInfos.getId());
+                                    indexInfoKey = String.format(TempIndexInfo.TEMP_INDEX_INFO_KEY_FORMAT, tempIndexInfoS.getEnvId(), tempIndexInfoS.getId());
                                 }
                                 // TiKV tempIndexInfo
-                                TempIndexInfo tempIndexInfoT = TempIndexInfo.initTempIndexInfo(tempIndexInfos);
+                                tempIndexInfoT = TempIndexInfo.initTempIndexInfo(tempIndexInfoS);
                                 key = ByteString.copyFromUtf8(indexInfoKey);
                                 value = ByteString.copyFromUtf8(JSONObject.toJSONString(tempIndexInfoT));
                                 logger.debug(String.format("[%s], K=%s, V={%s}", file.getAbsolutePath(), indexInfoKey, JSONObject.toJSONString(tempIndexInfoT)));
@@ -322,45 +336,22 @@ class BatchPutIndexInfoJob implements Runnable {
                         }
                         break;
                     case Model.CSV_FORMAT:
-                        switch (scenes) {
-                            case Model.INDEX_INFO:
-                                String delimiter_1 = properties.getProperty(Model.DELIMITER_1);
-                                String delimiter_2 = properties.getProperty(Model.DELIMITER_2);
-                                envId = line.split(delimiter_1)[0];
-                                String type = line.split(delimiter_1)[1];
-                                String id = line.split(delimiter_1)[2].split(delimiter_2)[0];
-                                IndexInfo indexInfoS = new IndexInfo();
-                                if (envId != null) {
-                                    indexInfoKey = String.format(IndexInfo.INDEX_INFO_KET_FORMAT, envId, type, id);
-                                } else {
-                                    indexInfoKey = String.format(IndexInfo.INDEX_INFO_KET_FORMAT, indexInfoS.getEnvId(), type, id);
-                                }
-                                // TODO
-                                String v = line.split(delimiter_1)[2];
-                                String targetId = v.split(delimiter_2)[0];
-                                ServiceTag serviceTag = new ServiceTag();
-                                serviceTag.setBLKMDL_ID(v.split(delimiter_2)[1]);
-                                serviceTag.setPD_SALE_FTA_CD(v.split(delimiter_2)[2]);
-                                serviceTag.setACCT_DTL_TYPE(v.split(delimiter_2)[3]);
-                                serviceTag.setTu_FLAG(v.split(delimiter_2)[4]);
-                                serviceTag.setCMTRST_CST_ACCNO(v.split(delimiter_2)[5]);
-                                serviceTag.setAR_ID(v.split(delimiter_2)[6]);
-                                serviceTag.setQCRCRD_IND("");
-                                String serviceTagJson = JSON.toJSONString(serviceTag);
-                                IndexInfo indexInfoT = new IndexInfo();
-                                indexInfoT.setAppId(appId);
-                                indexInfoT.setServiceTag(serviceTagJson);
-                                indexInfoT.setTargetId(targetId);
-                                indexInfoT.setUpdateTime(time);
-                                key = ByteString.copyFromUtf8(indexInfoKey);
-                                value = ByteString.copyFromUtf8(JSONObject.toJSONString(indexInfoT));
-                                break;
-                            case Model.TEMP_INDEX_INFO:
-                                logger.info("tempIndexInfo");
-                                break;
-                            default:
 
+                        id = line.split(delimiter_1)[0];
+                        type = line.split(delimiter_1)[1];
+
+                        indexInfoS = new IndexInfo();
+                        if (envId != null) {
+                            indexInfoKey = String.format(IndexInfo.INDEX_INFO_KET_FORMAT, envId, type, id);
+                        } else {
+                            indexInfoKey = String.format(IndexInfo.INDEX_INFO_KET_FORMAT, indexInfoS.getEnvId(), type, id);
                         }
+
+                        indexInfoT = IndexInfo.initIndexInfo(line, delimiter_1, delimiter_2);
+                        indexInfoT.setAppId(appId);
+                        indexInfoT.setUpdateTime(time);
+                        key = ByteString.copyFromUtf8(indexInfoKey);
+                        value = ByteString.copyFromUtf8(JSONObject.toJSONString(indexInfoT));
                         break;
                     default:
                         logger.error(String.format("Illegal format: %s", importMode));

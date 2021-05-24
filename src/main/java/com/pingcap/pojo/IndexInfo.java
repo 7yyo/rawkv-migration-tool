@@ -92,7 +92,10 @@ public class IndexInfo {
 
     public boolean equals(IndexInfo indexInfo) {
         boolean idC = this.id.equals(indexInfo.getId());
-        boolean serviceTagC = this.serviceTag.trim().equals(indexInfo.getServiceTag().trim());
+        boolean serviceTagC = true;
+        if ((this.serviceTag != null && !"".equals(this.serviceTag)) && (indexInfo.getServiceTag() != null && !"".equals(indexInfo.getServiceTag()))) {
+            serviceTagC = this.serviceTag.equals(indexInfo.getServiceTag());
+        }
         boolean targetIdC = this.targetId.equals(indexInfo.getTargetId());
         boolean typeC = this.type.equals(indexInfo.getType());
         return idC && serviceTagC && targetIdC && typeC;
@@ -101,25 +104,27 @@ public class IndexInfo {
     public static IndexInfo initIndexInfo(String originalLine, String delimiter_1, String delimiter_2) {
         IndexInfo indexInfo = new IndexInfo();
 
+        String id = originalLine.split(delimiter_1)[0];
+        indexInfo.setId(id);
         String type = originalLine.split(delimiter_1)[1];
         indexInfo.setType(type);
-        String id = originalLine.split(delimiter_1)[2].split(delimiter_2)[0];
-        indexInfo.setType(id);
 
-        String v = originalLine.split(delimiter_1)[2];
+        String targetId = originalLine.split(delimiter_1)[2].split(delimiter_2)[0];
 
-        String targetId = v.split(delimiter_2)[0];
-        ServiceTag serviceTag = new ServiceTag();
-        serviceTag.setBLKMDL_ID(v.split(delimiter_2)[1]);
-        serviceTag.setPD_SALE_FTA_CD(v.split(delimiter_2)[2]);
-        serviceTag.setACCT_DTL_TYPE(v.split(delimiter_2)[3]);
-        serviceTag.setTu_FLAG(v.split(delimiter_2)[4]);
-        serviceTag.setCMTRST_CST_ACCNO(v.split(delimiter_2)[5]);
-        serviceTag.setAR_ID(v.split(delimiter_2)[6]);
-        serviceTag.setQCRCRD_IND("");
-        indexInfo.setServiceTag(JSON.toJSONString(serviceTag));
+        if (originalLine.split(delimiter_1).length > 3) {
+            String v = originalLine.split(delimiter_1)[2];
+            ServiceTag serviceTag = new ServiceTag();
+            serviceTag.setBLKMDL_ID(v.split(delimiter_2)[0]);
+            serviceTag.setPD_SALE_FTA_CD(v.split(delimiter_2)[1]);
+            serviceTag.setACCT_DTL_TYPE(v.split(delimiter_2)[2]);
+            serviceTag.setCORPPRVT_FLAG(v.split(delimiter_2)[3]);
+            serviceTag.setCMTRST_CST_ACCNO(v.split(delimiter_2)[4]);
+            serviceTag.setAR_ID(v.split(delimiter_2)[5]);
+            serviceTag.setQCRCRD_IND(v.split(delimiter_2)[6]);
+            indexInfo.setServiceTag(JSON.toJSONString(serviceTag));
 
-        indexInfo.setAppId("appId");
+        }
+
         indexInfo.setTargetId(targetId);
 
         return indexInfo;
@@ -127,11 +132,15 @@ public class IndexInfo {
 
     public static IndexInfo initIndexInfoT(IndexInfo indexInfoS, String time) {
         IndexInfo indexInfo = new IndexInfo();
+        // value
+        // appId、serviceTag、targetId、updateTime
         indexInfo.setAppId(indexInfo.getAppId());
-        if (StringUtils.isNotBlank(indexInfoS.getServiceTag())) {
-            indexInfo.setServiceTag(indexInfoS.getServiceTag());
-        } else {
+        if (indexInfoS.getServiceTag() == null) {
+            indexInfo.setServiceTag(null);
+        } else if ("".equals(indexInfoS.getServiceTag())) {
             indexInfo.setServiceTag("");
+        } else {
+            indexInfo.setServiceTag(indexInfoS.getServiceTag());
         }
         indexInfo.setTargetId(indexInfoS.getTargetId());
         indexInfo.setUpdateTime(time);

@@ -1,6 +1,7 @@
-package com.pingcap.util;
+package com.pingcap.timer;
 
 import com.pingcap.enums.Model;
+import com.pingcap.util.CountUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

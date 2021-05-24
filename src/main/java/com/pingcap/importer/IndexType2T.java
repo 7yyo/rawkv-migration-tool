@@ -2,7 +2,6 @@ package com.pingcap.importer;
 
 import com.pingcap.enums.Model;
 import com.pingcap.util.FileUtil;
-import com.pingcap.util.PropertiesUtil;
 import com.pingcap.util.TiSessionUtil;
 import org.apache.commons.lang.StringUtils;
 import org.slf4j.Logger;

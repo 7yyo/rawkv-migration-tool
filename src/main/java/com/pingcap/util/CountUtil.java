@@ -31,7 +31,6 @@ public class CountUtil {
             } else {
                 list.add(startIndex + "," + todo);
             }
-//            logger.info(String.format(threadLog, i, fileName, startIndex, todo));
         }
         return list;
     }

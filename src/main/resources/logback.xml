@@ -8,7 +8,7 @@
     </appender>
 
     <!-- mac -->
-    <appender name="log" class="ch.qos.logback.core.rolling.RollingFileAppender">
+    <!--<appender name="log" class="ch.qos.logback.core.rolling.RollingFileAppender">
         <encoder>
             <pattern>%d{HH:mm:ss.SSS} %-5level %logger{36} - %msg%n</pattern>
             <charset>utf-8</charset>
@@ -46,18 +46,18 @@
         <triggeringPolicy class="ch.qos.logback.core.rolling.SizeBasedTriggeringPolicy">
             <MaxFileSize>100MB</MaxFileSize>
         </triggeringPolicy>
-    </appender>
+    </appender>-->
 
 
     <!-- linux -->
-    <!--<appender name="log" class="ch.qos.logback.core.rolling.RollingFileAppender">
+    <appender name="log" class="ch.qos.logback.core.rolling.RollingFileAppender">
         <encoder>
             <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
             <charset>utf-8</charset>
         </encoder>
-        <file>/home/tidb/yuyang/toTiKV.log</file>
+        <file>./toTiKV.log</file>
         <rollingPolicy class="ch.qos.logback.core.rolling.FixedWindowRollingPolicy">
-            <fileNamePattern>/Users/yuyang/log/toTiKV.log.%i</fileNamePattern>
+            <fileNamePattern>./toTiKV.log.%i</fileNamePattern>
         </rollingPolicy>
         <triggeringPolicy class="ch.qos.logback.core.rolling.SizeBasedTriggeringPolicy">
             <MaxFileSize>100MB</MaxFileSize>
@@ -68,9 +68,9 @@
             <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
             <charset>utf-8</charset>
         </encoder>
-        <file>/home/tidb/yuyang/audit.log</file>
+        <file>./audit.log</file>
         <rollingPolicy class="ch.qos.logback.core.rolling.FixedWindowRollingPolicy">
-            <fileNamePattern>/Users/yuyang/log/audit.log.%i</fileNamePattern>
+            <fileNamePattern>./audit.log.%i</fileNamePattern>
         </rollingPolicy>
         <triggeringPolicy class="ch.qos.logback.core.rolling.SizeBasedTriggeringPolicy">
             <MaxFileSize>100MB</MaxFileSize>
@@ -81,14 +81,14 @@
             <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
             <charset>utf-8</charset>
         </encoder>
-        <file>/home/tidb/yuyang/checkSum.log</file>
+        <file>./checkSum.log</file>
         <rollingPolicy class="ch.qos.logback.core.rolling.FixedWindowRollingPolicy">
-            <fileNamePattern>/Users/yuyang/log/checkSum.log.%i</fileNamePattern>
+            <fileNamePattern>./checkSum.log.%i</fileNamePattern>
         </rollingPolicy>
         <triggeringPolicy class="ch.qos.logback.core.rolling.SizeBasedTriggeringPolicy">
             <MaxFileSize>100MB</MaxFileSize>
         </triggeringPolicy>
-    </appender>-->
+    </appender>
 
     <logger name="logger" level="INFO" additivity="true">
         <appender-ref ref="log"/>

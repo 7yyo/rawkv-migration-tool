@@ -73,7 +73,9 @@ public class TempIndexInfo {
 
     public static TempIndexInfo initTempIndexInfo(TempIndexInfo tempIndexInfoS) {
         TempIndexInfo tempIndexInfoT = new TempIndexInfo();
-        tempIndexInfoT.setId(tempIndexInfoS.getId());
+        // value -
+        // appId、targetId
+        tempIndexInfoT.setAppId(tempIndexInfoS.getAppId());
         tempIndexInfoT.setTargetId(tempIndexInfoS.getTargetId());
         return tempIndexInfoT;
     }

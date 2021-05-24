@@ -2,8 +2,12 @@ package com.pingcap.enums;
 
 public class Model {
 
+    public static final String IMPORT = "import";
+    public static final String CHECK_SUM = "checkSum";
     public static final String JSON_FORMAT = "json";
     public static final String CSV_FORMAT = "csv";
+    public static final String ON = "1";
+    public static final String OFF = "0";
 
     public static final String INDEX_INFO = "indexInfo";
     public static final String TEMP_INDEX_INFO = "tempIndexInfo";
@@ -13,13 +17,16 @@ public class Model {
     public static final String CHECK_SUM_LOG = "checkSumLog";
     public static final String AUDIT_LOG = "auditLog";
 
+    public static final String TASK = "importer.tikv.task";
     public static final String PD = "importer.tikv.pd";
     public static final String INTERNAL_THREAD_NUM = "importer.tikv.internalThreadNum";
     public static final String CORE_POOL_SIZE = "importer.tikv.corePoolSize";
     public static final String MAX_POOL_SIZE = "importer.tikv.maxPoolSize";
+    public static final String BLOCK_DEQUE_CAPACITY = "importer.tikv.blockDequeCapacity";
     public static final String CHECK_SUM_THREAD_NUM = "importer.checkSum.checkSumThreadNum";
     public static final String BATCH_SIZE = "importer.tikv.batchSize";
     public static final String DELETE_FOR_TEST = "importer.tikv.deleteForTest";
+    public static final String SKIP_EXISTS_KEY = "importer.tikv.skipExistsKey";
     public static final String ENABLE_CHECK_SUM = "importer.checkSum.enabledCheckSum";
     public static final String CHECK_SUM_FILE_PATH = "importer.checkSum.checkSumFilePath";
     public static final String CHECK_SUM_DELIMITER = "importer.checkSum.checkSumDelimiter";
@@ -35,5 +42,6 @@ public class Model {
     public static final String TTL_TYPE = "importer.ttl.type";
     public static final String TTL_DAY = "importer.ttl.day";
     public static final String TIMER_INTERVAL = "importer.timer.interval";
+    public static final String TIMER_TOTAL_FILE_INTERVAL = "importer.timer.totalFileInterval";
 
 }

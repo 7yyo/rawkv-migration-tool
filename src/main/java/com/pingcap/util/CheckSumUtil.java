@@ -5,6 +5,7 @@ import com.alibaba.fastjson.JSONObject;
 import com.pingcap.enums.Model;
 import com.pingcap.pojo.IndexInfo;
 import com.pingcap.pojo.TempIndexInfo;
+import com.pingcap.timer.CheckSumTimer;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.LineIterator;
 import org.slf4j.Logger;
@@ -97,8 +98,14 @@ public class CheckSumUtil {
         }
 
         // get original line to check sum
+        int originalLineNum;
+        int rowSpan;
+        IndexInfo indexInfo_checkSum;
+        TempIndexInfo tempIndexInfo_checkSum;
+        IndexInfo indexInfo_original;
+        TempIndexInfo tempIndexInfo_original;
         while (checkSumFileIt.hasNext()) {
-            int originalLineNum = 0;
+            originalLineNum = 0;
             // Total check num
             totalCheckNum.addAndGet(1);
             try {
@@ -121,7 +128,7 @@ public class CheckSumUtil {
                 continue;
             }
 
-            int rowSpan = csFileLineNum - lastFileLine;
+            rowSpan = csFileLineNum - lastFileLine;
 
             // begin to check sum original & checkSum
 
@@ -136,8 +143,8 @@ public class CheckSumUtil {
 
             // Init checkSum object
             // Because the check sum is all < json key + line num >, the format is unified, and there is no csv
-            IndexInfo indexInfo_checkSum = new IndexInfo();
-            TempIndexInfo tempIndexInfo_checkSum = new TempIndexInfo();
+            indexInfo_checkSum = new IndexInfo();
+            tempIndexInfo_checkSum = new TempIndexInfo();
             jsonObject = JSONObject.parseObject(value);
             switch (scenes) {
                 case Model.INDEX_INFO:
@@ -172,8 +179,6 @@ public class CheckSumUtil {
             }
 
             // Init original object
-            IndexInfo indexInfo_original;
-            TempIndexInfo tempIndexInfo_original;
             switch (importMode) {
                 case Model.JSON_FORMAT:
                     jsonObject = JSONObject.parseObject(originalLine);
@@ -217,13 +222,6 @@ public class CheckSumUtil {
                                 checkFailNum++;
                             }
                             break;
-                        case Model.TEMP_INDEX_INFO:
-                            tempIndexInfo_original = TempIndexInfo.initTempIndexInfo(originalLine, delimiter_1, delimiter_2);
-                            if (!tempIndexInfo_checkSum.equals(tempIndexInfo_original)) {
-                                checkSumLog.error(String.format("Check sum failed! Line = %s", originalLine));
-                                checkFailNum++;
-                            }
-                            break;
                         default:
                             throw new IllegalStateException("Unexpected value: " + scenes);
                     }
@@ -236,7 +234,7 @@ public class CheckSumUtil {
 
         LineIterator.closeQuietly(checkSumFileIt);
         LineIterator.closeQuietly(originalFileIt);
-
+        rawKVClient.close();
         timer.cancel();
 
         logger.info(String.format("[%s] check sum over! TotalCheckNum[%s], TotalNotInsertNum[%s], TotalParseErrorNum[%s], TotalCheckFailNum[%s]", checkSumFilePath, totalCheckNum, checkNotInsertErrorNum, checkParseErrorNum, checkFailNum));
