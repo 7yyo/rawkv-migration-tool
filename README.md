@@ -1,43 +1,52 @@
 ```properties
-# pd address
-importer.tikv.pd=172.16.4.32:5555,172.16.4.33:5555,172.16.4.34:5555,172.16.4.35:5555
-# File processing main thread's internal thread pool size
-importer.tikv.internalThreadNum=10
-# File processing main thread core thread pool size
-importer.tikv.corePoolSize=5
-# File processing main thread maximum thread pool size
-importer.tikv.maxPoolSize=5
-# Batch size for each insertion
-importer.tikv.batchSize=10000
-# Whether to delete the existing data before inserting, for testing purposes. 1 means to delete, 0 means not to delete.
+## pd 
+importer.tikv.pd=172.16.4.33:5555,172.16.4.34:5555,172.16.4.35:5555
+## 主线程核心线程数
+importer.tikv.corePoolSize=1
+## 主线程最大线程数
+importer.tikv.maxPoolSize=1
+## 内部子线程数量
+importer.tikv.internalThreadNum=1
+## 阻塞队列，不需要调整
+importer.tikv.blockDequeCapacity=2
+## 每次 batch put 大小
+importer.tikv.batchSize=4
+## 是否在每次批量插入前删除数据，为了不报错已存在 key 而设置，测试用，0 为不删除
 importer.tikv.deleteForTest=1
-# check sum switch, 0 is off check sum
+## 是否做 check sum，0 为不执行
 importer.checkSum.enabledCheckSum=1
-# check sum the number of threads
+## 是否做 key 已存在检查， 0 为不检查
+importer.tikv.skipExistsKey=1
+## check sum 的线程数
 importer.checkSum.checkSumThreadNum=5
-# check sum file storage path, it is recommended to put it on the best disk
+## check sum 文件存放的路径
 importer.checkSum.checkSumFilePath=/Users/yuyang/checkSum
-# check sum file separator, if not necessary, no need to modify
+## check sum 文件行的分隔符，不需要调整
 importer.checkSum.checkSumDelimiter=@#@#@
-# check sum Sampling percentage, 100 is 100%
-importer.checkSum.checkSumPercentage=100
-# The storage path of the imported data file
-importer.in.filePath=/resources/testFile/tempIndexInfoJson
-# Import data file format, there are two kinds of json and csv
+## check sum 抽数百分比
+importer.checkSum.checkSumPercentage=1
+## 导入数据文件路径
+importer.in.filePath=/Users/yuyang/IdeaProjects/tikv_importer/src/Main/resources/testFile/indexInfoJson
+## 模式，分为导入和check
+importer.tikv.task=import
+## 导入文件格式，有 json 和 csv
 importer.in.mode=json
-# The format of the imported data, currently there are indexInfo, tempIndexInfo, indexType three
-importer.in.scenes=tempIndexInfo
-# The first delimiter of csv file
-importer.in.delimiter_1=|
-# The second delimiter of csv file
+## 导入的数据文件格式
+importer.in.scenes=indexInfo
+## 导入的 csv 文件第一个分隔符
+importer.in.delimiter_1=\\|
+## 导入的 csv 文件第二个分隔符
 importer.in.delimiter_2=##
-# key separator
+## key 的分隔符
 importer.in.keyDelimiter=_:_
+## envId
 importer.out.envId=00998877
+## appId
 importer.out.appId=123456789
+## 跳过的 type
 importer.ttl.type=A001,B001,C001
-# TTL expiration time, the unit is ms
+## ttl 时间 单位 ms
 importer.ttl.day=604800000
-# The statistical interval of import and checkSum progress, the unit is ms
+## 统计线程打印周期 单位 ms
 importer.timer.interval=30000
 ```
