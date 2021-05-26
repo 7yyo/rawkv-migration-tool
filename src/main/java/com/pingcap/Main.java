@@ -9,6 +9,7 @@ import org.apache.commons.lang.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.tikv.common.TiSession;
+import org.tikv.raw.RawKVClient;
 
 import java.io.File;
 import java.util.List;
@@ -28,18 +29,29 @@ public class Main {
         }
 
         Properties properties = PropertiesUtil.getProperties(propertiesPath);
+
+        TiSession tiSession = TiSessionUtil.getTiSession(properties);
+
+        if (Model.GET.equals(System.getProperty("m")) && System.getProperty("k") != null) {
+            RawKVClient rawKVClient = tiSession.createRawClient();
+            String value = RawKVUtil.get(rawKVClient, System.getProperty("k"));
+            logger.info(String.format("Result={key=%s, value=%s}", System.getProperty("k"), value));
+
+            try {
+                rawKVClient.close();
+                tiSession.close();
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+            return;
+        }
+
         String task = properties.getProperty(Model.TASK);
         String importMode = properties.getProperty(Model.MODE);
         String scenes = properties.getProperty(Model.SCENES);
         String checkSumFilePath = properties.getProperty(Model.CHECK_SUM_FILE_PATH);
         String checkSumDelimiter = properties.getProperty(Model.CHECK_SUM_DELIMITER);
         int checkSumThreadNum = Integer.parseInt(properties.getProperty(Model.CHECK_SUM_THREAD_NUM));
-
-        TiSession tiSession = TiSessionUtil.getTiSession(properties);
-
-        if (System.getProperty("get") != null && System.getProperty("k") != null) {
-            RawKVUtil.get(tiSession.createRawClient(), System.getProperty("k"));
-        }
 
         if (StringUtils.isNotBlank(task)) {
             switch (task) {
@@ -67,7 +79,6 @@ public class Main {
                         logger.error(String.format("Check sum file [%s] is not exists!", checkSumFilePath));
                         return;
                     }
-
                     try {
                         checkSumThreadPoolExecutor.awaitTermination(3000, TimeUnit.SECONDS);
                         long duration = System.currentTimeMillis() - checkStartTime;
@@ -83,6 +94,11 @@ public class Main {
             }
         }
 
+        try {
+            tiSession.close();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
 
     }
 

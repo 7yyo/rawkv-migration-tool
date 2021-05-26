@@ -9,6 +9,8 @@ public class Model {
     public static final String ON = "1";
     public static final String OFF = "0";
 
+    public static final String GET = "get";
+
     public static final String INDEX_INFO = "indexInfo";
     public static final String TEMP_INDEX_INFO = "tempIndexInfo";
     public static final String INDEX_TYPE = "indexType";
