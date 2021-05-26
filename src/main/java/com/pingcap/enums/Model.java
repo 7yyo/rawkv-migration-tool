@@ -7,7 +7,6 @@ public class Model {
     public static final String JSON_FORMAT = "json";
     public static final String CSV_FORMAT = "csv";
     public static final String ON = "1";
-    public static final String OFF = "0";
 
     public static final String GET = "get";
     public static final String CHECK = "check";

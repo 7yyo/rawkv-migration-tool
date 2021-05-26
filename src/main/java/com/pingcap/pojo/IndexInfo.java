@@ -15,7 +15,6 @@ public class IndexInfo {
     private String targetId;
     private String createTime;
     private String updateTime;
-    private int fileLine;
 
     public String getId() {
         return id;
@@ -82,14 +81,6 @@ public class IndexInfo {
         this.updateTime = updateTime;
     }
 
-    public int getFileLine() {
-        return fileLine;
-    }
-
-    public void setFileLine(int fileLine) {
-        this.fileLine = fileLine;
-    }
-
     public boolean equals(IndexInfo indexInfo) {
         boolean idC = this.id.equals(indexInfo.getId());
         boolean serviceTagC = true;
@@ -130,20 +121,19 @@ public class IndexInfo {
         return indexInfo;
     }
 
-    public static IndexInfo initIndexInfoT(IndexInfo indexInfoS, String time) {
-        IndexInfo indexInfo = new IndexInfo();
+    public static IndexInfo initIndexInfoT(IndexInfo indexInfoT, IndexInfo indexInfoS, String time) {
         // value
         // appId、serviceTag、targetId、updateTime
-        indexInfo.setAppId(indexInfo.getAppId());
+        indexInfoT.setAppId(indexInfoT.getAppId());
         if (indexInfoS.getServiceTag() == null) {
-            indexInfo.setServiceTag(null);
+            indexInfoT.setServiceTag(null);
         } else if ("".equals(indexInfoS.getServiceTag())) {
-            indexInfo.setServiceTag("");
+            indexInfoT.setServiceTag("");
         } else {
-            indexInfo.setServiceTag(indexInfoS.getServiceTag());
+            indexInfoT.setServiceTag(indexInfoS.getServiceTag());
         }
-        indexInfo.setTargetId(indexInfoS.getTargetId());
-        indexInfo.setUpdateTime(time);
-        return indexInfo;
+        indexInfoT.setTargetId(indexInfoS.getTargetId());
+        indexInfoT.setUpdateTime(time);
+        return indexInfoT;
     }
 }
