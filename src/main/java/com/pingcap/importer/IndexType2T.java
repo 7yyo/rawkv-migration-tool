@@ -21,10 +21,9 @@ public class IndexType2T {
     private static final Logger logger = LoggerFactory.getLogger(Model.LOG);
     private static final HashMap<ByteString, ByteString> kvPairs = new HashMap<>();
 
-    public static void RunIndexInfo2T(Properties properties) {
+    public static void runIndexType(Properties properties, TiSession tiSession) {
 
         String filePath = properties.getProperty(Model.FILE_PATH);
-        TiSession tiSession = TiSessionUtil.getTiSession(properties);
 
         List<File> fileList = FileUtil.showFileList(filePath, false, properties);
         RawKVClient rawKVClient = tiSession.createRawClient();

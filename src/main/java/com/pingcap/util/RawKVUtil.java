@@ -12,7 +12,7 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
-public class BatchPutUtil {
+public class RawKVUtil {
 
     private static final Logger logger = LoggerFactory.getLogger(Model.LOG);
     private static final Logger auditLog = LoggerFactory.getLogger(Model.AUDIT_LOG);
@@ -62,6 +62,11 @@ public class BatchPutUtil {
 
         }
         return count;
+    }
+
+    public static String get(RawKVClient rawKVClient, String key) {
+        ByteString value = rawKVClient.get(ByteString.copyFromUtf8(key));
+        return value.toStringUtf8();
     }
 
 }

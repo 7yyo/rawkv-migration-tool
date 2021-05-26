@@ -42,6 +42,13 @@ public class Model {
     public static final String TTL_TYPE = "importer.ttl.type";
     public static final String TTL_DAY = "importer.ttl.day";
     public static final String TIMER_INTERVAL = "importer.timer.interval";
-    public static final String TIMER_TOTAL_FILE_INTERVAL = "importer.timer.totalFileInterval";
+
+    // TODO
+    public static final String INIT_START_NUM = "importer.init.startNum";
+    public static final String INIT_START_INIT_NUM = "importer.init.initNum";
+    public static final String INIT_SLICE = "importer.init.slice";
+    public static final String INIT_WRONG_NUM = "importer.init.wrongNum";
+    public static final String INIT_TTL_TYPE_NUM = "importer.init.ttlTypeNum";
+    public static final String INIT_FILE_PATH_WITH_OUT_SUFFIX = "importer.init.filePathWithOutSuffix";
 
 }

@@ -18,9 +18,6 @@ public class ImportTimer extends TimerTask {
     private final AtomicInteger totalFileLine;
     private final int totalLines;
     private final String filePath;
-    private boolean timerCancel;
-
-    private final Timer timer = new Timer();
 
     public ImportTimer(AtomicInteger totalFileLine, int totalLines, String filePath) {
         this.totalFileLine = totalFileLine;

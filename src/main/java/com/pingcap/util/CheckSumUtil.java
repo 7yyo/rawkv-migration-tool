@@ -15,6 +15,9 @@ import org.tikv.raw.RawKVClient;
 import org.tikv.shade.com.google.protobuf.ByteString;
 
 import java.io.*;
+import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -23,24 +26,28 @@ public class CheckSumUtil {
     private static final Logger logger = LoggerFactory.getLogger(Model.LOG);
     private static final Logger checkSumLog = LoggerFactory.getLogger(Model.CHECK_SUM_LOG);
 
-    public static BufferedWriter initCheckSumLog(Properties properties, File originalFile) {
+    public static FileChannel initCheckSumLog(Properties properties, FileChannel fileChannel, File originalFile) {
 
         String checkSumFilePath = properties.getProperty(Model.CHECK_SUM_FILE_PATH);
-        BufferedWriter bufferedWriter = null;
         String checkSumFileName = checkSumFilePath.replaceAll("\"", "") + "/" + originalFile.getName().replaceAll("\\.", "") + "/" + Thread.currentThread().getId() + ".txt";
-        File checkSumFile = new File(checkSumFileName);
 
+        File checkSumFile = new File(checkSumFileName);
         try {
             checkSumFile.getParentFile().mkdirs();
             checkSumFile.createNewFile();
-            FileWriter fileWriter = new FileWriter(checkSumFile, true);
-            bufferedWriter = new BufferedWriter(fileWriter);
-            bufferedWriter.write(originalFile.getAbsolutePath() + "\n");
-            bufferedWriter.flush();
+            FileOutputStream fileOutputStream = new FileOutputStream(new File(checkSumFileName));
+            fileChannel = fileOutputStream.getChannel();
         } catch (IOException e) {
             e.printStackTrace();
         }
-        return bufferedWriter;
+
+        try {
+            ByteBuffer originalLine = StandardCharsets.UTF_8.encode(originalFile.getAbsolutePath() + "\n");
+            fileChannel.write(originalLine);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return fileChannel;
     }
 
     public static void checkSumIndexInfoJson(String checkSumFilePath, String checkSumDelimiter, TiSession tiSession, Properties properties) {
@@ -214,16 +221,10 @@ public class CheckSumUtil {
                     }
                     break;
                 case Model.CSV_FORMAT:
-                    switch (scenes) {
-                        case Model.INDEX_INFO:
-                            indexInfo_original = IndexInfo.initIndexInfo(originalLine, delimiter_1, delimiter_2);
-                            if (!indexInfo_checkSum.equals(indexInfo_original)) {
-                                checkSumLog.error(String.format("Check sum failed! Line = %s", originalLine));
-                                checkFailNum++;
-                            }
-                            break;
-                        default:
-                            throw new IllegalStateException("Unexpected value: " + scenes);
+                    indexInfo_original = IndexInfo.initIndexInfo(originalLine, delimiter_1, delimiter_2);
+                    if (!indexInfo_checkSum.equals(indexInfo_original)) {
+                        checkSumLog.error(String.format("Check sum failed! Line = %s", originalLine));
+                        checkFailNum++;
                     }
                     break;
                 default:
@@ -232,9 +233,13 @@ public class CheckSumUtil {
 
         }
 
-        LineIterator.closeQuietly(checkSumFileIt);
-        LineIterator.closeQuietly(originalFileIt);
-        rawKVClient.close();
+        try {
+            checkSumFileIt.close();
+            originalFileIt.close();
+            rawKVClient.close();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
         timer.cancel();
 
         logger.info(String.format("[%s] check sum over! TotalCheckNum[%s], TotalNotInsertNum[%s], TotalParseErrorNum[%s], TotalCheckFailNum[%s]", checkSumFilePath, totalCheckNum, checkNotInsertErrorNum, checkParseErrorNum, checkFailNum));

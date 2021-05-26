@@ -18,7 +18,9 @@ public class FileUtil {
     public static List<File> showFileList(String filePath, boolean isCheckSum, Properties properties) {
         if (!isCheckSum) {
             logger.info("Welcome to To_TiKV.");
-            logger.info(String.format("Properties=%s", properties));
+            if (properties != null) {
+                logger.info(String.format("Properties=%s", properties));
+            }
         }
         List<File> fileList = FileUtil.loadDirectory(new File(filePath), isCheckSum);
         if (fileList.isEmpty()) {
@@ -70,7 +72,7 @@ public class FileUtil {
             in = new FileReader(file);
             LineNumberReader reader = new LineNumberReader(in);
             reader.skip(Long.MAX_VALUE);
-            lines = reader.getLineNumber() + 1;
+            lines = reader.getLineNumber();
             reader.close();
         } catch (IOException e) {
             e.printStackTrace();
@@ -78,8 +80,8 @@ public class FileUtil {
         return lines;
     }
 
-    public static ConcurrentHashMap<String, Long> getTtlTypeMap(List<String> list) {
-        ConcurrentHashMap<String, Long> ttlTypeCountMap = new ConcurrentHashMap<>();
+    public static HashMap<String, Long> getTtlTypeMap(List<String> list) {
+        HashMap<String, Long> ttlTypeCountMap = new HashMap<>();
         for (String ttlType : list) {
             ttlTypeCountMap.put(ttlType, 0L);
         }

@@ -10,6 +10,7 @@ import com.pingcap.timer.ImportTimer;
 import com.pingcap.util.*;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.LineIterator;
+import org.apache.commons.lang.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.tikv.common.TiSession;
@@ -17,6 +18,7 @@ import org.tikv.raw.RawKVClient;
 import org.tikv.shade.com.google.protobuf.ByteString;
 
 import java.io.*;
+import java.nio.channels.FileChannel;
 import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
 import java.util.*;
@@ -29,14 +31,14 @@ public class IndexInfo2T {
 
     private static final Logger logger = LoggerFactory.getLogger(Model.LOG);
 
-    public static void RunIndexInfo2T(Properties properties) {
+    public static void RunIndexInfo2T(Properties properties, TiSession tiSession) {
 
         String filesPath = properties.getProperty(Model.FILE_PATH);
         int corePoolSize = Integer.parseInt(properties.getProperty(Model.CORE_POOL_SIZE));
         int maxPoolSize = Integer.parseInt(properties.getProperty(Model.MAX_POOL_SIZE));
         String checkSumDelimiter = properties.getProperty(Model.CHECK_SUM_DELIMITER);
         String checkSumFilePath = properties.getProperty(Model.CHECK_SUM_FILE_PATH);
-        TiSession tiSession = TiSessionUtil.getTiSession(properties);
+        String ttlType = properties.getProperty(Model.TTL_TYPE);
 
         long importStartTime = System.currentTimeMillis();
 
@@ -45,14 +47,16 @@ public class IndexInfo2T {
         // Clear the check sum folder before starting.
         FileUtil.deleteFolder(properties.getProperty(Model.CHECK_SUM_FILE_PATH));
         FileUtil.deleteFolders(properties.getProperty(Model.CHECK_SUM_FILE_PATH));
+        // Generate ttl type map.
+        List<String> ttlTypeList = new ArrayList<>(Arrays.asList(ttlType.split(",")));
 
         // Start the Main thread for each file.showFileList
-        ThreadPoolExecutor threadPoolExecutor = ThreadPoolUtil.startJob(corePoolSize, maxPoolSize, properties);
-        if (!fileList.isEmpty()) {
+        ThreadPoolExecutor threadPoolExecutor = ThreadPoolUtil.startJob(corePoolSize, maxPoolSize, properties, filesPath);
+        if (fileList != null) {
             for (File file : fileList) {
                 // Pass in the file to be processed and the ttl map.
                 // The ttl map is shared by all file threads, because it is a table for processing, which is summarized here.
-                threadPoolExecutor.execute(new IndexInfo2TJob(file.getAbsolutePath(), properties));
+                threadPoolExecutor.execute(new IndexInfo2TJob(file.getAbsolutePath(), tiSession, properties, ttlTypeList));
             }
         } else {
             logger.error("Data file is empty!");
@@ -73,20 +77,12 @@ public class IndexInfo2T {
         int checkSumThreadNum = Integer.parseInt(properties.getProperty(Model.CHECK_SUM_THREAD_NUM));
 
         ThreadPoolExecutor checkSumThreadPoolExecutor;
-        if (!Model.OFF.equals(properties.getProperty(Model.ENABLE_CHECK_SUM))) {
+        if (Model.ON.equals(properties.getProperty(Model.ENABLE_CHECK_SUM))) {
             List<File> checkSumFileList = FileUtil.showFileList(checkSumFilePath, true, properties);
-            checkSumThreadPoolExecutor = ThreadPoolUtil.startJob(checkSumThreadNum, checkSumThreadNum, properties);
+            checkSumThreadPoolExecutor = ThreadPoolUtil.startJob(checkSumThreadNum, checkSumThreadNum, properties, filesPath);
             if (!checkSumFileList.isEmpty()) {
                 for (File checkSumFile : checkSumFileList) {
-//                    switch (mode) {
-//                        case Model.JSON_FORMAT:
                     checkSumThreadPoolExecutor.execute(new checkSumJsonJob(checkSumFile.getAbsolutePath(), checkSumDelimiter, tiSession, properties));
-//                            break;
-//                        case Model.CSV_FORMAT:
-//                            logger.info("CSV");
-//                        default:
-//                            throw new IllegalStateException("Unexpected value: " + scenes);
-//                    }
                 }
                 checkSumThreadPoolExecutor.shutdown();
             } else {
@@ -114,28 +110,30 @@ class IndexInfo2TJob implements Runnable {
 
     private final String filePath;
     private final Properties properties;
+    // Generate ttl type map.
+    private final List<String> ttlTypeList;
+    private final TiSession tiSession;
 
     private final AtomicInteger totalImportCount = new AtomicInteger(0);
     private final AtomicInteger totalSkipCount = new AtomicInteger(0);
     private final AtomicInteger totalParseErrorCount = new AtomicInteger(0);
     private final AtomicInteger totalBatchPutFailCount = new AtomicInteger(0);
 
-    public IndexInfo2TJob(String filePath, Properties properties) {
+    public IndexInfo2TJob(String filePath, TiSession tiSession, Properties properties, List<String> ttlTypeList) {
         this.filePath = filePath;
         this.properties = properties;
+        this.ttlTypeList = ttlTypeList;
+        this.tiSession = tiSession;
     }
 
     @Override
     public void run() {
 
         int insideThread = Integer.parseInt(properties.getProperty(Model.INTERNAL_THREAD_NUM));
-        String ttlType = properties.getProperty(Model.TTL_TYPE);
 
         long startTime = System.currentTimeMillis();
 
-        // Generate ttl type map.
-        List<String> ttlTypeList = new ArrayList<>(Arrays.asList(ttlType.split(",")));
-        ConcurrentHashMap<String, Long> ttlTypeCountMap = null;
+        HashMap<String, Long> ttlTypeCountMap = null;
         if (!ttlTypeList.isEmpty()) {
             ttlTypeCountMap = FileUtil.getTtlTypeMap(ttlTypeList);
         }
@@ -150,9 +148,9 @@ class IndexInfo2TJob implements Runnable {
         ImportTimer importTimer = new ImportTimer(totalImportCount, lines, filePath);
         timer.schedule(importTimer, 5000, Long.parseLong(properties.getProperty(Model.TIMER_INTERVAL)));
 
-        ThreadPoolExecutor threadPoolExecutor = ThreadPoolUtil.startJob(insideThread, insideThread, properties);
+        ThreadPoolExecutor threadPoolExecutor = ThreadPoolUtil.startJob(insideThread, insideThread, properties, file.getName());
         for (String s : threadPerLineList) {
-            threadPoolExecutor.execute(new BatchPutIndexInfoJob(totalImportCount, totalSkipCount, totalParseErrorCount, totalBatchPutFailCount, filePath, ttlTypeList, ttlTypeCountMap, s, properties));
+            threadPoolExecutor.execute(new BatchPutIndexInfoJob(tiSession, totalImportCount, totalSkipCount, totalParseErrorCount, totalBatchPutFailCount, filePath, ttlTypeList, ttlTypeCountMap, s, properties));
         }
 
         threadPoolExecutor.shutdown();
@@ -184,17 +182,20 @@ class BatchPutIndexInfoJob implements Runnable {
     private static final Logger auditLog = LoggerFactory.getLogger(Model.AUDIT_LOG);
 
     private final String filePath;
+    private final TiSession tiSession;
     private final List<String> ttlTypeList;
-    private final ConcurrentHashMap<String, Long> ttlTypeCountMap;
+    private final HashMap<String, Long> ttlTypeCountMap;
     private final String fileBlock;
     private final AtomicInteger totalImportCount;
     private final AtomicInteger totalSkipCount;
     private final AtomicInteger totalParseErrorCount;
     private final AtomicInteger totalBatchPutFailCount;
     private final Properties properties;
+    private FileChannel fileChannel;
 
-    public BatchPutIndexInfoJob(AtomicInteger totalImportCount, AtomicInteger totalSkipCount, AtomicInteger totalParseErrorCount, AtomicInteger totalBatchPutFailCount, String filePath, List<String> ttlTypeList, ConcurrentHashMap<String, Long> ttlTypeCountMap, String fileBlock, Properties properties) {
+    public BatchPutIndexInfoJob(TiSession tiSession, AtomicInteger totalImportCount, AtomicInteger totalSkipCount, AtomicInteger totalParseErrorCount, AtomicInteger totalBatchPutFailCount, String filePath, List<String> ttlTypeList, HashMap<String, Long> ttlTypeCountMap, String fileBlock, Properties properties) {
         this.totalImportCount = totalImportCount;
+        this.tiSession = tiSession;
         this.totalSkipCount = totalSkipCount;
         this.totalParseErrorCount = totalParseErrorCount;
         this.totalBatchPutFailCount = totalBatchPutFailCount;
@@ -208,46 +209,35 @@ class BatchPutIndexInfoJob implements Runnable {
     @Override
     public void run() {
 
-        TiSession tiSession = TiSessionUtil.getTiSession(properties);
-
         String envId = properties.getProperty(Model.ENV_ID);
         String appId = properties.getProperty(Model.APP_ID);
         String importMode = properties.getProperty(Model.MODE);
         String scenes = properties.getProperty(Model.SCENES);
         int batchSize = Integer.parseInt(properties.getProperty(Model.BATCH_SIZE));
         int checkSumPercentage = Integer.parseInt(properties.getProperty(Model.CHECK_SUM_PERCENTAGE));
-        int isCheckSum = Integer.parseInt(properties.getProperty(Model.ENABLE_CHECK_SUM));
+        String isCheckSum = properties.getProperty(Model.ENABLE_CHECK_SUM);
         String delimiter_1 = properties.getProperty(Model.DELIMITER_1);
         String delimiter_2 = properties.getProperty(Model.DELIMITER_2);
 
         File file = new File(filePath);
-        BufferedReader bufferedReader = null;
-        FileInputStream fileInputStream = null;
-        BufferedInputStream bufferedInputStream = null;
-
-        try {
-            fileInputStream = new FileInputStream(file);
-            bufferedInputStream = new BufferedInputStream(fileInputStream);
-            bufferedReader = new BufferedReader(new InputStreamReader(bufferedInputStream, StandardCharsets.UTF_8));
-        } catch (FileNotFoundException e) {
-            e.printStackTrace();
-        }
 
         int start = Integer.parseInt(fileBlock.split(",")[0]);
         int todo = Integer.parseInt(fileBlock.split(",")[1]);
 
-        BufferedWriter bufferedWriter = null;
-        if (0 != isCheckSum) {
-            bufferedWriter = CheckSumUtil.initCheckSumLog(properties, file);
+
+        if (Model.ON.equals(isCheckSum)) {
+            fileChannel = CheckSumUtil.initCheckSumLog(properties, fileChannel, file);
+        }
+
+        LineIterator lineIterator = null;
+        try {
+            lineIterator = FileUtils.lineIterator(file, "UTF-8");
+        } catch (IOException e) {
+            e.printStackTrace();
         }
 
         for (int m = 0; m < start; m++) {
-            try {
-                assert bufferedReader != null;
-                bufferedReader.readLine();
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
+            lineIterator.nextLine();
         }
 
         int count = 0;
@@ -277,9 +267,8 @@ class BatchPutIndexInfoJob implements Runnable {
                 count++;
                 totalCount++;
 
-                assert bufferedReader != null;
-                line = bufferedReader.readLine();
-                if (line == null || "".equals(line)) {
+                line = lineIterator.nextLine();
+                if (StringUtils.isBlank(line)) {
                     logger.warn(String.format("This is blank in file=%s, line=%s", file.getAbsolutePath(), start + totalCount));
                     continue;
                 }
@@ -297,7 +286,7 @@ class BatchPutIndexInfoJob implements Runnable {
                             auditLog.error(String.format("Failed to parse json, file='%s', json='%s',line=%s,", file, line, start + totalCount));
                             totalParseErrorCount.addAndGet(1);
                             // if _todo_ == totalCount in json failed, batch put.
-                            count = BatchPutUtil.batchPut(totalCount, todo, count, batchSize, rawKVClient, kvPairs, file, totalImportCount, totalSkipCount, totalBatchPutFailCount, start + totalCount, properties);
+                            count = RawKVUtil.batchPut(totalCount, todo, count, batchSize, rawKVClient, kvPairs, file, totalImportCount, totalSkipCount, totalBatchPutFailCount, start + totalCount, properties);
                             continue;
                         }
                         switch (scenes) {
@@ -308,7 +297,7 @@ class BatchPutIndexInfoJob implements Runnable {
                                     ttlTypeCountMap.put(indexInfoS.getType(), ttlTypeCountMap.get(indexInfoS.getType()) + 1);
                                     auditLog.warn(String.format("[Skip TTL] [%s] in [%s],line=[%s]", indexInfoKey, file.getAbsolutePath(), start + totalCount));
                                     totalSkipCount.addAndGet(1);
-                                    count = BatchPutUtil.batchPut(totalCount, todo, count, batchSize, rawKVClient, kvPairs, file, totalImportCount, totalSkipCount, totalBatchPutFailCount, start + totalCount, properties);
+                                    count = RawKVUtil.batchPut(totalCount, todo, count, batchSize, rawKVClient, kvPairs, file, totalImportCount, totalSkipCount, totalBatchPutFailCount, start + totalCount, properties);
                                     continue;
                                 }
                                 if (envId != null) {
@@ -361,35 +350,27 @@ class BatchPutIndexInfoJob implements Runnable {
                 }
 
                 // Sampling data is written into the check sum file
-                if (0 != isCheckSum) {
+                if (Model.ON.equals(isCheckSum)) {
                     int nn = random.nextInt(100 / checkSumPercentage) + 1;
                     if (nn == 1) {
-                        bufferedWriter.write(indexInfoKey + checkSumDelimiter + (start + totalCount) + "\n");
+                        fileChannel.write(StandardCharsets.UTF_8.encode(indexInfoKey + checkSumDelimiter + (start + totalCount) + "\n"));
                     }
                 }
 
                 assert key != null;
                 kvPairs.put(key, value);
 
-                count = BatchPutUtil.batchPut(totalCount, todo, count, batchSize, rawKVClient, kvPairs, file, totalImportCount, totalSkipCount, totalBatchPutFailCount, start + totalCount, properties);
-
+                count = RawKVUtil.batchPut(totalCount, todo, count, batchSize, rawKVClient, kvPairs, file, totalImportCount, totalSkipCount, totalBatchPutFailCount, start + totalCount, properties);
             } catch (IOException e) {
                 e.printStackTrace();
             }
         }
         try {
-            if (0 != isCheckSum) {
-                bufferedWriter.flush();
-                bufferedWriter.close();
+            if (Model.ON.equals(isCheckSum)) {
+                fileChannel.close();
             }
-            assert bufferedReader != null;
-            bufferedReader.close();
-            fileInputStream.close();
-            bufferedInputStream.close();
+            lineIterator.close();
             rawKVClient.close();
-            tiSession.close();
-        } catch (IOException e) {
-            e.printStackTrace();
         } catch (Exception e) {
             e.printStackTrace();
         }
