@@ -255,9 +255,9 @@ class BatchPutIndexInfoJob implements Runnable {
         SimpleDateFormat simpleDateFormat;
         String time;
         IndexInfo indexInfoS;
-        IndexInfo indexInfoT;
+        IndexInfo indexInfoT = new IndexInfo();
         TempIndexInfo tempIndexInfoS;
-        TempIndexInfo tempIndexInfoT;
+        TempIndexInfo tempIndexInfoT = new TempIndexInfo();
         String id;
         String type;
 
@@ -306,7 +306,8 @@ class BatchPutIndexInfoJob implements Runnable {
                                     indexInfoKey = String.format(IndexInfo.INDEX_INFO_KET_FORMAT, indexInfoS.getEnvId(), indexInfoS.getType(), indexInfoS.getId());
                                 }
                                 // TiKV indexInfo
-                                indexInfoT = IndexInfo.initIndexInfoT(indexInfoS, time);
+                                indexInfoT = IndexInfo.initIndexInfoT(indexInfoT, indexInfoS, time);
+                                indexInfoT.setAppId(indexInfoS.getAppId());
                                 key = ByteString.copyFromUtf8(indexInfoKey);
                                 value = ByteString.copyFromUtf8(JSONObject.toJSONString(indexInfoT));
                                 logger.debug(String.format("[%s], K=%s, V={%s}", file.getAbsolutePath(), indexInfoKey, JSONObject.toJSONString(indexInfoT)));
@@ -319,7 +320,7 @@ class BatchPutIndexInfoJob implements Runnable {
                                     indexInfoKey = String.format(TempIndexInfo.TEMP_INDEX_INFO_KEY_FORMAT, tempIndexInfoS.getEnvId(), tempIndexInfoS.getId());
                                 }
                                 // TiKV tempIndexInfo
-                                tempIndexInfoT = TempIndexInfo.initTempIndexInfo(tempIndexInfoS);
+                                tempIndexInfoT = TempIndexInfo.initTempIndexInfo(tempIndexInfoT, tempIndexInfoS);
                                 key = ByteString.copyFromUtf8(indexInfoKey);
                                 value = ByteString.copyFromUtf8(JSONObject.toJSONString(tempIndexInfoT));
                                 logger.debug(String.format("[%s], K=%s, V={%s}", file.getAbsolutePath(), indexInfoKey, JSONObject.toJSONString(tempIndexInfoT)));

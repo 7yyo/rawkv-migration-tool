@@ -54,9 +54,10 @@ public class RawKVUtil {
 
             if (!kvPairs.isEmpty()) {
                 try {
-                    if (Model.JSON_FORMAT.equals(importMode)) {
+                    if (Model.INDEX_INFO.equals(properties.getProperty(Model.SCENES))) {
                         rawKVClient.batchPut(kvPairs);
-                    } else if (Model.CSV_FORMAT.equals(importMode)) {
+//                        System.out.println(totalCount + "==" + todo + "|||" + count + "==" + batchSize + "===put");
+                    } else if (Model.TEMP_INDEX_INFO.equals(properties.getProperty(Model.SCENES))) {
                         rawKVClient.batchPut(kvPairs, ttl);
                     }
                     totalLineCount.addAndGet(kvPairs.size());

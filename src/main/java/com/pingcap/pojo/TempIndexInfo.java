@@ -1,7 +1,5 @@
 package com.pingcap.pojo;
 
-import com.alibaba.fastjson.JSON;
-
 public class TempIndexInfo {
 
     public static final String TEMP_INDEX_INFO_KEY_FORMAT = "tempIndex_:_%s_:_%s";
@@ -10,7 +8,6 @@ public class TempIndexInfo {
     private String id;
     private String appId;
     private String targetId;
-    private int fileLine;
 
     public String getAppId() {
         return appId;
@@ -44,14 +41,6 @@ public class TempIndexInfo {
         this.id = id;
     }
 
-    public int getFileLine() {
-        return fileLine;
-    }
-
-    public void setFileLine(int fileLine) {
-        this.fileLine = fileLine;
-    }
-
     public boolean equals(TempIndexInfo tmpIndexInfo) {
 //        boolean envIdC = this.envId.equals(tmpIndexInfo.getEnvId());
         boolean idC = this.id.equals(tmpIndexInfo.getId());
@@ -60,19 +49,7 @@ public class TempIndexInfo {
         return idC && targetIdC;
     }
 
-    public static TempIndexInfo initTempIndexInfo(String originalLine, String delimiter_1, String delimiter_2) {
-        TempIndexInfo tempIndexInfo = new TempIndexInfo();
-        String evnId = originalLine.split(delimiter_1)[1];
-        tempIndexInfo.setEnvId(evnId);
-        String id = originalLine.split(delimiter_1)[2].split(delimiter_2)[0];
-        tempIndexInfo.setId(id);
-        String targetId = originalLine.split(delimiter_1)[2].split(delimiter_2)[1];
-        tempIndexInfo.setTargetId(targetId);
-        return tempIndexInfo;
-    }
-
-    public static TempIndexInfo initTempIndexInfo(TempIndexInfo tempIndexInfoS) {
-        TempIndexInfo tempIndexInfoT = new TempIndexInfo();
+    public static TempIndexInfo initTempIndexInfo(TempIndexInfo tempIndexInfoT, TempIndexInfo tempIndexInfoS) {
         // value -
         // appId、targetId
         tempIndexInfoT.setAppId(tempIndexInfoS.getAppId());
