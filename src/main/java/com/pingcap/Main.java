@@ -45,6 +45,17 @@ public class Main {
             }
             return;
         }
+        if (Model.CHECK.equals(System.getProperty("m")) && System.getProperty("f") != null) {
+            RawKVClient rawKVClient = tiSession.createRawClient();
+            RawKVUtil.batchGetCheck(System.getProperty("f"), tiSession, properties);
+            try {
+                rawKVClient.close();
+                tiSession.close();
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+            return;
+        }
 
         String task = properties.getProperty(Model.TASK);
         String importMode = properties.getProperty(Model.MODE);

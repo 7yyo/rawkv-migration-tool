@@ -10,6 +10,7 @@ public class Model {
     public static final String OFF = "0";
 
     public static final String GET = "get";
+    public static final String CHECK = "check";
 
     public static final String INDEX_INFO = "indexInfo";
     public static final String TEMP_INDEX_INFO = "tempIndexInfo";
@@ -28,7 +29,7 @@ public class Model {
     public static final String CHECK_SUM_THREAD_NUM = "importer.checkSum.checkSumThreadNum";
     public static final String BATCH_SIZE = "importer.tikv.batchSize";
     public static final String DELETE_FOR_TEST = "importer.tikv.deleteForTest";
-    public static final String SKIP_EXISTS_KEY = "importer.tikv.skipExistsKey";
+    public static final String CHECK_EXISTS_KEY = "importer.tikv.checkExistsKey";
     public static final String ENABLE_CHECK_SUM = "importer.checkSum.enabledCheckSum";
     public static final String CHECK_SUM_FILE_PATH = "importer.checkSum.checkSumFilePath";
     public static final String CHECK_SUM_DELIMITER = "importer.checkSum.checkSumDelimiter";
