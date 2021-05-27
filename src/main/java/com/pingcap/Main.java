@@ -95,13 +95,12 @@ public class Main {
                         long duration = System.currentTimeMillis() - checkStartTime;
                         logger.info(String.format("All files check sum is complete! It takes [%s] seconds", (duration / 1000)));
                         System.exit(0);
-                    } catch (
-                            InterruptedException e) {
+                    } catch (InterruptedException e) {
                         e.printStackTrace();
                     }
-
                     break;
                 default:
+                    logger.error(String.format("The configuration parameter [%s] must be [import] or [checkSum]]!", Model.TASK));
             }
         }
 
