@@ -72,7 +72,7 @@ public class FileUtil {
             in = new FileReader(file);
             LineNumberReader reader = new LineNumberReader(in);
             reader.skip(Long.MAX_VALUE);
-            lines = reader.getLineNumber() + 1;
+            lines = reader.getLineNumber();
             reader.close();
         } catch (IOException e) {
             e.printStackTrace();

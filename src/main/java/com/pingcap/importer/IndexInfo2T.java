@@ -66,7 +66,7 @@ public class IndexInfo2T {
         threadPoolExecutor.shutdown();
 
         try {
-            threadPoolExecutor.awaitTermination(3000, TimeUnit.SECONDS);
+            threadPoolExecutor.awaitTermination(Long.MAX_VALUE, TimeUnit.SECONDS);
             long duration = System.currentTimeMillis() - importStartTime;
             logger.info(String.format("All files import is complete! It takes [%s] seconds", (duration / 1000)));
         } catch (InterruptedException e) {
@@ -91,7 +91,7 @@ public class IndexInfo2T {
             }
 
             try {
-                checkSumThreadPoolExecutor.awaitTermination(3000, TimeUnit.SECONDS);
+                checkSumThreadPoolExecutor.awaitTermination(Long.MAX_VALUE, TimeUnit.SECONDS);
                 long duration = System.currentTimeMillis() - checkStartTime;
                 logger.info(String.format("All files check sum is complete! It takes [%s] seconds", (duration / 1000)));
                 logger.info(String.format("Total duration=[%s] seconds", ((System.currentTimeMillis() - importStartTime) / 1000)));

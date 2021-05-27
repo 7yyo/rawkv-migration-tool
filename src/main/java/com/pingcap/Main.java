@@ -91,7 +91,7 @@ public class Main {
                         return;
                     }
                     try {
-                        checkSumThreadPoolExecutor.awaitTermination(3000, TimeUnit.SECONDS);
+                        checkSumThreadPoolExecutor.awaitTermination(Long.MAX_VALUE, TimeUnit.SECONDS);
                         long duration = System.currentTimeMillis() - checkStartTime;
                         logger.info(String.format("All files check sum is complete! It takes [%s] seconds", (duration / 1000)));
                         System.exit(0);
