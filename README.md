@@ -1,5 +1,9 @@
+# Overview
 ![image](https://github.com/7yyo/to_tikv/blob/master/src/main/resources/img/total.png)
+# Data validation
+![image](https://github.com/7yyo/to_tikv/blob/master/src/main/resources/img/checksum.png)
 
+# Configuration file parameters
 ```properties
 # pd address
 importer.tikv.pd=172.16.4.33:5555,172.16.4.34:5555,172.16.4.35:5555
@@ -50,3 +54,8 @@ importer.ttl.day=604800000
 # Progress printing frequency, the unit is ms
 importer.timer.interval=30000
 ```
+# Usage
+```java
+java -Dp='importer.properties_file_path' -jar tikv_importer.jar
+```
+
