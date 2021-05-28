@@ -328,22 +328,30 @@ class BatchPutIndexInfoJob implements Runnable {
                         }
                         break;
                     case Model.CSV_FORMAT:
+                        try {
+                            id = line.split(delimiter_1)[0];
+                            type = line.split(delimiter_1)[1];
 
-                        id = line.split(delimiter_1)[0];
-                        type = line.split(delimiter_1)[1];
+                            indexInfoS = new IndexInfo();
+                            if (envId != null) {
+                                indexInfoKey = String.format(IndexInfo.INDEX_INFO_KET_FORMAT, envId, type, id);
+                            } else {
+                                indexInfoKey = String.format(IndexInfo.INDEX_INFO_KET_FORMAT, indexInfoS.getEnvId(), type, id);
+                            }
 
-                        indexInfoS = new IndexInfo();
-                        if (envId != null) {
-                            indexInfoKey = String.format(IndexInfo.INDEX_INFO_KET_FORMAT, envId, type, id);
-                        } else {
-                            indexInfoKey = String.format(IndexInfo.INDEX_INFO_KET_FORMAT, indexInfoS.getEnvId(), type, id);
+                            indexInfoT = IndexInfo.initIndexInfo(line, delimiter_1, delimiter_2);
+                            indexInfoT.setAppId(appId);
+                            indexInfoT.setUpdateTime(time);
+                            key = ByteString.copyFromUtf8(indexInfoKey);
+                            value = ByteString.copyFromUtf8(JSONObject.toJSONString(indexInfoT));
+                        } catch (Exception e) {
+                            logger.error(String.format("Failed to parse csv, file='%s', csv='%s',line=%s,", file, line, start + totalCount));
+                            totalParseErrorCount.addAndGet(1);
+                            // if _todo_ == totalCount in json failed, batch put.
+                            count = RawKVUtil.batchPut(totalCount, todo, count, batchSize, rawKVClient, kvPairs, file, totalImportCount, totalSkipCount, totalBatchPutFailCount, start + totalCount, properties);
+                            continue;
                         }
 
-                        indexInfoT = IndexInfo.initIndexInfo(line, delimiter_1, delimiter_2);
-                        indexInfoT.setAppId(appId);
-                        indexInfoT.setUpdateTime(time);
-                        key = ByteString.copyFromUtf8(indexInfoKey);
-                        value = ByteString.copyFromUtf8(JSONObject.toJSONString(indexInfoT));
                         break;
                     default:
                         logger.error(String.format("Illegal format: %s", importMode));
