@@ -55,7 +55,7 @@ importer.ttl.day=604800000
 importer.timer.interval=30000
 ```
 # Usage
-```java
+```shell
 java -Dp='importer.properties_file_path' -jar tikv_importer.jar
 ```
 
