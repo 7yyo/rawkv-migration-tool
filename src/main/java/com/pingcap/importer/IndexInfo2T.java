@@ -339,6 +339,15 @@ class BatchPutIndexInfoJob implements Runnable {
                                 indexInfoKey = String.format(IndexInfo.INDEX_INFO_KET_FORMAT, indexInfoS.getEnvId(), type, id);
                             }
 
+                            // Skip the type that exists in the tty type map.
+                            if (ttlTypeList.contains(type)) {
+                                ttlTypeCountMap.put(type, ttlTypeCountMap.get(type) + 1);
+                                auditLog.warn(String.format("[Skip TTL] [%s] in [%s],line=[%s]", indexInfoKey, file.getAbsolutePath(), start + totalCount));
+                                totalSkipCount.addAndGet(1);
+                                count = RawKVUtil.batchPut(totalCount, todo, count, batchSize, rawKVClient, kvPairs, file, totalImportCount, totalSkipCount, totalBatchPutFailCount, start + totalCount, properties);
+                                continue;
+                            }
+
                             indexInfoT = IndexInfo.initIndexInfo(line, delimiter_1, delimiter_2);
                             indexInfoT.setAppId(appId);
                             indexInfoT.setUpdateTime(time);
