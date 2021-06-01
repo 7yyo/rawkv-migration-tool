@@ -21,6 +21,6 @@ public class checkSumJsonJob implements Runnable {
 
     @Override
     public void run() {
-        CheckSumUtil.checkSumIndexInfoJson(checkSumFilePath, checkSumDelimiter, tiSession, properties);
+        CheckSumUtil.checkSum(checkSumFilePath, checkSumDelimiter, tiSession, properties);
     }
 }

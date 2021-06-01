@@ -14,7 +14,7 @@ public class ThreadPoolUtil {
                 maxPoolSize,
                 0,
                 TimeUnit.SECONDS,
-                new LinkedBlockingDeque<Runnable>(Integer.parseInt(properties.getProperty(Model.BLOCK_DEQUE_CAPACITY))),
+                new LinkedBlockingDeque<Runnable>(Integer.parseInt(properties.getProperty(Model.MAX_POOL_SIZE))),
                 new ThreadFactoryBuilder().setDaemon(true).setNameFormat("thread-" + filaName + "-%d").build(),
                 new ThreadPoolExecutor.CallerRunsPolicy());
     }

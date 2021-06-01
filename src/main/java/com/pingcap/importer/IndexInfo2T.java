@@ -22,7 +22,6 @@ import java.nio.channels.FileChannel;
 import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -50,7 +49,7 @@ public class IndexInfo2T {
         // Generate ttl type map.
         List<String> ttlTypeList = new ArrayList<>(Arrays.asList(ttlType.split(",")));
 
-        // Start the Main thread for each file.showFileList
+        // Start the Main thread for each file.showFileList.
         ThreadPoolExecutor threadPoolExecutor = ThreadPoolUtil.startJob(corePoolSize, maxPoolSize, properties, filesPath);
         if (fileList != null) {
             for (File file : fileList) {
@@ -66,9 +65,10 @@ public class IndexInfo2T {
         threadPoolExecutor.shutdown();
 
         try {
-            threadPoolExecutor.awaitTermination(Long.MAX_VALUE, TimeUnit.SECONDS);
-            long duration = System.currentTimeMillis() - importStartTime;
-            logger.info(String.format("All files import is complete! It takes [%s] seconds", (duration / 1000)));
+            if (threadPoolExecutor.awaitTermination(Long.MAX_VALUE, TimeUnit.SECONDS)) {
+                long duration = System.currentTimeMillis() - importStartTime;
+                logger.info(String.format("All files import is complete! It takes [%s] seconds", (duration / 1000)));
+            }
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
@@ -80,7 +80,7 @@ public class IndexInfo2T {
         if (Model.ON.equals(properties.getProperty(Model.ENABLE_CHECK_SUM))) {
             List<File> checkSumFileList = FileUtil.showFileList(checkSumFilePath, true, properties);
             checkSumThreadPoolExecutor = ThreadPoolUtil.startJob(checkSumThreadNum, checkSumThreadNum, properties, filesPath);
-            if (!checkSumFileList.isEmpty()) {
+            if (checkSumFileList != null) {
                 for (File checkSumFile : checkSumFileList) {
                     checkSumThreadPoolExecutor.execute(new checkSumJsonJob(checkSumFile.getAbsolutePath(), checkSumDelimiter, tiSession, properties));
                 }
@@ -91,11 +91,12 @@ public class IndexInfo2T {
             }
 
             try {
-                checkSumThreadPoolExecutor.awaitTermination(Long.MAX_VALUE, TimeUnit.SECONDS);
-                long duration = System.currentTimeMillis() - checkStartTime;
-                logger.info(String.format("All files check sum is complete! It takes [%s] seconds", (duration / 1000)));
-                logger.info(String.format("Total duration=[%s] seconds", ((System.currentTimeMillis() - importStartTime) / 1000)));
-                System.exit(0);
+                if (checkSumThreadPoolExecutor.awaitTermination(Long.MAX_VALUE, TimeUnit.SECONDS)) {
+                    long duration = System.currentTimeMillis() - checkStartTime;
+                    logger.info(String.format("All files check sum is complete! It takes [%s] seconds", (duration / 1000)));
+                    logger.info(String.format("Total duration=[%s] seconds", ((System.currentTimeMillis() - importStartTime) / 1000)));
+                    System.exit(0);
+                }
             } catch (
                     InterruptedException e) {
                 e.printStackTrace();
@@ -155,24 +156,23 @@ class IndexInfo2TJob implements Runnable {
 
         threadPoolExecutor.shutdown();
 
-        while (true) {
-            if (threadPoolExecutor.isTerminated()) {
-                break;
+        try {
+            if (threadPoolExecutor.awaitTermination(Long.MAX_VALUE, TimeUnit.SECONDS)) {
+                long duration = System.currentTimeMillis() - startTime;
+                StringBuilder result = new StringBuilder("[Import Report] File[" + file.getAbsolutePath() + "],TotalRows[" + lines + "],ImportedRows[" + totalImportCount + "],SkipRows[" + totalSkipCount + "],ParseERROR[" + totalParseErrorCount + "],BatchPutERROR[" + totalBatchPutFailCount + "],Duration[" + duration / 1000 + "s],");
+                result.append("Skip type[");
+                if (ttlTypeCountMap != null) {
+                    for (Map.Entry<String, Long> item : ttlTypeCountMap.entrySet()) {
+                        result.append("<").append(item.getKey()).append(">").append("[").append(item.getValue()).append("]").append("]");
+                    }
+                }
+                timer.cancel();
+                logger.info(result.toString());
             }
+        } catch (InterruptedException e) {
+            e.printStackTrace();
         }
 
-        long duration = System.currentTimeMillis() - startTime;
-        StringBuilder result = new StringBuilder("[Import Report] File[" + file.getAbsolutePath() + "],TotalRows[" + lines + "],ImportedRows[" + totalImportCount + "],SkipRows[" + totalSkipCount + "],ParseERROR[" + totalParseErrorCount + "],BatchPutERROR[" + totalBatchPutFailCount + "],Duration[" + duration / 1000 + "s],");
-        result.append("Skip type[");
-
-        assert ttlTypeCountMap != null;
-        if (!ttlTypeCountMap.isEmpty()) {
-            for (Map.Entry<String, Long> item : ttlTypeCountMap.entrySet()) {
-                result.append("<").append(item.getKey()).append(">").append("[").append(item.getValue()).append("]").append("]");
-            }
-        }
-        timer.cancel();
-        logger.info(result.toString());
     }
 }
 
@@ -215,7 +215,7 @@ class BatchPutIndexInfoJob implements Runnable {
         String scenes = properties.getProperty(Model.SCENES);
         int batchSize = Integer.parseInt(properties.getProperty(Model.BATCH_SIZE));
         int checkSumPercentage = Integer.parseInt(properties.getProperty(Model.CHECK_SUM_PERCENTAGE));
-        String isCheckSum = properties.getProperty(Model.ENABLE_CHECK_SUM);
+        String enableCheckSum = properties.getProperty(Model.ENABLE_CHECK_SUM);
         String delimiter_1 = properties.getProperty(Model.DELIMITER_1);
         String delimiter_2 = properties.getProperty(Model.DELIMITER_2);
 
@@ -225,7 +225,7 @@ class BatchPutIndexInfoJob implements Runnable {
         int todo = Integer.parseInt(fileBlock.split(",")[1]);
 
 
-        if (Model.ON.equals(isCheckSum)) {
+        if (Model.ON.equals(enableCheckSum)) {
             fileChannel = CheckSumUtil.initCheckSumLog(properties, fileChannel, file);
         }
 
@@ -245,7 +245,7 @@ class BatchPutIndexInfoJob implements Runnable {
         String line;
         String indexInfoKey = null;
         JSONObject jsonObject;
-        ConcurrentHashMap<ByteString, ByteString> kvPairs = new ConcurrentHashMap<>();
+        HashMap<ByteString, ByteString> kvPairs = new HashMap<>();
         RawKVClient rawKVClient = tiSession.createRawClient();
         String checkSumDelimiter = properties.getProperty(Model.CHECK_SUM_DELIMITER);
 
@@ -306,7 +306,7 @@ class BatchPutIndexInfoJob implements Runnable {
                                     indexInfoKey = String.format(IndexInfo.INDEX_INFO_KET_FORMAT, indexInfoS.getEnvId(), indexInfoS.getType(), indexInfoS.getId());
                                 }
                                 // TiKV indexInfo
-                                indexInfoT = IndexInfo.initIndexInfoT(indexInfoT, indexInfoS, time);
+                                IndexInfo.initIndexInfoT(indexInfoT, indexInfoS, time);
                                 indexInfoT.setAppId(indexInfoS.getAppId());
                                 key = ByteString.copyFromUtf8(indexInfoKey);
                                 value = ByteString.copyFromUtf8(JSONObject.toJSONString(indexInfoT));
@@ -320,7 +320,7 @@ class BatchPutIndexInfoJob implements Runnable {
                                     indexInfoKey = String.format(TempIndexInfo.TEMP_INDEX_INFO_KEY_FORMAT, tempIndexInfoS.getEnvId(), tempIndexInfoS.getId());
                                 }
                                 // TiKV tempIndexInfo
-                                tempIndexInfoT = TempIndexInfo.initTempIndexInfo(tempIndexInfoT, tempIndexInfoS);
+                                TempIndexInfo.initTempIndexInfo(tempIndexInfoT, tempIndexInfoS);
                                 key = ByteString.copyFromUtf8(indexInfoKey);
                                 value = ByteString.copyFromUtf8(JSONObject.toJSONString(tempIndexInfoT));
                                 logger.debug(String.format("[%s], K=%s, V={%s}", file.getAbsolutePath(), indexInfoKey, JSONObject.toJSONString(tempIndexInfoT)));
@@ -368,7 +368,7 @@ class BatchPutIndexInfoJob implements Runnable {
                 }
 
                 // Sampling data is written into the check sum file
-                if (Model.ON.equals(isCheckSum)) {
+                if (Model.ON.equals(enableCheckSum)) {
                     int nn = random.nextInt(100 / checkSumPercentage) + 1;
                     if (nn == 1) {
                         fileChannel.write(StandardCharsets.UTF_8.encode(indexInfoKey + checkSumDelimiter + (start + totalCount) + "\n"));
@@ -384,7 +384,7 @@ class BatchPutIndexInfoJob implements Runnable {
             }
         }
         try {
-            if (Model.ON.equals(isCheckSum)) {
+            if (Model.ON.equals(enableCheckSum)) {
                 fileChannel.close();
             }
             lineIterator.close();

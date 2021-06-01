@@ -12,11 +12,7 @@ import org.tikv.shade.com.google.protobuf.ByteString;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.Properties;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
 
@@ -25,8 +21,9 @@ public class RawKVUtil {
     private static final Logger logger = LoggerFactory.getLogger(Model.LOG);
     private static final Logger auditLog = LoggerFactory.getLogger(Model.AUDIT_LOG);
 
-    public static int batchPut(int totalCount, int todo, int count, int batchSize, RawKVClient rawKVClient, ConcurrentHashMap<ByteString, ByteString> kvPairs, File file, AtomicInteger totalLineCount, AtomicInteger totalSkipCount, AtomicInteger totalBatchPutFailCount, int totalLine, Properties properties) {
+    public static int batchPut(int totalCount, int todo, int count, int batchSize, RawKVClient rawKVClient, HashMap<ByteString, ByteString> kvPairs, File file, AtomicInteger totalLineCount, AtomicInteger totalSkipCount, AtomicInteger totalBatchPutFailCount, int totalLine, Properties properties) {
 
+        // batch put
         if (totalCount == todo || count == batchSize) {
 
             String importMode = properties.getProperty(Model.MODE);
@@ -46,8 +43,8 @@ public class RawKVUtil {
                     for (Kvrpcpb.KvPair kv : haveList) {
                         kvPairs.remove(kv.getKey());
                         auditLog.warn(String.format("Skip key - exists: [ %s ], file is [ %s ], almost line= %s", kv.getKey().toStringUtf8(), file.getAbsolutePath(), totalLine));
-                        totalSkipCount.addAndGet(haveList.size());
                     }
+                    totalSkipCount.addAndGet(haveList.size());
                 }
 
             }
@@ -56,7 +53,6 @@ public class RawKVUtil {
                 try {
                     if (Model.INDEX_INFO.equals(properties.getProperty(Model.SCENES))) {
                         rawKVClient.batchPut(kvPairs);
-//                        System.out.println(totalCount + "==" + todo + "|||" + count + "==" + batchSize + "===put");
                     } else if (Model.TEMP_INDEX_INFO.equals(properties.getProperty(Model.SCENES))) {
                         rawKVClient.batchPut(kvPairs, ttl);
                     }

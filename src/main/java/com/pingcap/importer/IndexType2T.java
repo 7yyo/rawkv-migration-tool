@@ -2,7 +2,6 @@ package com.pingcap.importer;
 
 import com.pingcap.enums.Model;
 import com.pingcap.util.FileUtil;
-import com.pingcap.util.TiSessionUtil;
 import org.apache.commons.lang.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -31,52 +30,55 @@ public class IndexType2T {
         BufferedReader bufferedReader = null;
         BufferedInputStream bufferedInputStream;
 
-        for (File file : fileList) {
-            try {
-                bufferedInputStream = new BufferedInputStream(new FileInputStream(file));
-                bufferedReader = new BufferedReader(new InputStreamReader(bufferedInputStream, StandardCharsets.UTF_8));
-            } catch (FileNotFoundException e) {
-                e.printStackTrace();
-            }
-
-            String line;
-            ByteString key;
-            ByteString value;
-            int lineNum = 0;
-            int skipNum = 0;
-
-            long startTime = System.currentTimeMillis();
-
-            try {
-                while ((line = bufferedReader.readLine()) != null) {
-                    lineNum++;
-                    if (StringUtils.isBlank(line)) {
-                        continue;
-                    }
-                    try {
-                        key = ByteString.copyFromUtf8(line.split("@")[0]);
-                        value = ByteString.copyFromUtf8(line.split("@")[1]);
-                        kvPairs.put(key, value);
-                    } catch (Exception e) {
-                        logger.error(String.format("Failed to process key@value string, file='%s', line=%s, k@v='%s'", file, lineNum, line));
-                        skipNum++;
-                    }
+        if (fileList != null) {
+            for (File file : fileList) {
+                try {
+                    bufferedInputStream = new BufferedInputStream(new FileInputStream(file));
+                    bufferedReader = new BufferedReader(new InputStreamReader(bufferedInputStream, StandardCharsets.UTF_8));
+                } catch (FileNotFoundException e) {
+                    e.printStackTrace();
                 }
-                if (!kvPairs.isEmpty()) {
-                    try {
-                        rawKVClient.batchPut(kvPairs);
-                    } catch (Exception e) {
-                        logger.error(String.format("Batch put Tikv failed, file is [ %s ]", file.getAbsolutePath()), e);
-                    }
-                    kvPairs.clear();
-                }
-                long duration = System.currentTimeMillis() - startTime;
-                logger.info("Import Report: File->[" + file.getAbsolutePath() + "], Total rows->[" + lineNum + "], Imported rows->[" + kvPairs.size() + "], Skip rows->[" + skipNum + "], Duration->[" + duration / 1000 + "s]");
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
 
+                String line;
+                ByteString key;
+                ByteString value;
+                int lineNum = 0;
+                int skipNum = 0;
+
+                long startTime = System.currentTimeMillis();
+
+                try {
+                    while ((line = bufferedReader.readLine()) != null) {
+                        lineNum++;
+                        if (StringUtils.isBlank(line)) {
+                            continue;
+                        }
+                        try {
+                            key = ByteString.copyFromUtf8(line.split("@")[0]);
+                            value = ByteString.copyFromUtf8(line.split("@")[1]);
+                            kvPairs.put(key, value);
+                        } catch (Exception e) {
+                            logger.error(String.format("Failed to process key@value string, file='%s', line=%s, k@v='%s'", file, lineNum, line));
+                            skipNum++;
+                        }
+                    }
+                    if (!kvPairs.isEmpty()) {
+                        try {
+                            rawKVClient.batchPut(kvPairs);
+                        } catch (Exception e) {
+                            logger.error(String.format("Batch put Tikv failed, file is [ %s ]", file.getAbsolutePath()), e);
+                        }
+                        kvPairs.clear();
+                    }
+                    long duration = System.currentTimeMillis() - startTime;
+                    logger.info("Import Report: File->[" + file.getAbsolutePath() + "], Total rows->[" + lineNum + "], Imported rows->[" + kvPairs.size() + "], Skip rows->[" + skipNum + "], Duration->[" + duration / 1000 + "s]");
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+
+            }
         }
+
     }
 
 

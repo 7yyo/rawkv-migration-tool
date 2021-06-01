@@ -24,7 +24,6 @@ public class Model {
     public static final String INTERNAL_THREAD_NUM = "importer.tikv.internalThreadNum";
     public static final String CORE_POOL_SIZE = "importer.tikv.corePoolSize";
     public static final String MAX_POOL_SIZE = "importer.tikv.maxPoolSize";
-    public static final String BLOCK_DEQUE_CAPACITY = "importer.tikv.blockDequeCapacity";
     public static final String CHECK_SUM_THREAD_NUM = "importer.checkSum.checkSumThreadNum";
     public static final String BATCH_SIZE = "importer.tikv.batchSize";
     public static final String DELETE_FOR_TEST = "importer.tikv.deleteForTest";
@@ -44,13 +43,5 @@ public class Model {
     public static final String TTL_TYPE = "importer.ttl.type";
     public static final String TTL_DAY = "importer.ttl.day";
     public static final String TIMER_INTERVAL = "importer.timer.interval";
-
-    // TODO
-    public static final String INIT_START_NUM = "importer.init.startNum";
-    public static final String INIT_START_INIT_NUM = "importer.init.initNum";
-    public static final String INIT_SLICE = "importer.init.slice";
-    public static final String INIT_WRONG_NUM = "importer.init.wrongNum";
-    public static final String INIT_TTL_TYPE_NUM = "importer.init.ttlTypeNum";
-    public static final String INIT_FILE_PATH_WITH_OUT_SUFFIX = "importer.init.filePathWithOutSuffix";
 
 }

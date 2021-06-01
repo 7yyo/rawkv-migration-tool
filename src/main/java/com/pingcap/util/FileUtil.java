@@ -6,7 +6,6 @@ import org.slf4j.LoggerFactory;
 
 import java.io.*;
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
 
 public class FileUtil {
 
@@ -17,13 +16,13 @@ public class FileUtil {
 
     public static List<File> showFileList(String filePath, boolean isCheckSum, Properties properties) {
         if (!isCheckSum) {
-            logger.info("Welcome to To_TiKV.");
+            logger.info("Welcome to To_RawKV.");
             if (properties != null) {
                 logger.info(String.format("Properties=%s", properties));
             }
         }
         List<File> fileList = FileUtil.loadDirectory(new File(filePath), isCheckSum);
-        if (fileList.isEmpty()) {
+        if (fileList == null) {
             logger.warn(String.format("There are no files in this path [%s]", filePath));
             return null;
         } else {
@@ -46,12 +45,10 @@ public class FileUtil {
             if (file.isDirectory()) {
                 insideFiles.add(file);
             } else {
-                if (!file.getAbsolutePath().contains("DS") && !file.getAbsolutePath().contains("import.txt.swp")) {
-                    if (isCheckSum) {
-                        checkSumList.add(file);
-                    } else {
-                        list.add(file);
-                    }
+                if (isCheckSum) {
+                    checkSumList.add(file);
+                } else {
+                    list.add(file);
                 }
             }
         }

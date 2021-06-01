@@ -12,7 +12,6 @@ public class CountUtil {
     private static final Logger logger = LoggerFactory.getLogger(Model.LOG);
 
     private static final String totalLog = " The total number of lines in the '%s' is %s, and each thread processes %s, and the remainder is %s";
-    private static final String threadLog = " Thread-%s Processing '%s' from line %s, need to process %s.";
 
     public static List<String> getPerThreadFileLines(long line, int threadNum, String fileName) {
         // Average number of items processed by each thread
@@ -39,11 +38,6 @@ public class CountUtil {
         java.text.NumberFormat numerator = java.text.NumberFormat.getInstance();
         numerator.setMaximumFractionDigits(2);
         return numerator.format((float) num1 / (float) num2 * 100);
-    }
-
-    public static String getRowSpanLine() {
-
-        return "";
     }
 
 }
