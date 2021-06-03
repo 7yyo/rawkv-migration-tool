@@ -40,7 +40,7 @@ importer.in.mode=json
 # Import data format, there are indexInfo, tempIndexInfo, indexType three
 importer.in.scenes=indexInfo
 # The first type of delimiter of csv file, if it is a csv file in 123, 123, 123 format, this configuration represents "," and delimiter_2 will be ignored
-importer.in.delimiter_1=|
+importer.in.delimiter_1=\\|
 # The second separator of the csv file
 importer.in.delimiter_2=##
 # key separator
