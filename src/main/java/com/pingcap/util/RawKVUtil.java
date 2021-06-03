@@ -58,7 +58,12 @@ public class RawKVUtil {
                     }
                     totalLineCount.addAndGet(kvPairs.size());
                 } catch (Exception e) {
-                    logger.error(String.format("Batch put TiKV failed, file=[%s]", file.getAbsolutePath()), e);
+                    StringBuilder errorLog = new StringBuilder("Batch put TiKV failed, file=[" + file.getAbsolutePath() + "]");
+                    for (Map.Entry<ByteString, ByteString> item : kvPairs.entrySet()) {
+                        errorLog.append("key[").append(item.getKey()).append("]");
+                    }
+                    errorLog.append("\n ").append(e);
+                    logger.error(String.valueOf(errorLog));
                     totalBatchPutFailCount.addAndGet(kvPairs.size());
                 }
             }
