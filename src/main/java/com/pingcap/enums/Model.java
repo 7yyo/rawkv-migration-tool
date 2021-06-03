@@ -32,6 +32,7 @@ public class Model {
     public static final String CHECK_SUM_FILE_PATH = "importer.checkSum.checkSumFilePath";
     public static final String CHECK_SUM_DELIMITER = "importer.checkSum.checkSumDelimiter";
     public static final String CHECK_SUM_PERCENTAGE = "importer.checkSum.checkSumPercentage";
+    public static final String SIMPLE_CHECK_SUM = "importer.checkSum.simpleCheckSum";
     public static final String FILE_PATH = "importer.in.filePath";
     public static final String MODE = "importer.in.mode";
     public static final String SCENES = "importer.in.scenes";

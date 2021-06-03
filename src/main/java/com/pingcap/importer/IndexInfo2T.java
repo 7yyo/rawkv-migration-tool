@@ -77,7 +77,11 @@ public class IndexInfo2T {
         int checkSumThreadNum = Integer.parseInt(properties.getProperty(Model.CHECK_SUM_THREAD_NUM));
 
         ThreadPoolExecutor checkSumThreadPoolExecutor;
+        String simpleCheckSum = properties.getProperty(Model.SIMPLE_CHECK_SUM);
         if (Model.ON.equals(properties.getProperty(Model.ENABLE_CHECK_SUM))) {
+            if (Model.ON.equals(simpleCheckSum)) {
+                checkSumFilePath = filesPath;
+            }
             List<File> checkSumFileList = FileUtil.showFileList(checkSumFilePath, true, properties);
             checkSumThreadPoolExecutor = ThreadPoolUtil.startJob(checkSumThreadNum, checkSumThreadNum, properties, filesPath);
             if (checkSumFileList != null) {
@@ -215,6 +219,7 @@ class BatchPutIndexInfoJob implements Runnable {
         String scenes = properties.getProperty(Model.SCENES);
         int batchSize = Integer.parseInt(properties.getProperty(Model.BATCH_SIZE));
         int checkSumPercentage = Integer.parseInt(properties.getProperty(Model.CHECK_SUM_PERCENTAGE));
+        String simpleCheckSum = properties.getProperty(Model.SIMPLE_CHECK_SUM);
         String enableCheckSum = properties.getProperty(Model.ENABLE_CHECK_SUM);
         String delimiter_1 = properties.getProperty(Model.DELIMITER_1);
         String delimiter_2 = properties.getProperty(Model.DELIMITER_2);
@@ -225,7 +230,8 @@ class BatchPutIndexInfoJob implements Runnable {
         int todo = Integer.parseInt(fileBlock.split(",")[1]);
 
 
-        if (Model.ON.equals(enableCheckSum)) {
+        // If not 100, write check sum file.
+        if (Model.ON.equals(enableCheckSum) && !Model.ON.equals(simpleCheckSum)) {
             fileChannel = CheckSumUtil.initCheckSumLog(properties, fileChannel, file);
         }
 
@@ -368,7 +374,7 @@ class BatchPutIndexInfoJob implements Runnable {
                 }
 
                 // Sampling data is written into the check sum file
-                if (Model.ON.equals(enableCheckSum)) {
+                if (Model.ON.equals(enableCheckSum) && !Model.ON.equals(simpleCheckSum)) {
                     int nn = random.nextInt(100 / checkSumPercentage) + 1;
                     if (nn == 1) {
                         fileChannel.write(StandardCharsets.UTF_8.encode(indexInfoKey + checkSumDelimiter + (start + totalCount) + "\n"));
@@ -384,7 +390,7 @@ class BatchPutIndexInfoJob implements Runnable {
             }
         }
         try {
-            if (Model.ON.equals(enableCheckSum)) {
+            if (Model.ON.equals(enableCheckSum) && !Model.ON.equals(simpleCheckSum)) {
                 fileChannel.close();
             }
             lineIterator.close();

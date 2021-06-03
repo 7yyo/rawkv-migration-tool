@@ -1,5 +1,6 @@
 package com.pingcap.job;
 
+import com.pingcap.enums.Model;
 import com.pingcap.util.CheckSumUtil;
 import org.tikv.common.TiSession;
 
@@ -21,6 +22,12 @@ public class checkSumJsonJob implements Runnable {
 
     @Override
     public void run() {
-        CheckSumUtil.checkSum(checkSumFilePath, checkSumDelimiter, tiSession, properties);
+        String simpleCheckSum = properties.getProperty(Model.SIMPLE_CHECK_SUM);
+        if (!Model.ON.equals(simpleCheckSum)) {
+            CheckSumUtil.checkSum(checkSumFilePath, checkSumDelimiter, tiSession, properties);
+        } else {
+            CheckSumUtil.simpleCheckSum(checkSumFilePath, tiSession, properties);
+        }
+
     }
 }
