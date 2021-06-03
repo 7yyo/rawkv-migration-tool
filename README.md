@@ -5,53 +5,53 @@
 
 # Configuration file parameters
 ```properties
-# pd address
+# PD's IP and port
 importer.tikv.pd=172.16.4.33:5555,172.16.4.34:5555,172.16.4.35:5555
 # The number of core threads in the main thread pool
 importer.tikv.corePoolSize=10
 # The maximum number of threads in the main thread pool
 importer.tikv.maxPoolSize=10
-# Number of threads in the internal thread pool
+# The number of threads in the child thread pool
 importer.tikv.internalThreadNum=5
-# Blocking queue size
-importer.tikv.blockDequeCapacity=2
-# Batch insert data size
+# Insert the number of data in batches
 importer.tikv.batchSize=1000
-# Test use: delete the existing data before inserting, 0 is closed, non-zero is open, no need to change
-importer.tikv.deleteForTest=0
-# Whether to open check sum, 0 is off, non-zero is on
+# Test the parameters, because it is possible to check whether the key already exists in the raw kv before inserting. In order to prevent the skip key caused by the same data in the database, delete the data to be inserted before each insertion. 1 is on, 0 is off. Please turn off this function in the formal test.
+importer.tikv.deleteForTest=1
+# After the full import is over, whether to check sum immediately. 1 is on, 0 is off.
 importer.checkSum.enabledCheckSum=1
-# Whether to check the existing key before inserting, 0 is closed, non-zero is open
+# Whether to check whether the data to be inserted exists in the raw kv before inserting, if it exists, skip the insert. 1 is on, 0 is off.
 importer.tikv.checkExistsKey=1
-# check sum the number of threads
+# check sum thread count
 importer.checkSum.checkSumThreadNum=50
-# check sum folder path
-importer.checkSum.checkSumFilePath=/Users/yuyang/checkSum
-# check sum file separator, generally do not need to be changed
+# The path where the check sum file is stored is recommended to be configured on a better disk
+importer.checkSum.checkSumFilePath=/Users/checkSum
+# The separator of the check sum file content, if there is no conflict, generally do not need to be modified.
 importer.checkSum.checkSumDelimiter=@#@#@
-# Percentage of sampled data
+# check sum sampling percentage, 100 is full data verification.
 importer.checkSum.checkSumPercentage=100
-# Import file path
+# For the full check sum, directly compare with the original data file after the import, and no longer write the sampling check sum file. The problem here is that if there is data that fails ttl filtering or parsing in the original file, it will also appear in the check sum log. Need to manually confirm whether it is duplicate data.
+# Note that when this configuration is 1, no matter how much checkSumPercentage is, the full check sum will be performed
+importer.checkSum.simpleCheckSum=1
+# Import data file path
 importer.in.filePath=src/Main/resources/testFile/indexInfoJson
-# Tasks performed, import-import, checkSum-data verification
+# The tasks performed by the tool currently support import and checkSum. Import is to perform import tasks, and checkSum is to perform data verification tasks. The check sum file executed here is the check sum file generated during import. If it is a full verification, it is to verify the original file.
 importer.tikv.task=import
-# Import file format, there are two kinds of json and csv
+# Imported data format, currently supports json and csv
 importer.in.mode=json
-# Import data format, there are indexInfo, tempIndexInfo, indexType three
+# Business data format, currently supports indexInfo, tempIndexInfo, indexType
 importer.in.scenes=indexInfo
-# The first type of delimiter of csv file, if it is a csv file in 123, 123, 123 format, this configuration represents "," and delimiter_2 will be ignored
-importer.in.delimiter_1=\\|
-# The second separator of the csv file
+# For the separator in csv format, this refers to the first separator. Note: If it is data in xxx, xxx, xxx format, set it to "," here, and importer.in.delimiter_2 will be ignored in this case.
+importer.in.delimiter_1=,
+# For the separator in csv format, this refers to the second separator.
 importer.in.delimiter_2=##
-# key separator
+# The key separator of the original file, generally does not need to be modified
 importer.in.keyDelimiter=_:_
 importer.out.envId=00998877
 importer.out.appId=123456789
-# type filter item, no filter if it is empty
 importer.ttl.type=A001,B001,C001
-# ttl time, the unit is ms
+# ttl time in ms
 importer.ttl.day=604800000
-# Progress printing frequency, the unit is ms
+# Statistics log printing interval, unit ms
 importer.timer.interval=30000
 ```
 # Usage
