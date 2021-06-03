@@ -79,7 +79,14 @@ public class Main {
                     break;
                 case Model.CHECK_SUM:
                     long checkStartTime = System.currentTimeMillis();
-                    List<File> checkSumFileList = FileUtil.showFileList(checkSumFilePath, true, properties);
+                    String simpleCheckSum = properties.getProperty(Model.SIMPLE_CHECK_SUM);
+                    List<File> checkSumFileList;
+                    if (!Model.ON.equals(simpleCheckSum)) {
+                        checkSumFileList = FileUtil.showFileList(checkSumFilePath, true, properties);
+                    } else {
+                        checkSumFileList = FileUtil.showFileList(properties.getProperty(Model.FILE_PATH), true, properties);
+                    }
+
                     ThreadPoolExecutor checkSumThreadPoolExecutor = ThreadPoolUtil.startJob(checkSumThreadNum, checkSumThreadNum, properties, checkSumFilePath);
                     if (checkSumFileList != null) {
                         for (File checkSumFile : checkSumFileList) {
