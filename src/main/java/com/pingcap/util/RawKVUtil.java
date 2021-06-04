@@ -11,7 +11,10 @@ import org.tikv.raw.RawKVClient;
 import org.tikv.shade.com.google.protobuf.ByteString;
 
 import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.nio.channels.FileChannel;
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -21,7 +24,7 @@ public class RawKVUtil {
     private static final Logger logger = LoggerFactory.getLogger(Model.LOG);
     private static final Logger auditLog = LoggerFactory.getLogger(Model.AUDIT_LOG);
 
-    public static int batchPut(int totalCount, int todo, int count, int batchSize, RawKVClient rawKVClient, HashMap<ByteString, ByteString> kvPairs, File file, AtomicInteger totalLineCount, AtomicInteger totalSkipCount, AtomicInteger totalBatchPutFailCount, int totalLine, Properties properties) {
+    public static int batchPut(int totalCount, int todo, int count, int batchSize, RawKVClient rawKVClient, HashMap<ByteString, ByteString> kvPairs, List<String> kvList, File file, AtomicInteger totalLineCount, AtomicInteger totalSkipCount, AtomicInteger totalBatchPutFailCount, int totalLine, Properties properties, FileChannel fileChannel) {
 
         // batch put
         if (totalCount == todo || count == batchSize) {
@@ -58,17 +61,20 @@ public class RawKVUtil {
                     }
                     totalLineCount.addAndGet(kvPairs.size());
                 } catch (Exception e) {
-                    StringBuilder errorLog = new StringBuilder("Batch put TiKV failed, file=[" + file.getAbsolutePath() + "]");
-                    for (Map.Entry<ByteString, ByteString> item : kvPairs.entrySet()) {
-                        errorLog.append("key[").append(item.getKey()).append("]");
+                    for (String kv : kvList) {
+                        try {
+                            fileChannel.write(StandardCharsets.UTF_8.encode(kv + "\n"));
+                        } catch (IOException ioException) {
+                            ioException.printStackTrace();
+                        }
                     }
-                    errorLog.append("\n ").append(e);
-                    logger.error(String.valueOf(errorLog));
                     totalBatchPutFailCount.addAndGet(kvPairs.size());
+                } finally {
+                    kvPairs.clear();
+                    kvList.clear();
+                    count = 0;
                 }
             }
-            kvPairs.clear();
-            count = 0;
         }
         return count;
     }
@@ -113,6 +119,24 @@ public class RawKVUtil {
             }
         }
 
+    }
+
+    public static FileChannel initBatchPutErrLog(Properties properties, FileChannel fileChannel, File originalFile) {
+
+        String batchPutErrFilePath = properties.getProperty(Model.BATCH_PUT_ERR_FILE_PATH);
+        String batchPutErrFileName = batchPutErrFilePath.replaceAll("\"", "") + "/" + originalFile.getName().replaceAll("\\.", "") + "/" + Thread.currentThread().getId() + ".txt";
+
+        File batchPutErrFile = new File(batchPutErrFileName);
+        try {
+            batchPutErrFile.getParentFile().mkdirs();
+            batchPutErrFile.createNewFile();
+            FileOutputStream fileOutputStream = new FileOutputStream(new File(batchPutErrFileName));
+            fileChannel = fileOutputStream.getChannel();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        return fileChannel;
     }
 
 }
