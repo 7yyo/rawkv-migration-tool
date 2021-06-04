@@ -9,6 +9,7 @@ public class Model {
     public static final String ON = "1";
 
     public static final String GET = "get";
+    public static final String TRUNCATE = "truncate";
     public static final String CHECK = "check";
 
     public static final String INDEX_INFO = "indexInfo";
