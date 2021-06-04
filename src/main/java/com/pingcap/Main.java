@@ -10,6 +10,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.tikv.common.TiSession;
 import org.tikv.raw.RawKVClient;
+import org.tikv.shade.com.google.protobuf.ByteString;
 
 import java.io.File;
 import java.util.List;
@@ -23,38 +24,55 @@ public class Main {
 
     public static void main(String[] args) {
 
+        // Get properties by file path
         String propertiesPath = System.getProperty("p");
         if (propertiesPath == null) {
             propertiesPath = "src/main/resources/importer.properties";
         }
-
         Properties properties = PropertiesUtil.getProperties(propertiesPath);
 
         TiSession tiSession = TiSessionUtil.getTiSession(properties);
 
-        if (Model.GET.equals(System.getProperty("m")) && System.getProperty("k") != null) {
-            RawKVClient rawKVClient = tiSession.createRawClient();
-            String value = RawKVUtil.get(rawKVClient, System.getProperty("k"));
-            logger.info(String.format("Result={key=%s, value=%s}", System.getProperty("k"), value));
-
-            try {
-                rawKVClient.close();
-                tiSession.close();
-            } catch (Exception e) {
-                e.printStackTrace();
+        if (System.getProperty("m") != null) {
+            // Get value by key
+            if (Model.GET.equals(System.getProperty("m")) && System.getProperty("k") != null) {
+                RawKVClient rawKVClient = tiSession.createRawClient();
+                String value = RawKVUtil.get(rawKVClient, System.getProperty("k"));
+                logger.info(String.format("Result={key=%s, value=%s}", System.getProperty("k"), value));
+                try {
+                    rawKVClient.close();
+                    tiSession.close();
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+                return;
             }
-            return;
-        }
-        if (Model.CHECK.equals(System.getProperty("m")) && System.getProperty("f") != null) {
-            RawKVClient rawKVClient = tiSession.createRawClient();
-            RawKVUtil.batchGetCheck(System.getProperty("f"), tiSession, properties);
-            try {
-                rawKVClient.close();
-                tiSession.close();
-            } catch (Exception e) {
-                e.printStackTrace();
+            // Check value by key from RawKV
+            if (Model.CHECK.equals(System.getProperty("m")) && System.getProperty("f") != null) {
+                RawKVClient rawKVClient = tiSession.createRawClient();
+                RawKVUtil.batchGetCheck(System.getProperty("f"), tiSession, properties);
+                try {
+                    rawKVClient.close();
+                    tiSession.close();
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+                return;
             }
-            return;
+            // Truncate all RawKV
+            if (Model.TRUNCATE.equals(System.getProperty("m"))) {
+                RawKVClient rawKVClient = tiSession.createRawClient();
+                logger.info("Start truncate all RawKV...");
+                rawKVClient.delete(ByteString.EMPTY);
+                logger.info("Truncate all RawKV complete...");
+                try {
+                    tiSession.close();
+                    rawKVClient.close();
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+                return;
+            }
         }
 
         String task = properties.getProperty(Model.TASK);
@@ -66,6 +84,7 @@ public class Main {
 
         if (StringUtils.isNotBlank(task)) {
             switch (task) {
+                // Import task
                 case Model.IMPORT:
                     if (StringUtils.isNotBlank(importMode)) {
                         if (Model.INDEX_TYPE.equals(scenes)) {
@@ -77,6 +96,7 @@ public class Main {
                         logger.error(String.format("The configuration parameter [%s] must not be empty!", Model.MODE));
                     }
                     break;
+                // Check sum task
                 case Model.CHECK_SUM:
                     long checkStartTime = System.currentTimeMillis();
                     String simpleCheckSum = properties.getProperty(Model.SIMPLE_CHECK_SUM);
@@ -86,7 +106,6 @@ public class Main {
                     } else {
                         checkSumFileList = FileUtil.showFileList(properties.getProperty(Model.FILE_PATH), true, properties);
                     }
-
                     ThreadPoolExecutor checkSumThreadPoolExecutor = ThreadPoolUtil.startJob(checkSumThreadNum, checkSumThreadNum, properties, checkSumFilePath);
                     if (checkSumFileList != null) {
                         for (File checkSumFile : checkSumFileList) {
