@@ -46,6 +46,9 @@ public class IndexInfo2T {
         // Clear the check sum folder before starting.
         FileUtil.deleteFolder(properties.getProperty(Model.CHECK_SUM_FILE_PATH));
         FileUtil.deleteFolders(properties.getProperty(Model.CHECK_SUM_FILE_PATH));
+        // Clear the batch out err folder before starting.
+        FileUtil.deleteFolder(properties.getProperty(Model.BATCH_PUT_ERR_FILE_PATH));
+        FileUtil.deleteFolders(properties.getProperty(Model.BATCH_PUT_ERR_FILE_PATH));
         // Generate ttl type map.
         List<String> ttlTypeList = new ArrayList<>(Arrays.asList(ttlType.split(",")));
 
@@ -195,7 +198,8 @@ class BatchPutIndexInfoJob implements Runnable {
     private final AtomicInteger totalParseErrorCount;
     private final AtomicInteger totalBatchPutFailCount;
     private final Properties properties;
-    private FileChannel fileChannel;
+    private FileChannel checkSumFileChannel;
+    private FileChannel batchPutErrFileChannel;
 
     public BatchPutIndexInfoJob(TiSession tiSession, AtomicInteger totalImportCount, AtomicInteger totalSkipCount, AtomicInteger totalParseErrorCount, AtomicInteger totalBatchPutFailCount, String filePath, List<String> ttlTypeList, HashMap<String, Long> ttlTypeCountMap, String fileBlock, Properties properties) {
         this.totalImportCount = totalImportCount;
@@ -231,9 +235,13 @@ class BatchPutIndexInfoJob implements Runnable {
 
 
         // If not 100, write check sum file.
-        if (Model.ON.equals(enableCheckSum) && !Model.ON.equals(simpleCheckSum)) {
-            fileChannel = CheckSumUtil.initCheckSumLog(properties, fileChannel, file);
+        boolean writeCheckSumFile = Model.ON.equals(enableCheckSum) && !Model.ON.equals(simpleCheckSum);
+
+        if (writeCheckSumFile) {
+            checkSumFileChannel = CheckSumUtil.initCheckSumLog(properties, checkSumFileChannel, file);
         }
+
+        batchPutErrFileChannel = RawKVUtil.initBatchPutErrLog(properties, batchPutErrFileChannel, file);
 
         LineIterator lineIterator = null;
         try {
@@ -252,6 +260,7 @@ class BatchPutIndexInfoJob implements Runnable {
         String indexInfoKey = null;
         JSONObject jsonObject;
         HashMap<ByteString, ByteString> kvPairs = new HashMap<>();
+        List<String> kvList = new ArrayList<>();
         RawKVClient rawKVClient = tiSession.createRawClient();
         String checkSumDelimiter = properties.getProperty(Model.CHECK_SUM_DELIMITER);
 
@@ -292,7 +301,7 @@ class BatchPutIndexInfoJob implements Runnable {
                             auditLog.error(String.format("Failed to parse json, file='%s', json='%s',line=%s,", file, line, start + totalCount));
                             totalParseErrorCount.addAndGet(1);
                             // if _todo_ == totalCount in json failed, batch put.
-                            count = RawKVUtil.batchPut(totalCount, todo, count, batchSize, rawKVClient, kvPairs, file, totalImportCount, totalSkipCount, totalBatchPutFailCount, start + totalCount, properties);
+                            count = RawKVUtil.batchPut(totalCount, todo, count, batchSize, rawKVClient, kvPairs, kvList, file, totalImportCount, totalSkipCount, totalBatchPutFailCount, start + totalCount, properties, batchPutErrFileChannel);
                             continue;
                         }
                         switch (scenes) {
@@ -303,7 +312,7 @@ class BatchPutIndexInfoJob implements Runnable {
                                     ttlTypeCountMap.put(indexInfoS.getType(), ttlTypeCountMap.get(indexInfoS.getType()) + 1);
                                     auditLog.warn(String.format("[Skip TTL] [%s] in [%s],line=[%s]", indexInfoKey, file.getAbsolutePath(), start + totalCount));
                                     totalSkipCount.addAndGet(1);
-                                    count = RawKVUtil.batchPut(totalCount, todo, count, batchSize, rawKVClient, kvPairs, file, totalImportCount, totalSkipCount, totalBatchPutFailCount, start + totalCount, properties);
+                                    count = RawKVUtil.batchPut(totalCount, todo, count, batchSize, rawKVClient, kvPairs, kvList, file, totalImportCount, totalSkipCount, totalBatchPutFailCount, start + totalCount, properties, batchPutErrFileChannel);
                                     continue;
                                 }
                                 if (envId != null) {
@@ -350,7 +359,7 @@ class BatchPutIndexInfoJob implements Runnable {
                                 ttlTypeCountMap.put(type, ttlTypeCountMap.get(type) + 1);
                                 auditLog.warn(String.format("[Skip TTL] [%s] in [%s],line=[%s]", indexInfoKey, file.getAbsolutePath(), start + totalCount));
                                 totalSkipCount.addAndGet(1);
-                                count = RawKVUtil.batchPut(totalCount, todo, count, batchSize, rawKVClient, kvPairs, file, totalImportCount, totalSkipCount, totalBatchPutFailCount, start + totalCount, properties);
+                                count = RawKVUtil.batchPut(totalCount, todo, count, batchSize, rawKVClient, kvPairs, kvList, file, totalImportCount, totalSkipCount, totalBatchPutFailCount, start + totalCount, properties, batchPutErrFileChannel);
                                 continue;
                             }
 
@@ -363,7 +372,7 @@ class BatchPutIndexInfoJob implements Runnable {
                             logger.error(String.format("Failed to parse csv, file='%s', csv='%s',line=%s,", file, line, start + totalCount));
                             totalParseErrorCount.addAndGet(1);
                             // if _todo_ == totalCount in json failed, batch put.
-                            count = RawKVUtil.batchPut(totalCount, todo, count, batchSize, rawKVClient, kvPairs, file, totalImportCount, totalSkipCount, totalBatchPutFailCount, start + totalCount, properties);
+                            count = RawKVUtil.batchPut(totalCount, todo, count, batchSize, rawKVClient, kvPairs, kvList, file, totalImportCount, totalSkipCount, totalBatchPutFailCount, start + totalCount, properties, batchPutErrFileChannel);
                             continue;
                         }
 
@@ -374,24 +383,25 @@ class BatchPutIndexInfoJob implements Runnable {
                 }
 
                 // Sampling data is written into the check sum file
-                if (Model.ON.equals(enableCheckSum) && !Model.ON.equals(simpleCheckSum)) {
+                if (writeCheckSumFile) {
                     int nn = random.nextInt(100 / checkSumPercentage) + 1;
                     if (nn == 1) {
-                        fileChannel.write(StandardCharsets.UTF_8.encode(indexInfoKey + checkSumDelimiter + (start + totalCount) + "\n"));
+                        checkSumFileChannel.write(StandardCharsets.UTF_8.encode(indexInfoKey + checkSumDelimiter + (start + totalCount) + "\n"));
                     }
                 }
 
                 assert key != null;
                 kvPairs.put(key, value);
+                kvList.add(line);
 
-                count = RawKVUtil.batchPut(totalCount, todo, count, batchSize, rawKVClient, kvPairs, file, totalImportCount, totalSkipCount, totalBatchPutFailCount, start + totalCount, properties);
+                count = RawKVUtil.batchPut(totalCount, todo, count, batchSize, rawKVClient, kvPairs, kvList, file, totalImportCount, totalSkipCount, totalBatchPutFailCount, start + totalCount, properties, batchPutErrFileChannel);
             } catch (IOException e) {
                 e.printStackTrace();
             }
         }
         try {
-            if (Model.ON.equals(enableCheckSum) && !Model.ON.equals(simpleCheckSum)) {
-                fileChannel.close();
+            if (writeCheckSumFile) {
+                checkSumFileChannel.close();
             }
             lineIterator.close();
             rawKVClient.close();

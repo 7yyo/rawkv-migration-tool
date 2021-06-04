@@ -36,6 +36,7 @@ public class Model {
     public static final String FILE_PATH = "importer.in.filePath";
     public static final String MODE = "importer.in.mode";
     public static final String SCENES = "importer.in.scenes";
+    public static final String BATCH_PUT_ERR_FILE_PATH = "importer.in.batchPutErrFilePath";
     public static final String DELIMITER_1 = "importer.in.delimiter_1";
     public static final String DELIMITER_2 = "importer.in.delimiter_2";
     public static final String KEY_DELIMITER = "importer.in.keyDelimiter";
