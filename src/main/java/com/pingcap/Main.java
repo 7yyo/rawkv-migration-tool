@@ -1,6 +1,7 @@
 package com.pingcap;
 
 import com.pingcap.enums.Model;
+import com.pingcap.export.Exporter;
 import com.pingcap.importer.IndexInfo2T;
 import com.pingcap.importer.IndexType2T;
 import com.pingcap.job.checkSumJsonJob;
@@ -9,10 +10,16 @@ import org.apache.commons.lang.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.tikv.common.TiSession;
+import org.tikv.common.key.Key;
+import org.tikv.common.region.TiRegion;
 import org.tikv.raw.RawKVClient;
 import org.tikv.shade.com.google.protobuf.ByteString;
 
+import javax.security.auth.kerberos.KeyTab;
 import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -64,7 +71,7 @@ public class Main {
                 RawKVClient rawKVClient = tiSession.createRawClient();
                 logger.info("Start truncate all RawKV...");
                 rawKVClient.delete(ByteString.EMPTY);
-                logger.info("Truncate all RawKV complete...");
+                logger.info("Truncate all RawKV complete!");
                 try {
                     tiSession.close();
                     rawKVClient.close();
@@ -125,6 +132,15 @@ public class Main {
                     } catch (InterruptedException e) {
                         e.printStackTrace();
                     }
+                    break;
+                case Model.EXPORT:
+                    String exportFilePath = properties.getProperty(Model.EXPORT_FILE_PATH);
+                    File file = new File(exportFilePath);
+                    file.mkdir();
+                    logger.info("Start to export all raw kv data.");
+                    List<TiRegion> regionList = RawKVUtil.getTiRegionList(tiSession);
+                    logger.info(String.format("%s regions in raw kv.", regionList.size()));
+                    Exporter.runExporter(exportFilePath, regionList, properties, tiSession);
                     break;
                 default:
                     logger.error(String.format("The configuration parameter [%s] must be [import] or [checkSum]]!", Model.TASK));

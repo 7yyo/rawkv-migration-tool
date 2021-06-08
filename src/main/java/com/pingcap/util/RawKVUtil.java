@@ -6,6 +6,8 @@ import org.apache.commons.io.LineIterator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.tikv.common.TiSession;
+import org.tikv.common.key.Key;
+import org.tikv.common.region.TiRegion;
 import org.tikv.kvproto.Kvrpcpb;
 import org.tikv.raw.RawKVClient;
 import org.tikv.shade.com.google.protobuf.ByteString;
@@ -137,6 +139,21 @@ public class RawKVUtil {
         }
 
         return fileChannel;
+    }
+
+    public static List<TiRegion> getTiRegionList(TiSession tiSession) {
+        List<TiRegion> regionList = new ArrayList<>();
+        ByteString key = ByteString.EMPTY;
+        boolean isStart = true;
+        TiRegion tiRegion;
+        while (isStart || !key.isEmpty()) {
+            isStart = false;
+            tiRegion = tiSession.getRegionManager().getRegionByKey(key);
+            regionList.add(tiRegion);
+            key = Key.toRawKey(tiRegion.getEndKey()).toByteString();
+            System.out.println(tiRegion.getId());
+        }
+        return regionList;
     }
 
 }

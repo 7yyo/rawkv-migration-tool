@@ -1,5 +1,17 @@
 package com.pingcap.enums;
 
+import com.pingcap.util.PropertiesUtil;
+import com.pingcap.util.TiSessionUtil;
+import org.tikv.common.TiSession;
+import org.tikv.common.key.Key;
+import org.tikv.common.region.TiRegion;
+import org.tikv.raw.RawKVClient;
+import org.tikv.shade.com.google.protobuf.ByteString;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Properties;
+
 public class Model {
 
     public static final String IMPORT = "import";
@@ -11,6 +23,7 @@ public class Model {
     public static final String GET = "get";
     public static final String TRUNCATE = "truncate";
     public static final String CHECK = "check";
+    public static final String EXPORT = "export";
 
     public static final String INDEX_INFO = "indexInfo";
     public static final String TEMP_INDEX_INFO = "tempIndexInfo";
@@ -46,5 +59,8 @@ public class Model {
     public static final String TTL_TYPE = "importer.ttl.type";
     public static final String TTL_DAY = "importer.ttl.day";
     public static final String TIMER_INTERVAL = "importer.timer.interval";
+
+    public static final String EXPORT_FILE_PATH = "exporter.out.filePath";
+    public static final String EXPORT_BATCHSIZE = "exporter.out.batchSize";
 
 }
