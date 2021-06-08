@@ -61,6 +61,5 @@ public class Model {
     public static final String TIMER_INTERVAL = "importer.timer.interval";
 
     public static final String EXPORT_FILE_PATH = "exporter.out.filePath";
-    public static final String EXPORT_BATCHSIZE = "exporter.out.batchSize";
 
 }
