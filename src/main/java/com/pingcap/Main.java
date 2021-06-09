@@ -66,8 +66,9 @@ public class Main {
             if (Model.TRUNCATE.equals(System.getProperty("m"))) {
                 RawKVClient rawKVClient = tiSession.createRawClient();
                 logger.info("Start truncate all RawKV...");
-                rawKVClient.delete(ByteString.EMPTY);
-                logger.info("Truncate all RawKV complete!");
+                long startTime = System.currentTimeMillis();
+                rawKVClient.deleteRange(ByteString.EMPTY, ByteString.EMPTY);
+                logger.info(String.format("Truncate all RawKV complete, duration=[%s]s", (System.currentTimeMillis() - startTime) / 1000));
                 try {
                     tiSession.close();
                     rawKVClient.close();
