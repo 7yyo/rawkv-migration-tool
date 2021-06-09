@@ -1,6 +1,8 @@
 package com.pingcap;
 
 import com.pingcap.enums.Model;
+import com.pingcap.export.LimitExporter;
+import com.pingcap.export.RegionExporter;
 import com.pingcap.importer.IndexInfo2T;
 import com.pingcap.importer.IndexType2T;
 import com.pingcap.job.checkSumJsonJob;
@@ -9,6 +11,7 @@ import org.apache.commons.lang.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.tikv.common.TiSession;
+import org.tikv.common.region.TiRegion;
 import org.tikv.raw.RawKVClient;
 import org.tikv.shade.com.google.protobuf.ByteString;
 
@@ -125,6 +128,22 @@ public class Main {
                         }
                     } catch (InterruptedException e) {
                         e.printStackTrace();
+                    }
+                    break;
+                case Model.EXPORT:
+                    String exportMode = properties.getProperty(Model.EXPORT_MODE);
+                    String exportFilePath = properties.getProperty(Model.EXPORT_FILE_PATH);
+                    File file = new File(exportFilePath);
+                    file.mkdir();
+                    logger.info("Start to export all raw kv data.");
+                    switch (exportMode) {
+                        case Model.REGION_EXPORT:
+                            RegionExporter.runRegionExporter(exportFilePath, properties, tiSession);
+                            break;
+                        case Model.LIMIT_EXPORT:
+                            LimitExporter.runLimitExporter(exportFilePath, properties, tiSession);
+                            break;
+                        default:
                     }
                     break;
                 default:

@@ -11,6 +11,9 @@ public class Model {
     public static final String GET = "get";
     public static final String TRUNCATE = "truncate";
     public static final String CHECK = "check";
+    public static final String EXPORT = "export";
+    public static final String REGION_EXPORT = "region";
+    public static final String LIMIT_EXPORT = "limit";
 
     public static final String INDEX_INFO = "indexInfo";
     public static final String TEMP_INDEX_INFO = "tempIndexInfo";
@@ -20,7 +23,7 @@ public class Model {
     public static final String CHECK_SUM_LOG = "checkSumLog";
     public static final String AUDIT_LOG = "auditLog";
 
-    public static final String TASK = "importer.tikv.task";
+    public static final String TASK = "tikv.task";
     public static final String PD = "importer.tikv.pd";
     public static final String INTERNAL_THREAD_NUM = "importer.tikv.internalThreadNum";
     public static final String CORE_POOL_SIZE = "importer.tikv.corePoolSize";
@@ -46,5 +49,9 @@ public class Model {
     public static final String TTL_TYPE = "importer.ttl.type";
     public static final String TTL_DAY = "importer.ttl.day";
     public static final String TIMER_INTERVAL = "importer.timer.interval";
+
+    public static final String EXPORT_FILE_PATH = "exporter.out.filePath";
+    public static final String EXPORT_MODE = "exporter.tikv.mode";
+    public static final String EXPORT_LIMIT = "exporter.tikv.exportLimit";
 
 }
