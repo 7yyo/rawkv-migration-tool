@@ -14,7 +14,7 @@ public class LimitExporter {
     public static void runLimitExporter(String exportFilePath, Properties properties, TiSession tiSession) {
         int exportLimit = Integer.parseInt(properties.getProperty(Model.EXPORT_LIMIT));
         RawKVClient rawKVClient = tiSession.createRawClient();
-        ByteString startKey = ByteString.copyFromUtf8("0");
+        ByteString startKey = ByteString.EMPTY;
         ByteString endKey = null;
         boolean isStart = true;
         List<Kvrpcpb.KvPair> kvPairList;
