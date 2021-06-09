@@ -8,6 +8,7 @@ import com.pingcap.pojo.IndexInfo;
 import com.pingcap.pojo.TempIndexInfo;
 import com.pingcap.timer.ImportTimer;
 import com.pingcap.util.*;
+import io.prometheus.client.Counter;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.LineIterator;
 import org.apache.commons.lang.StringUtils;
@@ -30,7 +31,7 @@ public class IndexInfo2T {
 
     private static final Logger logger = LoggerFactory.getLogger(Model.LOG);
 
-    public static void RunIndexInfo2T(Properties properties, TiSession tiSession) {
+    public static void RunIndexInfo2T(Properties properties, TiSession tiSession, Counter fileCounter) {
 
         String filesPath = properties.getProperty(Model.FILE_PATH);
         int corePoolSize = Integer.parseInt(properties.getProperty(Model.CORE_POOL_SIZE));
@@ -58,7 +59,7 @@ public class IndexInfo2T {
             for (File file : fileList) {
                 // Pass in the file to be processed and the ttl map.
                 // The ttl map is shared by all file threads, because it is a table for processing, which is summarized here.
-                threadPoolExecutor.execute(new IndexInfo2TJob(file.getAbsolutePath(), tiSession, properties, ttlTypeList));
+                threadPoolExecutor.execute(new IndexInfo2TJob(file.getAbsolutePath(), tiSession, properties, ttlTypeList, fileCounter));
             }
         } else {
             logger.error("Data file is empty!");
@@ -89,7 +90,7 @@ public class IndexInfo2T {
             checkSumThreadPoolExecutor = ThreadPoolUtil.startJob(checkSumThreadNum, checkSumThreadNum, properties, filesPath);
             if (checkSumFileList != null) {
                 for (File checkSumFile : checkSumFileList) {
-                    checkSumThreadPoolExecutor.execute(new checkSumJsonJob(checkSumFile.getAbsolutePath(), checkSumDelimiter, tiSession, properties));
+                    checkSumThreadPoolExecutor.execute(new checkSumJsonJob(checkSumFile.getAbsolutePath(), checkSumDelimiter, tiSession, properties, fileCounter));
                 }
                 checkSumThreadPoolExecutor.shutdown();
             } else {
@@ -121,24 +122,26 @@ class IndexInfo2TJob implements Runnable {
     // Generate ttl type map.
     private final List<String> ttlTypeList;
     private final TiSession tiSession;
+    private Counter importFileCounter;
 
     private final AtomicInteger totalImportCount = new AtomicInteger(0);
     private final AtomicInteger totalSkipCount = new AtomicInteger(0);
     private final AtomicInteger totalParseErrorCount = new AtomicInteger(0);
     private final AtomicInteger totalBatchPutFailCount = new AtomicInteger(0);
 
-    public IndexInfo2TJob(String filePath, TiSession tiSession, Properties properties, List<String> ttlTypeList) {
+    public IndexInfo2TJob(String filePath, TiSession tiSession, Properties properties, List<String> ttlTypeList, Counter importFileCounter) {
         this.filePath = filePath;
         this.properties = properties;
         this.ttlTypeList = ttlTypeList;
         this.tiSession = tiSession;
+        this.importFileCounter = importFileCounter;
     }
 
     @Override
     public void run() {
 
         int insideThread = Integer.parseInt(properties.getProperty(Model.INTERNAL_THREAD_NUM));
-
+        importFileCounter.labels("import").inc();
         long startTime = System.currentTimeMillis();
 
         HashMap<String, Long> ttlTypeCountMap = null;

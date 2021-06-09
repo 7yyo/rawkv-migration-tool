@@ -1,6 +1,7 @@
 package com.pingcap.util;
 
 import com.pingcap.enums.Model;
+import io.prometheus.client.Counter;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.LineIterator;
 import org.slf4j.Logger;
@@ -26,6 +27,9 @@ public class RawKVUtil {
     private static final Logger logger = LoggerFactory.getLogger(Model.LOG);
     private static final Logger auditLog = LoggerFactory.getLogger(Model.AUDIT_LOG);
 
+    static final Counter requestCounter = Counter.build().name("request_counter").help("Request counter.").labelNames("request_counter").register();
+    static final Counter batchPutFailCounter = Counter.build().name("batch_put_fail_counter").help("Batch put fail counter.").labelNames("batch_put_fail").register();
+
     public static int batchPut(int totalCount, int todo, int count, int batchSize, RawKVClient rawKVClient, HashMap<ByteString, ByteString> kvPairs, List<String> kvList, File file, AtomicInteger totalLineCount, AtomicInteger totalSkipCount, AtomicInteger totalBatchPutFailCount, int totalLine, Properties properties, FileChannel fileChannel) {
 
         // batch put
@@ -42,9 +46,11 @@ public class RawKVUtil {
                         list.add(item.getKey());
                     }
                     if (Model.ON.equals(properties.getProperty(Model.DELETE_FOR_TEST))) {
+                        requestCounter.labels("batch delete").inc();
                         rawKVClient.batchDelete(list);
                     }
                     List<Kvrpcpb.KvPair> haveList = rawKVClient.batchGet(list);
+                    requestCounter.labels("batch get").inc();
                     for (Kvrpcpb.KvPair kv : haveList) {
                         kvPairs.remove(kv.getKey());
                         auditLog.warn(String.format("Skip key - exists: [ %s ], file is [ %s ], almost line= %s", kv.getKey().toStringUtf8(), file.getAbsolutePath(), totalLine));
@@ -58,11 +64,14 @@ public class RawKVUtil {
                 try {
                     if (Model.INDEX_INFO.equals(properties.getProperty(Model.SCENES))) {
                         rawKVClient.batchPut(kvPairs);
+                        requestCounter.labels("batch put").inc();
                     } else if (Model.TEMP_INDEX_INFO.equals(properties.getProperty(Model.SCENES))) {
                         rawKVClient.batchPut(kvPairs, ttl);
+                        requestCounter.labels("batch put").inc();
                     }
                     totalLineCount.addAndGet(kvPairs.size());
                 } catch (Exception e) {
+                    batchPutFailCounter.labels("batch put fail").inc();
                     for (String kv : kvList) {
                         try {
                             fileChannel.write(StandardCharsets.UTF_8.encode(kv + "\n"));
