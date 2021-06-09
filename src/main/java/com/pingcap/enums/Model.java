@@ -1,17 +1,5 @@
 package com.pingcap.enums;
 
-import com.pingcap.util.PropertiesUtil;
-import com.pingcap.util.TiSessionUtil;
-import org.tikv.common.TiSession;
-import org.tikv.common.key.Key;
-import org.tikv.common.region.TiRegion;
-import org.tikv.raw.RawKVClient;
-import org.tikv.shade.com.google.protobuf.ByteString;
-
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Properties;
-
 public class Model {
 
     public static final String IMPORT = "import";
@@ -24,6 +12,8 @@ public class Model {
     public static final String TRUNCATE = "truncate";
     public static final String CHECK = "check";
     public static final String EXPORT = "export";
+    public static final String REGION_EXPORT = "region";
+    public static final String LIMIT_EXPORT = "limit";
 
     public static final String INDEX_INFO = "indexInfo";
     public static final String TEMP_INDEX_INFO = "tempIndexInfo";
@@ -33,7 +23,7 @@ public class Model {
     public static final String CHECK_SUM_LOG = "checkSumLog";
     public static final String AUDIT_LOG = "auditLog";
 
-    public static final String TASK = "importer.tikv.task";
+    public static final String TASK = "tikv.task";
     public static final String PD = "importer.tikv.pd";
     public static final String INTERNAL_THREAD_NUM = "importer.tikv.internalThreadNum";
     public static final String CORE_POOL_SIZE = "importer.tikv.corePoolSize";
@@ -61,5 +51,7 @@ public class Model {
     public static final String TIMER_INTERVAL = "importer.timer.interval";
 
     public static final String EXPORT_FILE_PATH = "exporter.out.filePath";
+    public static final String EXPORT_MODE = "exporter.tikv.mode";
+    public static final String EXPORT_LIMIT = "exporter.tikv.exportLimit";
 
 }

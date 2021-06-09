@@ -123,6 +123,9 @@ public class RawKVUtil {
 
     }
 
+    /**
+     * Create a log of batch put failed data records.
+     */
     public static FileChannel initBatchPutErrLog(Properties properties, FileChannel fileChannel, File originalFile) {
 
         String batchPutErrFilePath = properties.getProperty(Model.BATCH_PUT_ERR_FILE_PATH);
@@ -141,6 +144,9 @@ public class RawKVUtil {
         return fileChannel;
     }
 
+    /**
+     * Get all regions in the current raw kv.
+     */
     public static List<TiRegion> getTiRegionList(TiSession tiSession) {
         List<TiRegion> regionList = new ArrayList<>();
         ByteString key = ByteString.EMPTY;
@@ -151,7 +157,6 @@ public class RawKVUtil {
             tiRegion = tiSession.getRegionManager().getRegionByKey(key);
             regionList.add(tiRegion);
             key = Key.toRawKey(tiRegion.getEndKey()).toByteString();
-            System.out.println(tiRegion.getId());
         }
         return regionList;
     }

@@ -5,15 +5,12 @@ import com.alibaba.fastjson.JSONObject;
 import com.pingcap.enums.Model;
 import com.pingcap.pojo.IndexInfo;
 import com.pingcap.pojo.TempIndexInfo;
-import com.pingcap.util.PropertiesUtil;
+import com.pingcap.util.RawKVUtil;
 import com.pingcap.util.ThreadPoolUtil;
-import com.pingcap.util.TiSessionUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.tikv.common.TiSession;
-import org.tikv.common.key.Key;
 import org.tikv.common.region.TiRegion;
-import org.tikv.kvproto.ImportKvpb;
 import org.tikv.kvproto.Kvrpcpb;
 import org.tikv.raw.RawKVClient;
 import org.tikv.shade.com.google.protobuf.ByteString;
@@ -30,17 +27,20 @@ import java.util.List;
 import java.util.Properties;
 import java.util.concurrent.ThreadPoolExecutor;
 
-public class Exporter {
+public class RegionExporter {
 
-    public static void runExporter(String exportFilePath, List<TiRegion> tiRegionList, Properties properties, TiSession tiSession) {
+    public static void runRegionExporter(String exportFilePath, Properties properties, TiSession tiSession) {
 
         int corePoolSize = Integer.parseInt(properties.getProperty(Model.CORE_POOL_SIZE));
         int maxPoolSize = Integer.parseInt(properties.getProperty(Model.MAX_POOL_SIZE));
 
+        List<TiRegion> tiRegionList = RawKVUtil.getTiRegionList(tiSession);
+
         ThreadPoolExecutor threadPoolExecutor = ThreadPoolUtil.startJob(corePoolSize, maxPoolSize, properties, null);
         RawKVClient rawKVClient;
-        for (int i = 0; i < tiRegionList.size(); i++) {
-            String exportFileName = exportFilePath + "/" + "export_" + i + ".txt";
+        for (TiRegion tiRegion : tiRegionList) {
+            // export_regionId.txt
+            String exportFileName = exportFilePath + "/" + "export_" + tiRegion.getId() + ".txt";
             File file = new File(exportFileName);
             try {
                 file.createNewFile();
@@ -56,7 +56,7 @@ public class Exporter {
                 e.printStackTrace();
             }
             rawKVClient = tiSession.createRawClient();
-            threadPoolExecutor.execute(new ExportJob(tiRegionList.get(i), rawKVClient, fileChannel, properties));
+            threadPoolExecutor.execute(new ExportJob(tiRegion, rawKVClient, fileChannel, properties));
         }
 
     }
@@ -82,7 +82,8 @@ class ExportJob implements Runnable {
     @Override
     public void run() {
 
-//        logger.info(String.format("Thread - %s starts to export data of region[%s]", Thread.currentThread(), tiRegion.getId()));
+        logger.info(String.format("Thread - %s starts to export data of region[%s]", Thread.currentThread(), tiRegion.getId()));
+
         String scenes = properties.getProperty(Model.SCENES);
         String keyDelimiter = properties.getProperty(Model.KEY_DELIMITER);
 
@@ -94,24 +95,21 @@ class ExportJob implements Runnable {
         } catch (Exception e) {
             logger.error(String.format("Failed to query data in region %s", tiRegion.getId()));
         }
-        logger.info(String.valueOf(kvPairList.size()));
 
-        String kv;
         ByteBuffer byteBuffer;
         String key;
         String value;
         IndexInfo indexInfo;
         TempIndexInfo tempIndexInfo;
         JSONObject jsonObject;
+        String json;
         for (Kvrpcpb.KvPair kvPair : kvPairList) {
+
             key = kvPair.getKey().toStringUtf8();
             value = kvPair.getValue().toStringUtf8();
-            kv = kvPair.getKey().toStringUtf8() + kvPair.getValue().toStringUtf8();
-            byteBuffer = StandardCharsets.UTF_8.encode(kv + "\n");
+
             jsonObject = JSONObject.parseObject(value);
-            if (key == null) {
-                continue;
-            }
+
             switch (scenes) {
                 case Model.INDEX_INFO:
                     try {
@@ -122,9 +120,10 @@ class ExportJob implements Runnable {
                         indexInfo.setType(key.split(keyDelimiter)[2]);
                         indexInfo.setId(key.split(keyDelimiter)[3]);
                     } catch (Exception e) {
-                        logger.error(String.format("Check sum file line parse failed! Line = %s", value));
+                        logger.error(String.format("Raw KV data parse failed! k=%s, v=%s", key, value));
                         continue;
                     }
+                    json = JSON.toJSONString(indexInfo);
                     break;
                 case Model.TEMP_INDEX_INFO:
                     try {
@@ -134,16 +133,16 @@ class ExportJob implements Runnable {
                         tempIndexInfo.setEnvId(key.split(keyDelimiter)[1]);
                         tempIndexInfo.setId(key.split(keyDelimiter)[2]);
                     } catch (Exception e) {
-                        logger.error(String.format("Check sum file line parse failed! Line = %s", value));
+                        logger.error(String.format("Raw KV data parse failed! k=%s, v=%s", key, value));
                         continue;
                     }
+                    json = JSON.toJSONString(tempIndexInfo);
                     break;
                 default:
                     throw new IllegalStateException("Unexpected value: " + scenes);
             }
-
-
             try {
+                byteBuffer = StandardCharsets.UTF_8.encode(json + "\n");
                 fileChannel.write(byteBuffer);
             } catch (IOException e) {
                 e.printStackTrace();
