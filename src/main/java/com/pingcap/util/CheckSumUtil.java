@@ -63,7 +63,6 @@ public class CheckSumUtil {
         String delimiter_1 = properties.getProperty(Model.DELIMITER_1);
         String delimiter_2 = properties.getProperty(Model.DELIMITER_2);
 
-
         int checkParseErrorNum = 0;
         int checkNotInsertErrorNum = 0;
         int checkFailNum = 0;
@@ -109,7 +108,7 @@ public class CheckSumUtil {
 
         // get original line to check sum
         int originalLineNum;
-        int rowSpan;
+        int rowSpan = 0;
         IndexInfo indexInfo_checkSum;
         TempIndexInfo tempIndexInfo_checkSum;
         IndexInfo indexInfo_original;
@@ -121,25 +120,16 @@ public class CheckSumUtil {
                 totalCheckNum.addAndGet(1);
                 csFileLine = checkSumFileIt.nextLine();
 
-//                try {
-//                    // check sum file line, Uniform format, no branch logic required
-//                    csFileLine = checkSumFileIt.nextLine();
-//                    csKey = csFileLine.split(checkSumDelimiter)[0];
-//                    csFileLineNum = Integer.parseInt(csFileLine.split(checkSumDelimiter)[1]);
-//                } catch (Exception e) {
-//                    // Illegal format
-//                    checkParseErrorNum++;
-//                    checkSumLog.error(String.format("The check sum file data line has an illegal format! Line=%s, original file line num=%s", csFileLine, csFileLineNum));
-//                    continue;
-//                }
-//
-//                // Get value by check sum file key
-//                value = rawKVClient.get(ByteString.copyFromUtf8(csKey)).toStringUtf8();
-//                if (value.isEmpty()) {
-//                    checkSumLog.warn(String.format("The key [%s] is not be inserted! original file line num=%s", csKey, csFileLineNum));
-//                    checkNotInsertErrorNum++;
-//                    continue;
-//                }
+                try {
+                    // check sum file line, Uniform format, no branch logic required
+                    csKey = csFileLine.split(checkSumDelimiter)[0];
+                    csFileLineNum = Integer.parseInt(csFileLine.split(checkSumDelimiter)[1]);
+                } catch (Exception e) {
+                    // Illegal format
+                    checkParseErrorNum++;
+                    checkSumLog.error(String.format("The check sum file data line has an illegal format! key=[%s], line=[%s]", csKey, csFileLineNum));
+                    continue;
+                }
 
                 rowSpan = csFileLineNum - lastFileLine;
 
@@ -148,27 +138,16 @@ public class CheckSumUtil {
                     while (originalFileIt.hasNext()) {
                         // original file line
                         originalLine = originalFileIt.nextLine();
-                        if (originalLineNum++ == rowSpan) {
+                        if (++originalLineNum == rowSpan) {
                             break;
                         }
                     }
                     lastFileLine = Integer.parseInt(csFileLine.split(checkSumDelimiter)[1]);
 
-                    try {
-                        // check sum file line, Uniform format, no branch logic required
-                        csKey = csFileLine.split(checkSumDelimiter)[0];
-                        csFileLineNum = Integer.parseInt(csFileLine.split(checkSumDelimiter)[1]);
-                    } catch (Exception e) {
-                        // Illegal format
-                        checkParseErrorNum++;
-                        checkSumLog.error(String.format("The check sum file data line has an illegal format! key=%s, line=%s", csKey, csFileLineNum));
-                        continue;
-                    }
-
                     // Get value by check sum file key
                     value = rawKVClient.get(ByteString.copyFromUtf8(csKey)).toStringUtf8();
                     if (value.isEmpty()) {
-                        checkSumLog.warn(String.format("The key [%s] is not be inserted! Original file line =%s", csKey, originalLine));
+                        checkSumLog.warn(String.format("The key [%s] is not be inserted! Original file line=[%s]", csKey, originalLine));
                         checkNotInsertErrorNum++;
                         continue;
                     }
@@ -188,7 +167,7 @@ public class CheckSumUtil {
                                 indexInfo_checkSum.setType(csKey.split(keyDelimiter)[2]);
                                 indexInfo_checkSum.setId(csKey.split(keyDelimiter)[3]);
                             } catch (Exception e) {
-                                checkSumLog.error(String.format("Check sum file line parse failed! Line = %s", value));
+                                checkSumLog.error(String.format("Check sum file line parse failed! Line=[%s]", value));
                                 checkParseErrorNum++;
                                 continue;
                             }
@@ -201,7 +180,7 @@ public class CheckSumUtil {
                                 tempIndexInfo_checkSum.setEnvId(csKey.split(keyDelimiter)[1]);
                                 tempIndexInfo_checkSum.setId(csKey.split(keyDelimiter)[2]);
                             } catch (Exception e) {
-                                checkSumLog.error(String.format("Check sum file line parse failed! Line = %s", value));
+                                checkSumLog.error(String.format("Check sum file line parse failed! Line=[%s]", value));
                                 checkParseErrorNum++;
                                 continue;
                             }
@@ -219,11 +198,11 @@ public class CheckSumUtil {
                                     try {
                                         indexInfo_original = JSON.toJavaObject(jsonObject, IndexInfo.class);
                                         if (!indexInfo_checkSum.equals(indexInfo_original)) {
-                                            checkSumLog.error(String.format("Check sum failed! Line = %s", originalLine));
+                                            checkSumLog.error(String.format("%s - Check sum failed! Line=[%s],key=[%s]", Thread.currentThread().getName(), originalLine, csKey));
                                             checkFailNum++;
                                         }
                                     } catch (Exception e) {
-                                        checkSumLog.error(String.format("Parse failed! Line = %s", originalLine));
+                                        checkSumLog.error(String.format("Parse failed! Line=[%s]", originalLine));
                                         checkParseErrorNum++;
                                         continue;
                                     }
@@ -232,11 +211,11 @@ public class CheckSumUtil {
                                     try {
                                         tempIndexInfo_original = JSON.toJavaObject(jsonObject, TempIndexInfo.class);
                                         if (!tempIndexInfo_checkSum.equals(tempIndexInfo_original)) {
-                                            checkSumLog.error(String.format("Check sum failed! Line = %s", originalLine));
+                                            checkSumLog.error(String.format("Check sum failed! Line=[%s]", originalLine));
                                             checkFailNum++;
                                         }
                                     } catch (Exception e) {
-                                        checkSumLog.error(String.format("Parse failed! Line = %s", originalLine));
+                                        checkSumLog.error(String.format("Parse failed! Line=[%s]", originalLine));
                                         checkParseErrorNum++;
                                         continue;
                                     }
@@ -248,7 +227,7 @@ public class CheckSumUtil {
                         case Model.CSV_FORMAT:
                             indexInfo_original = IndexInfo.initIndexInfo(originalLine, delimiter_1, delimiter_2);
                             if (!indexInfo_checkSum.equals(indexInfo_original)) {
-                                checkSumLog.error(String.format("Check sum failed! Line = %s", originalLine));
+                                checkSumLog.error(String.format("Check sum failed! Line=[%s]", originalLine));
                                 checkFailNum++;
                             }
                             break;
@@ -411,6 +390,7 @@ public class CheckSumUtil {
             }
         }
         timer.cancel();
+        rawKVClient.close();
         logger.info(String.format("[%s] check sum completed! TotalCheckNum[%s], TotalNotInsertNum[%s], TotalParseErrorNum[%s], TotalCheckFailNum[%s]", originalFilePath, totalCheckNum, checkNotInsertErrorNum, checkParseErrorNum, checkFailNum));
 
     }

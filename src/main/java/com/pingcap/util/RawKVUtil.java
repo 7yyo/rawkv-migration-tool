@@ -2,6 +2,7 @@ package com.pingcap.util;
 
 import com.pingcap.enums.Model;
 import io.prometheus.client.Counter;
+import io.prometheus.client.Histogram;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.LineIterator;
 import org.slf4j.Logger;
@@ -29,6 +30,7 @@ public class RawKVUtil {
 
     static final Counter requestCounter = Counter.build().name("request_counter").help("Request counter.").labelNames("request_counter").register();
     static final Counter batchPutFailCounter = Counter.build().name("batch_put_fail_counter").help("Batch put fail counter.").labelNames("batch_put_fail").register();
+    static final Histogram requestLatency = Histogram.build().name("requests_latency_seconds").help("Request latency in seconds.").labelNames("request_latency").register();
 
     public static int batchPut(int totalCount, int todo, int count, int batchSize, RawKVClient rawKVClient, HashMap<ByteString, ByteString> kvPairs, List<String> kvList, File file, AtomicInteger totalLineCount, AtomicInteger totalSkipCount, AtomicInteger totalBatchPutFailCount, int totalLine, Properties properties, FileChannel fileChannel) {
 
@@ -41,15 +43,14 @@ public class RawKVUtil {
             if (Model.JSON_FORMAT.equals(importMode)) { // Only json file skip exists key.
 
                 if (Model.ON.equals(properties.getProperty(Model.CHECK_EXISTS_KEY))) {
-                    List<ByteString> list = new ArrayList<>();
-                    for (Map.Entry<ByteString, ByteString> item : kvPairs.entrySet()) {
-                        list.add(item.getKey());
-                    }
+                    List<ByteString> list = new ArrayList<>(kvPairs.keySet());
                     if (Model.ON.equals(properties.getProperty(Model.DELETE_FOR_TEST))) {
                         requestCounter.labels("batch delete").inc();
                         rawKVClient.batchDelete(list);
                     }
+                    Histogram.Timer batchGetTimer = requestLatency.labels("batch get").startTimer();
                     List<Kvrpcpb.KvPair> haveList = rawKVClient.batchGet(list);
+                    batchGetTimer.observeDuration();
                     requestCounter.labels("batch get").inc();
                     for (Kvrpcpb.KvPair kv : haveList) {
                         kvPairs.remove(kv.getKey());
@@ -62,6 +63,7 @@ public class RawKVUtil {
 
             if (!kvPairs.isEmpty()) {
                 try {
+                    Histogram.Timer batchPutTimer = requestLatency.labels("batch put").startTimer();
                     if (Model.INDEX_INFO.equals(properties.getProperty(Model.SCENES))) {
                         rawKVClient.batchPut(kvPairs);
                         requestCounter.labels("batch put").inc();
@@ -69,6 +71,7 @@ public class RawKVUtil {
                         rawKVClient.batchPut(kvPairs, ttl);
                         requestCounter.labels("batch put").inc();
                     }
+                    batchPutTimer.observeDuration();
                     totalLineCount.addAndGet(kvPairs.size());
                 } catch (Exception e) {
                     batchPutFailCounter.labels("batch put fail").inc();
@@ -80,6 +83,7 @@ public class RawKVUtil {
                         }
                     }
                     totalBatchPutFailCount.addAndGet(kvPairs.size());
+                    logger.error(String.format("Failed to batch put in file[%s]", file.getAbsolutePath()), e);
                 } finally {
                     kvPairs.clear();
                     kvList.clear();

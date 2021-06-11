@@ -9,6 +9,7 @@ import com.pingcap.pojo.TempIndexInfo;
 import com.pingcap.timer.ImportTimer;
 import com.pingcap.util.*;
 import io.prometheus.client.Counter;
+import io.prometheus.client.Histogram;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.LineIterator;
 import org.apache.commons.lang.StringUtils;
@@ -23,6 +24,7 @@ import java.nio.channels.FileChannel;
 import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
 import java.util.*;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -30,6 +32,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class IndexInfo2T {
 
     private static final Logger logger = LoggerFactory.getLogger(Model.LOG);
+    static final Counter totalImportFileCounter = Counter.build().name("total_import_file_counter").help("Total_import_file counter.").labelNames("Total_import_file_counter").register();
 
     public static void RunIndexInfo2T(Properties properties, TiSession tiSession, Counter fileCounter) {
 
@@ -44,6 +47,7 @@ public class IndexInfo2T {
 
         // Traverse all the files that need to be written.
         List<File> fileList = FileUtil.showFileList(filesPath, false, properties);
+        totalImportFileCounter.labels("import").inc(fileList.size());
         // Clear the check sum folder before starting.
         FileUtil.deleteFolder(properties.getProperty(Model.CHECK_SUM_FILE_PATH));
         FileUtil.deleteFolders(properties.getProperty(Model.CHECK_SUM_FILE_PATH));
@@ -60,6 +64,11 @@ public class IndexInfo2T {
                 // Pass in the file to be processed and the ttl map.
                 // The ttl map is shared by all file threads, because it is a table for processing, which is summarized here.
                 threadPoolExecutor.execute(new IndexInfo2TJob(file.getAbsolutePath(), tiSession, properties, ttlTypeList, fileCounter));
+                try {
+                    Thread.sleep(15000);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
             }
         } else {
             logger.error("Data file is empty!");
@@ -122,7 +131,7 @@ class IndexInfo2TJob implements Runnable {
     // Generate ttl type map.
     private final List<String> ttlTypeList;
     private final TiSession tiSession;
-    private Counter importFileCounter;
+    private final Counter importFileCounter;
 
     private final AtomicInteger totalImportCount = new AtomicInteger(0);
     private final AtomicInteger totalSkipCount = new AtomicInteger(0);
@@ -159,37 +168,61 @@ class IndexInfo2TJob implements Runnable {
         ImportTimer importTimer = new ImportTimer(totalImportCount, lines, filePath);
         timer.schedule(importTimer, 5000, Long.parseLong(properties.getProperty(Model.TIMER_INTERVAL)));
 
-        ThreadPoolExecutor threadPoolExecutor = ThreadPoolUtil.startJob(insideThread, insideThread, properties, file.getName());
+//        ThreadPoolExecutor threadPoolExecutor = ThreadPoolUtil.startJob(insideThread, insideThread, properties, file.getName());
+//        for (String s : threadPerLineList) {
+//            threadPoolExecutor.execute(new BatchPutIndexInfoJob(tiSession, totalImportCount, totalSkipCount, totalParseErrorCount, totalBatchPutFailCount, filePath, ttlTypeList, ttlTypeCountMap, s, properties));
+//        }
+
+        final CountDownLatch countDownLatch = new CountDownLatch(threadPerLineList.size());
+
         for (String s : threadPerLineList) {
-            threadPoolExecutor.execute(new BatchPutIndexInfoJob(tiSession, totalImportCount, totalSkipCount, totalParseErrorCount, totalBatchPutFailCount, filePath, ttlTypeList, ttlTypeCountMap, s, properties));
+            BatchPutIndexInfoJob batchPutIndexInfoJob = new BatchPutIndexInfoJob(tiSession, totalImportCount, totalSkipCount, totalParseErrorCount, totalBatchPutFailCount, filePath, ttlTypeList, ttlTypeCountMap, s, properties, countDownLatch);
+            batchPutIndexInfoJob.start();
         }
-
-        threadPoolExecutor.shutdown();
-
         try {
-            if (threadPoolExecutor.awaitTermination(Long.MAX_VALUE, TimeUnit.SECONDS)) {
-                long duration = System.currentTimeMillis() - startTime;
-                StringBuilder result = new StringBuilder("[Import Report] File[" + file.getAbsolutePath() + "],TotalRows[" + lines + "],ImportedRows[" + totalImportCount + "],SkipRows[" + totalSkipCount + "],ParseERROR[" + totalParseErrorCount + "],BatchPutERROR[" + totalBatchPutFailCount + "],Duration[" + duration / 1000 + "s],");
-                result.append("Skip type[");
-                if (ttlTypeCountMap != null) {
-                    for (Map.Entry<String, Long> item : ttlTypeCountMap.entrySet()) {
-                        result.append("<").append(item.getKey()).append(">").append("[").append(item.getValue()).append("]").append("]");
-                    }
-                }
-                timer.cancel();
-                logger.info(result.toString());
-            }
+            countDownLatch.await();
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
+        long duration = System.currentTimeMillis() - startTime;
+        StringBuilder result = new StringBuilder("[Import Report] File[" + file.getAbsolutePath() + "],TotalRows[" + lines + "],ImportedRows[" + totalImportCount + "],SkipRows[" + totalSkipCount + "],ParseERROR[" + totalParseErrorCount + "],BatchPutERROR[" + totalBatchPutFailCount + "],Duration[" + duration / 1000 + "s],");
+        result.append("Skip type[");
+        if (ttlTypeCountMap != null) {
+            for (Map.Entry<String, Long> item : ttlTypeCountMap.entrySet()) {
+                result.append("<").append(item.getKey()).append(">").append("[").append(item.getValue()).append("]").append("]");
+            }
+        }
+        timer.cancel();
+        logger.info(result.toString());
+
+//        threadPoolExecutor.shutdown();
+//
+//        try {
+//            if (threadPoolExecutor.awaitTermination(Long.MAX_VALUE, TimeUnit.SECONDS)) {
+//                long duration = System.currentTimeMillis() - startTime;
+//                StringBuilder result = new StringBuilder("[Import Report] File[" + file.getAbsolutePath() + "],TotalRows[" + lines + "],ImportedRows[" + totalImportCount + "],SkipRows[" + totalSkipCount + "],ParseERROR[" + totalParseErrorCount + "],BatchPutERROR[" + totalBatchPutFailCount + "],Duration[" + duration / 1000 + "s],");
+//                result.append("Skip type[");
+//                if (ttlTypeCountMap != null) {
+//                    for (Map.Entry<String, Long> item : ttlTypeCountMap.entrySet()) {
+//                        result.append("<").append(item.getKey()).append(">").append("[").append(item.getValue()).append("]").append("]");
+//                    }
+//                }
+//                timer.cancel();
+//                logger.info(result.toString());
+//            }
+//        } catch (InterruptedException e) {
+//            e.printStackTrace();
+//        }
 
     }
 }
 
-class BatchPutIndexInfoJob implements Runnable {
+class BatchPutIndexInfoJob extends Thread {
 
     private static final Logger logger = LoggerFactory.getLogger(Model.LOG);
     private static final Logger auditLog = LoggerFactory.getLogger(Model.AUDIT_LOG);
+
+    static final Histogram parseLatency = Histogram.build().name("parse_latency_seconds").help("Parse latency in seconds.").labelNames("parse_latency").register();
 
     private final String filePath;
     private final TiSession tiSession;
@@ -203,8 +236,9 @@ class BatchPutIndexInfoJob implements Runnable {
     private final Properties properties;
     private FileChannel checkSumFileChannel;
     private FileChannel batchPutErrFileChannel;
+    private final CountDownLatch countDownLatch;
 
-    public BatchPutIndexInfoJob(TiSession tiSession, AtomicInteger totalImportCount, AtomicInteger totalSkipCount, AtomicInteger totalParseErrorCount, AtomicInteger totalBatchPutFailCount, String filePath, List<String> ttlTypeList, HashMap<String, Long> ttlTypeCountMap, String fileBlock, Properties properties) {
+    public BatchPutIndexInfoJob(TiSession tiSession, AtomicInteger totalImportCount, AtomicInteger totalSkipCount, AtomicInteger totalParseErrorCount, AtomicInteger totalBatchPutFailCount, String filePath, List<String> ttlTypeList, HashMap<String, Long> ttlTypeCountMap, String fileBlock, Properties properties, CountDownLatch countDownLatch) {
         this.totalImportCount = totalImportCount;
         this.tiSession = tiSession;
         this.totalSkipCount = totalSkipCount;
@@ -215,6 +249,7 @@ class BatchPutIndexInfoJob implements Runnable {
         this.ttlTypeCountMap = ttlTypeCountMap;
         this.fileBlock = fileBlock;
         this.properties = properties;
+        this.countDownLatch = countDownLatch;
     }
 
     @Override
@@ -280,6 +315,7 @@ class BatchPutIndexInfoJob implements Runnable {
         String type;
 
         for (int n = 0; n < todo; n++) {
+            Histogram.Timer parseTimer = parseLatency.labels("parse").startTimer();
             try {
 
                 count++;
@@ -401,6 +437,7 @@ class BatchPutIndexInfoJob implements Runnable {
             } catch (IOException e) {
                 e.printStackTrace();
             }
+            parseTimer.observeDuration();
         }
         try {
             if (writeCheckSumFile) {
@@ -411,6 +448,7 @@ class BatchPutIndexInfoJob implements Runnable {
         } catch (Exception e) {
             e.printStackTrace();
         }
+        countDownLatch.countDown();
 
     }
 

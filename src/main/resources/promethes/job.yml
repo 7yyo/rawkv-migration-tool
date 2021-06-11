@@ -1,0 +1,10 @@
+- job_name: "rawKV"
+  honor_labels: true # don't overwrite job & instance labels
+  static_configs:
+    - targets:
+        - '172.16.4.31:7777'
+- job_name: "java_client"
+  honor_labels: true # don't overwrite job & instance labels
+  static_configs:
+    - targets:
+        - '172.16.4.31:3140'

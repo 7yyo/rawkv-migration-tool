@@ -9,6 +9,7 @@ import com.pingcap.job.checkSumJsonJob;
 import com.pingcap.util.*;
 import io.prometheus.client.Counter;
 import io.prometheus.client.exporter.HTTPServer;
+import io.prometheus.client.hotspot.DefaultExports;
 import org.apache.commons.lang.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -27,6 +28,7 @@ public class Main {
 
     private static final Logger logger = LoggerFactory.getLogger(Model.LOG);
     static final Counter fileCounter = Counter.build().name("file_counter").help("File counter.").labelNames("file_counter").register();
+    static final Counter totalCheckSumFileCounter = Counter.build().name("total_checkSum_file_counter").help("Total_checkSum_file counter.").labelNames("Total_checkSum_file_counter").register();
 
     public static void main(String[] args) {
 
@@ -40,24 +42,25 @@ public class Main {
         TiSession tiSession = TiSessionUtil.getTiSession(properties);
 
         try {
-            HTTPServer server = new HTTPServer(7777);
+            new HTTPServer(7777);
         } catch (IOException e) {
-            logger.error(String.format("Failed to start prometheus, port=[%s]", 7777));
+            logger.error(String.format("Failed to start prometheus, port=[%s]", 7777), e);
         }
 
         if (System.getProperty("m") != null) {
             // Get value by key
             if (Model.GET.equals(System.getProperty("m")) && System.getProperty("k") != null) {
+                String key = System.getProperty("k");
                 RawKVClient rawKVClient = tiSession.createRawClient();
-                String value = RawKVUtil.get(rawKVClient, System.getProperty("k"));
-                logger.info(String.format("Result={key=%s, value=%s}", System.getProperty("k"), value));
+                String value = RawKVUtil.get(rawKVClient, key);
+                logger.info(String.format("[key]%s\n[value]%s}", key, value));
                 try {
                     rawKVClient.close();
                     tiSession.close();
                 } catch (Exception e) {
                     e.printStackTrace();
                 }
-                return;
+                System.exit(0);
             }
             // Check value by key from RawKV
             if (Model.CHECK.equals(System.getProperty("m")) && System.getProperty("f") != null) {
@@ -69,22 +72,22 @@ public class Main {
                 } catch (Exception e) {
                     e.printStackTrace();
                 }
-                return;
+                System.exit(0);
             }
-            // Truncate all RawKV
+            // Clean up all raw kv data
             if (Model.TRUNCATE.equals(System.getProperty("m"))) {
                 RawKVClient rawKVClient = tiSession.createRawClient();
-                logger.info("Start truncate all RawKV...");
+                logger.info("Start to clear all data in raw kv...");
                 long startTime = System.currentTimeMillis();
                 rawKVClient.deleteRange(ByteString.EMPTY, ByteString.EMPTY);
-                logger.info(String.format("Truncate all RawKV complete, duration=[%s]s", (System.currentTimeMillis() - startTime) / 1000));
+                logger.info(String.format("Cleaned up! duration=[%s]s", (System.currentTimeMillis() - startTime) / 1000));
                 try {
-                    tiSession.close();
                     rawKVClient.close();
+                    tiSession.close();
                 } catch (Exception e) {
                     e.printStackTrace();
                 }
-                return;
+                System.exit(0);
             }
         }
 
@@ -94,6 +97,8 @@ public class Main {
         String checkSumFilePath = properties.getProperty(Model.CHECK_SUM_FILE_PATH);
         String checkSumDelimiter = properties.getProperty(Model.CHECK_SUM_DELIMITER);
         int checkSumThreadNum = Integer.parseInt(properties.getProperty(Model.CHECK_SUM_THREAD_NUM));
+
+        DefaultExports.initialize();
 
         if (StringUtils.isNotBlank(task)) {
             switch (task) {
@@ -119,6 +124,7 @@ public class Main {
                     } else {
                         checkSumFileList = FileUtil.showFileList(properties.getProperty(Model.FILE_PATH), true, properties);
                     }
+                    totalCheckSumFileCounter.labels("check sum").inc(checkSumFileList.size());
                     ThreadPoolExecutor checkSumThreadPoolExecutor = ThreadPoolUtil.startJob(checkSumThreadNum, checkSumThreadNum, properties, checkSumFilePath);
                     if (checkSumFileList != null) {
                         for (File checkSumFile : checkSumFileList) {
