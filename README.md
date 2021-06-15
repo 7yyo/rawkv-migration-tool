@@ -25,6 +25,8 @@ importer.tikv.checkExistsKey=1
 importer.checkSum.checkSumThreadNum=50
 # The path where the check sum file is stored is recommended to be configured on a better disk
 importer.checkSum.checkSumFilePath=/Users/checkSum
+# Data that fails to import will be recorded in this path
+importer.in.batchPutErrFilePath=/Users/yuyang/batchPutErr
 # The separator of the check sum file content, if there is no conflict, generally do not need to be modified.
 importer.checkSum.checkSumDelimiter=@#@#@
 # check sum sampling percentage, 100 is full data verification.
@@ -53,6 +55,13 @@ importer.ttl.type=A001,B001,C001
 importer.ttl.day=604800000
 # Statistics log printing interval, unit ms
 importer.timer.interval=30000
+
+# The path of full data export
+exporter.out.filePath=/Users/yuyang/export
+# There are two export methods, limit / region
+exporter.tikv.mode=limit
+# In limit export mode, n items are exported as one
+exporter.tikv.exportLimit=1
 ```
 # Usage
 ```shell
