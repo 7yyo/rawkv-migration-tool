@@ -3,7 +3,7 @@ package com.pingcap;
 import com.pingcap.enums.Model;
 import com.pingcap.export.LimitExporter;
 import com.pingcap.export.RegionExporter;
-import com.pingcap.importer.IndexInfo2T;
+import com.pingcap.importer.Importer;
 import com.pingcap.importer.IndexType2T;
 import com.pingcap.job.checkSumJsonJob;
 import com.pingcap.util.*;
@@ -29,10 +29,10 @@ public class Main {
     private static final Logger logger = LoggerFactory.getLogger(Model.LOG);
     // Total import file count
     static final Counter fileCounter = Counter.build().name("file_counter").help("File counter.").labelNames("file_counter").register();
-    // Total check sum file count
-    static final Counter totalCheckSumFileCounter = Counter.build().name("total_checkSum_file_counter").help("Total_checkSum_file counter.").labelNames("Total_checkSum_file_counter").register();
 
     public static void main(String[] args) {
+
+        logger.info("Welcome to to_rawKV!");
 
         // Get properties by file path
         String propertiesPath = System.getProperty("p");
@@ -40,13 +40,15 @@ public class Main {
             propertiesPath = "src/main/resources/importer.properties";
         }
         Properties properties = PropertiesUtil.getProperties(propertiesPath);
+        logger.info(String.format("Properties=%s", properties));
 
-        TiSession tiSession = TiSessionUtil.getTiSession(properties);
-
+        TiSession tiSession = null;
         try {
-            new HTTPServer(7777);
-        } catch (IOException e) {
-            logger.error(String.format("Failed to start prometheus, port=[%s]", 7777), e);
+            tiSession = TiSessionUtil.getTiSession(properties);
+            logger.info("Create global tiSession success!");
+        } catch (Exception e) {
+            logger.error("Create global tiSession failed! Exit!");
+            System.exit(0);
         }
 
         if (System.getProperty("m") != null) {
@@ -99,9 +101,21 @@ public class Main {
         String checkSumFilePath = properties.getProperty(Model.CHECK_SUM_FILE_PATH);
         String checkSumDelimiter = properties.getProperty(Model.CHECK_SUM_DELIMITER);
         int checkSumThreadNum = Integer.parseInt(properties.getProperty(Model.CHECK_SUM_THREAD_NUM));
+        String prometheusEnable = properties.getProperty(Model.PROMETHEUS_ENABLE);
+        int prometheusPort = Integer.parseInt(properties.getProperty(Model.PROMETHEUS_PORT));
 
-        // Prometheus JVM
-        DefaultExports.initialize();
+        if (prometheusEnable != null) {
+            // Prometheus default port 7777
+            try {
+                new HTTPServer(prometheusPort);
+                logger.info(String.format("Start prometheus metrics success! Port=[%s]", prometheusPort));
+            } catch (IOException e) {
+                logger.error(String.format("Failed to start prometheus, port=[%s]", prometheusPort), e);
+            }
+            // Prometheus JVM
+            DefaultExports.initialize();
+        }
+
 
         if (StringUtils.isNotBlank(task)) {
             switch (task) {
@@ -112,7 +126,8 @@ public class Main {
                             IndexType2T.runIndexType(properties, tiSession);
                             return;
                         }
-                        IndexInfo2T.RunIndexInfo2T(properties, tiSession, fileCounter);
+                        logger.info("Start to run importer!");
+                        Importer.RunImporter(properties, tiSession, fileCounter);
                     } else {
                         logger.error(String.format("The configuration parameter [%s] must not be empty!", Model.MODE));
                     }
@@ -127,7 +142,6 @@ public class Main {
                     } else {
                         checkSumFileList = FileUtil.showFileList(properties.getProperty(Model.FILE_PATH), true, properties);
                     }
-                    totalCheckSumFileCounter.labels("check sum").inc(checkSumFileList.size());
                     ThreadPoolExecutor checkSumThreadPoolExecutor = ThreadPoolUtil.startJob(checkSumThreadNum, checkSumThreadNum, properties, checkSumFilePath);
                     if (checkSumFileList != null) {
                         for (File checkSumFile : checkSumFileList) {

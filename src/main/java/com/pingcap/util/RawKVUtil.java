@@ -46,14 +46,18 @@ public class RawKVUtil {
                     List<ByteString> list = new ArrayList<>(kvPairs.keySet());
                     if (Model.ON.equals(properties.getProperty(Model.DELETE_FOR_TEST))) {
                         requestCounter.labels("batch delete").inc();
+                        Histogram.Timer batchDeleteTimer = requestLatency.labels("batch delete").startTimer();
                         rawKVClient.batchDelete(list);
+                        batchDeleteTimer.observeDuration();
                     }
                     Histogram.Timer batchGetTimer = requestLatency.labels("batch get").startTimer();
                     List<Kvrpcpb.KvPair> haveList = rawKVClient.batchGet(list);
                     batchGetTimer.observeDuration();
                     requestCounter.labels("batch get").inc();
                     for (Kvrpcpb.KvPair kv : haveList) {
+                        Histogram.Timer deleteTimer = requestLatency.labels("delete").startTimer();
                         kvPairs.remove(kv.getKey());
+                        deleteTimer.observeDuration();
                         auditLog.warn(String.format("Skip key - exists: [ %s ], file is [ %s ], almost line= %s", kv.getKey().toStringUtf8(), file.getAbsolutePath(), totalLine));
                     }
                     totalSkipCount.addAndGet(haveList.size());

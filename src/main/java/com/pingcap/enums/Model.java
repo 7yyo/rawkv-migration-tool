@@ -49,6 +49,8 @@ public class Model {
     public static final String TTL_TYPE = "importer.ttl.type";
     public static final String TTL_DAY = "importer.ttl.day";
     public static final String TIMER_INTERVAL = "importer.timer.interval";
+    public static final String PROMETHEUS_ENABLE = "importer.prometheus.enable";
+    public static final String PROMETHEUS_PORT = "importer.prometheus.port";
 
     public static final String EXPORT_FILE_PATH = "exporter.out.filePath";
     public static final String EXPORT_MODE = "exporter.tikv.mode";

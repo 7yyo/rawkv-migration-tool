@@ -15,12 +15,6 @@ public class FileUtil {
     private static final List<File> checkSumList = new ArrayList<>();
 
     public static List<File> showFileList(String filePath, boolean isCheckSum, Properties properties) {
-        if (!isCheckSum) {
-            logger.info("Welcome to To_RawKV.");
-            if (properties != null) {
-                logger.info(String.format("Properties=%s", properties));
-            }
-        }
         List<File> fileList = FileUtil.loadDirectory(new File(filePath), isCheckSum);
         if (fileList == null) {
             logger.warn(String.format("There are no files in this path [%s]", filePath));

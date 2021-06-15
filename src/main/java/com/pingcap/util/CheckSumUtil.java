@@ -6,6 +6,7 @@ import com.pingcap.enums.Model;
 import com.pingcap.pojo.IndexInfo;
 import com.pingcap.pojo.TempIndexInfo;
 import com.pingcap.timer.CheckSumTimer;
+import io.prometheus.client.Histogram;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.LineIterator;
 import org.apache.commons.lang.StringUtils;
@@ -26,6 +27,8 @@ public class CheckSumUtil {
 
     private static final Logger logger = LoggerFactory.getLogger(Model.LOG);
     private static final Logger checkSumLog = LoggerFactory.getLogger(Model.CHECK_SUM_LOG);
+
+    static final Histogram checkSumLatency = Histogram.build().name("check_sum_latency_seconds").help("Check sum latency in seconds.").labelNames("check_sum_latency").register();
 
     public static FileChannel initCheckSumLog(Properties properties, FileChannel fileChannel, File originalFile) {
 
@@ -115,6 +118,7 @@ public class CheckSumUtil {
         TempIndexInfo tempIndexInfo_original;
         if (checkSumFileIt != null) {
             while (checkSumFileIt.hasNext()) {
+                Histogram.Timer iteTimer = checkSumLatency.labels("ite duration").startTimer();
                 originalLineNum = 0;
                 // Total check num
                 totalCheckNum.addAndGet(1);
@@ -143,15 +147,19 @@ public class CheckSumUtil {
                         }
                     }
                     lastFileLine = Integer.parseInt(csFileLine.split(checkSumDelimiter)[1]);
+                    iteTimer.observeDuration();
 
+                    Histogram.Timer checkSumGetTimer = checkSumLatency.labels("check sum get duration").startTimer();
                     // Get value by check sum file key
                     value = rawKVClient.get(ByteString.copyFromUtf8(csKey)).toStringUtf8();
+                    checkSumGetTimer.observeDuration();
                     if (value.isEmpty()) {
                         checkSumLog.warn(String.format("The key [%s] is not be inserted! Original file line=[%s]", csKey, originalLine));
                         checkNotInsertErrorNum++;
                         continue;
                     }
 
+                    Histogram.Timer eqTimer = checkSumLatency.labels("eq duration").startTimer();
                     // Init checkSum object
                     // Because the check sum is all < json key + line num >, the format is unified, and there is no csv
                     indexInfo_checkSum = new IndexInfo();
@@ -234,6 +242,7 @@ public class CheckSumUtil {
                         default:
                             throw new IllegalStateException("Unexpected value: " + importMode);
                     }
+                    eqTimer.observeDuration();
 
                 }
             }
@@ -260,6 +269,7 @@ public class CheckSumUtil {
         String delimiter_2 = properties.getProperty(Model.DELIMITER_2);
         String keyDelimiter = properties.getProperty(Model.KEY_DELIMITER);
         String envId = properties.getProperty(Model.ENV_ID);
+        String ttlType = properties.getProperty(Model.TTL_TYPE);
 
         int checkParseErrorNum = 0;
         int checkNotInsertErrorNum = 0;
@@ -304,6 +314,9 @@ public class CheckSumUtil {
                                     indexInfo_original = JSON.toJavaObject(jsonObject, IndexInfo.class);
                                     // get value by original key
                                     key = String.format(IndexInfo.INDEX_INFO_KET_FORMAT, envId, indexInfo_original.getType(), indexInfo_original.getId());
+                                    if (ttlType.contains(key.split(keyDelimiter)[2])) {
+                                        continue;
+                                    }
                                     // key = indexInfo_:_{envid}_:_{type}_:_{id}
                                     indexInfo_original.setEnvId(key.split(keyDelimiter)[1]);
                                     indexInfo_original.setType(key.split(keyDelimiter)[2]);
@@ -325,8 +338,6 @@ public class CheckSumUtil {
                                         continue;
                                     }
                                 } catch (Exception e) {
-                                    checkSumLog.error(String.format("Parse failed! Line = %s", originalLine));
-                                    checkParseErrorNum++;
                                     continue;
                                 }
                                 break;
@@ -353,8 +364,6 @@ public class CheckSumUtil {
                                         continue;
                                     }
                                 } catch (Exception e) {
-                                    checkSumLog.error(String.format("Parse failed! Line = %s", originalLine));
-                                    checkParseErrorNum++;
                                     continue;
                                 }
                                 break;
@@ -365,6 +374,9 @@ public class CheckSumUtil {
                     case Model.CSV_FORMAT:
                         try {
                             indexInfo_original = IndexInfo.initIndexInfo(originalLine, delimiter_1, delimiter_2);
+                            if (ttlType.contains(indexInfo_original.getType())) {
+                                continue;
+                            }
                             key = String.format(IndexInfo.INDEX_INFO_KET_FORMAT, envId, indexInfo_original.getType(), indexInfo_original.getId());
                             value = rawKVClient.get(ByteString.copyFromUtf8(key)).toStringUtf8();
                             if (StringUtils.isBlank(value)) {
@@ -380,8 +392,7 @@ public class CheckSumUtil {
                                 continue;
                             }
                         } catch (Exception e) {
-                            checkSumLog.error(String.format("Parse failed! Line = %s", originalLine));
-                            checkParseErrorNum++;
+                            continue;
                         }
                         break;
                     default:

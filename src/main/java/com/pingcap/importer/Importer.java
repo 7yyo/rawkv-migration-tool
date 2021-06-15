@@ -29,12 +29,14 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
-public class IndexInfo2T {
+public class Importer {
 
     private static final Logger logger = LoggerFactory.getLogger(Model.LOG);
     static final Counter totalImportFileCounter = Counter.build().name("total_import_file_counter").help("Total_import_file counter.").labelNames("Total_import_file_counter").register();
+    // Total check sum file count
+    static final Counter totalCheckSumFileCounter = Counter.build().name("total_checkSum_file_counter").help("Total_checkSum_file counter.").labelNames("Total_checkSum_file_counter").register();
 
-    public static void RunIndexInfo2T(Properties properties, TiSession tiSession, Counter fileCounter) {
+    public static void RunImporter(Properties properties, TiSession tiSession, Counter fileCounter) {
 
         String filesPath = properties.getProperty(Model.FILE_PATH);
         int corePoolSize = Integer.parseInt(properties.getProperty(Model.CORE_POOL_SIZE));
@@ -62,7 +64,7 @@ public class IndexInfo2T {
         for (File file : fileList) {
             // Pass in the file to be processed and the ttl map.
             // The ttl map is shared by all file threads, because it is a table for processing, which is summarized here.
-            threadPoolExecutor.execute(new IndexInfo2TJob(file.getAbsolutePath(), tiSession, properties, ttlTypeList, fileCounter));
+            threadPoolExecutor.execute(new ImporterJob(file.getAbsolutePath(), tiSession, properties, ttlTypeList, fileCounter));
             try {
                 Thread.sleep(15000);
             } catch (InterruptedException e) {
@@ -81,17 +83,20 @@ public class IndexInfo2T {
             e.printStackTrace();
         }
 
-        long checkStartTime = System.currentTimeMillis();
-        int checkSumThreadNum = Integer.parseInt(properties.getProperty(Model.CHECK_SUM_THREAD_NUM));
-
-        ThreadPoolExecutor checkSumThreadPoolExecutor;
-        String simpleCheckSum = properties.getProperty(Model.SIMPLE_CHECK_SUM);
+        // After importing, start check sum if enable check sum.
         if (Model.ON.equals(properties.getProperty(Model.ENABLE_CHECK_SUM))) {
+
+            long checkStartTime = System.currentTimeMillis();
+            int checkSumThreadNum = Integer.parseInt(properties.getProperty(Model.CHECK_SUM_THREAD_NUM));
+
+            ThreadPoolExecutor checkSumThreadPoolExecutor;
+            String simpleCheckSum = properties.getProperty(Model.SIMPLE_CHECK_SUM);
             if (Model.ON.equals(simpleCheckSum)) {
                 checkSumFilePath = filesPath;
             }
             List<File> checkSumFileList = FileUtil.showFileList(checkSumFilePath, true, properties);
             checkSumThreadPoolExecutor = ThreadPoolUtil.startJob(checkSumThreadNum, checkSumThreadNum, properties, filesPath);
+            totalCheckSumFileCounter.labels("check sum").inc(checkSumFileList.size());
             if (checkSumFileList != null) {
                 for (File checkSumFile : checkSumFileList) {
                     checkSumThreadPoolExecutor.execute(new checkSumJsonJob(checkSumFile.getAbsolutePath(), checkSumDelimiter, tiSession, properties, fileCounter));
@@ -109,15 +114,14 @@ public class IndexInfo2T {
                     logger.info(String.format("Total duration=[%s] seconds", ((System.currentTimeMillis() - importStartTime) / 1000)));
                     System.exit(0);
                 }
-            } catch (
-                    InterruptedException e) {
+            } catch (InterruptedException e) {
                 e.printStackTrace();
             }
         }
     }
 }
 
-class IndexInfo2TJob implements Runnable {
+class ImporterJob implements Runnable {
 
     private static final Logger logger = LoggerFactory.getLogger(Model.LOG);
 
@@ -133,7 +137,7 @@ class IndexInfo2TJob implements Runnable {
     private final AtomicInteger totalParseErrorCount = new AtomicInteger(0);
     private final AtomicInteger totalBatchPutFailCount = new AtomicInteger(0);
 
-    public IndexInfo2TJob(String filePath, TiSession tiSession, Properties properties, List<String> ttlTypeList, Counter importFileCounter) {
+    public ImporterJob(String filePath, TiSession tiSession, Properties properties, List<String> ttlTypeList, Counter importFileCounter) {
         this.filePath = filePath;
         this.properties = properties;
         this.ttlTypeList = ttlTypeList;
@@ -168,11 +172,12 @@ class IndexInfo2TJob implements Runnable {
 //            threadPoolExecutor.execute(new BatchPutIndexInfoJob(tiSession, totalImportCount, totalSkipCount, totalParseErrorCount, totalBatchPutFailCount, filePath, ttlTypeList, ttlTypeCountMap, s, properties));
 //        }
 
+        // When all child threads are over, end the main thread.
         final CountDownLatch countDownLatch = new CountDownLatch(threadPerLineList.size());
 
         // s: File block
         for (String s : threadPerLineList) {
-            BatchPutIndexInfoJob batchPutIndexInfoJob = new BatchPutIndexInfoJob(tiSession, totalImportCount, totalSkipCount, totalParseErrorCount, totalBatchPutFailCount, filePath, ttlTypeList, ttlTypeCountMap, s, properties, countDownLatch);
+            BatchPutJob batchPutIndexInfoJob = new BatchPutJob(tiSession, totalImportCount, totalSkipCount, totalParseErrorCount, totalBatchPutFailCount, filePath, ttlTypeList, ttlTypeCountMap, s, properties, countDownLatch);
             batchPutIndexInfoJob.start();
         }
         try {
@@ -214,7 +219,7 @@ class IndexInfo2TJob implements Runnable {
     }
 }
 
-class BatchPutIndexInfoJob extends Thread {
+class BatchPutJob extends Thread {
 
     private static final Logger logger = LoggerFactory.getLogger(Model.LOG);
     private static final Logger auditLog = LoggerFactory.getLogger(Model.AUDIT_LOG);
@@ -239,7 +244,7 @@ class BatchPutIndexInfoJob extends Thread {
     private FileChannel batchPutErrFileChannel;
     private final CountDownLatch countDownLatch;
 
-    public BatchPutIndexInfoJob(TiSession tiSession, AtomicInteger totalImportCount, AtomicInteger totalSkipCount, AtomicInteger totalParseErrorCount, AtomicInteger totalBatchPutFailCount, String filePath, List<String> ttlTypeList, HashMap<String, Long> ttlTypeCountMap, String fileBlock, Properties properties, CountDownLatch countDownLatch) {
+    public BatchPutJob(TiSession tiSession, AtomicInteger totalImportCount, AtomicInteger totalSkipCount, AtomicInteger totalParseErrorCount, AtomicInteger totalBatchPutFailCount, String filePath, List<String> ttlTypeList, HashMap<String, Long> ttlTypeCountMap, String fileBlock, Properties properties, CountDownLatch countDownLatch) {
         this.totalImportCount = totalImportCount;
         this.tiSession = tiSession;
         this.totalSkipCount = totalSkipCount;
@@ -273,13 +278,14 @@ class BatchPutIndexInfoJob extends Thread {
         int todo = Integer.parseInt(fileBlock.split(",")[1]);
 
 
-        // If not 100, write check sum file.
+        // If not 100%, write check sum file.
         boolean writeCheckSumFile = Model.ON.equals(enableCheckSum) && !Model.ON.equals(simpleCheckSum);
 
         if (writeCheckSumFile) {
             checkSumFileChannel = CheckSumUtil.initCheckSumLog(properties, checkSumFileChannel, file);
         }
 
+        // If batch put fails, record the failed batch put data under this path
         batchPutErrFileChannel = RawKVUtil.initBatchPutErrLog(properties, batchPutErrFileChannel, file);
 
         LineIterator lineIterator = null;
@@ -289,6 +295,7 @@ class BatchPutIndexInfoJob extends Thread {
             e.printStackTrace();
         }
 
+        // If the data file has a large number of rows, the block time may be slightly longer
         Histogram.Timer fileBlockTimer = fileBlockLatency.labels("file block").startTimer();
         for (int m = 0; m < start; m++) {
             lineIterator.nextLine();
