@@ -27,7 +27,9 @@ import java.util.concurrent.TimeUnit;
 public class Main {
 
     private static final Logger logger = LoggerFactory.getLogger(Model.LOG);
+    // Total import file count
     static final Counter fileCounter = Counter.build().name("file_counter").help("File counter.").labelNames("file_counter").register();
+    // Total check sum file count
     static final Counter totalCheckSumFileCounter = Counter.build().name("total_checkSum_file_counter").help("Total_checkSum_file counter.").labelNames("Total_checkSum_file_counter").register();
 
     public static void main(String[] args) {
@@ -98,6 +100,7 @@ public class Main {
         String checkSumDelimiter = properties.getProperty(Model.CHECK_SUM_DELIMITER);
         int checkSumThreadNum = Integer.parseInt(properties.getProperty(Model.CHECK_SUM_THREAD_NUM));
 
+        // Prometheus JVM
         DefaultExports.initialize();
 
         if (StringUtils.isNotBlank(task)) {
@@ -130,11 +133,11 @@ public class Main {
                         for (File checkSumFile : checkSumFileList) {
                             checkSumThreadPoolExecutor.execute(new checkSumJsonJob(checkSumFile.getAbsolutePath(), checkSumDelimiter, tiSession, properties, fileCounter));
                         }
-                        checkSumThreadPoolExecutor.shutdown();
                     } else {
                         logger.error(String.format("Check sum file [%s] is not exists!", checkSumFilePath));
                         return;
                     }
+                    checkSumThreadPoolExecutor.shutdown();
                     try {
                         if (checkSumThreadPoolExecutor.awaitTermination(Long.MAX_VALUE, TimeUnit.SECONDS)) {
                             long duration = System.currentTimeMillis() - checkStartTime;

@@ -59,20 +59,15 @@ public class IndexInfo2T {
 
         // Start the Main thread for each file.showFileList.
         ThreadPoolExecutor threadPoolExecutor = ThreadPoolUtil.startJob(corePoolSize, maxPoolSize, properties, filesPath);
-        if (fileList != null) {
-            for (File file : fileList) {
-                // Pass in the file to be processed and the ttl map.
-                // The ttl map is shared by all file threads, because it is a table for processing, which is summarized here.
-                threadPoolExecutor.execute(new IndexInfo2TJob(file.getAbsolutePath(), tiSession, properties, ttlTypeList, fileCounter));
-                try {
-                    Thread.sleep(15000);
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                }
+        for (File file : fileList) {
+            // Pass in the file to be processed and the ttl map.
+            // The ttl map is shared by all file threads, because it is a table for processing, which is summarized here.
+            threadPoolExecutor.execute(new IndexInfo2TJob(file.getAbsolutePath(), tiSession, properties, ttlTypeList, fileCounter));
+            try {
+                Thread.sleep(15000);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
             }
-        } else {
-            logger.error("Data file is empty!");
-            return;
         }
 
         threadPoolExecutor.shutdown();
@@ -150,7 +145,7 @@ class IndexInfo2TJob implements Runnable {
     public void run() {
 
         int insideThread = Integer.parseInt(properties.getProperty(Model.INTERNAL_THREAD_NUM));
-        importFileCounter.labels("import").inc();
+
         long startTime = System.currentTimeMillis();
 
         HashMap<String, Long> ttlTypeCountMap = null;
@@ -175,6 +170,7 @@ class IndexInfo2TJob implements Runnable {
 
         final CountDownLatch countDownLatch = new CountDownLatch(threadPerLineList.size());
 
+        // s: File block
         for (String s : threadPerLineList) {
             BatchPutIndexInfoJob batchPutIndexInfoJob = new BatchPutIndexInfoJob(tiSession, totalImportCount, totalSkipCount, totalParseErrorCount, totalBatchPutFailCount, filePath, ttlTypeList, ttlTypeCountMap, s, properties, countDownLatch);
             batchPutIndexInfoJob.start();
@@ -194,6 +190,7 @@ class IndexInfo2TJob implements Runnable {
         }
         timer.cancel();
         logger.info(result.toString());
+        importFileCounter.labels("import").inc();
 
 //        threadPoolExecutor.shutdown();
 //
@@ -223,6 +220,10 @@ class BatchPutIndexInfoJob extends Thread {
     private static final Logger auditLog = LoggerFactory.getLogger(Model.AUDIT_LOG);
 
     static final Histogram parseLatency = Histogram.build().name("parse_latency_seconds").help("Parse latency in seconds.").labelNames("parse_latency").register();
+    static final Histogram writeCheckSumLatency = Histogram.build().name("write_checkSum_latency").help("Write checkSum latency.").labelNames("check_sum").register();
+
+    static final Histogram fileBlockLatency = Histogram.build().name("file_block_latency").help("File block latency.").labelNames("file_block").register();
+
 
     private final String filePath;
     private final TiSession tiSession;
@@ -288,9 +289,11 @@ class BatchPutIndexInfoJob extends Thread {
             e.printStackTrace();
         }
 
+        Histogram.Timer fileBlockTimer = fileBlockLatency.labels("file block").startTimer();
         for (int m = 0; m < start; m++) {
             lineIterator.nextLine();
         }
+        fileBlockTimer.observeDuration();
 
         int count = 0;
         int totalCount = 0;
@@ -315,7 +318,7 @@ class BatchPutIndexInfoJob extends Thread {
         String type;
 
         for (int n = 0; n < todo; n++) {
-            Histogram.Timer parseTimer = parseLatency.labels("parse").startTimer();
+
             try {
 
                 count++;
@@ -332,10 +335,14 @@ class BatchPutIndexInfoJob extends Thread {
                 simpleDateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
                 time = simpleDateFormat.format(new Date());
 
+                Histogram.Timer parseJsonTimer = parseLatency.labels("parse json").startTimer();
+                Histogram.Timer toObjTimer = parseLatency.labels("to obj").startTimer();
+
                 switch (importMode) {
                     case Model.JSON_FORMAT:
                         try {
                             jsonObject = JSONObject.parseObject(line);
+                            parseJsonTimer.observeDuration();
                         } catch (Exception e) {
                             auditLog.error(String.format("Failed to parse json, file='%s', json='%s',line=%s,", file, line, start + totalCount));
                             totalParseErrorCount.addAndGet(1);
@@ -346,6 +353,7 @@ class BatchPutIndexInfoJob extends Thread {
                         switch (scenes) {
                             case Model.INDEX_INFO:
                                 indexInfoS = JSON.toJavaObject(jsonObject, IndexInfo.class);
+                                toObjTimer.observeDuration();
                                 // Skip the type that exists in the tty type map.
                                 if (ttlTypeList.contains(indexInfoS.getType())) {
                                     ttlTypeCountMap.put(indexInfoS.getType(), ttlTypeCountMap.get(indexInfoS.getType()) + 1);
@@ -368,6 +376,7 @@ class BatchPutIndexInfoJob extends Thread {
                                 break;
                             case Model.TEMP_INDEX_INFO:
                                 tempIndexInfoS = JSON.toJavaObject(jsonObject, TempIndexInfo.class);
+                                toObjTimer.observeDuration();
                                 if (envId != null) {
                                     indexInfoKey = String.format(TempIndexInfo.TEMP_INDEX_INFO_KEY_FORMAT, envId, tempIndexInfoS.getId());
                                 } else {
@@ -425,7 +434,9 @@ class BatchPutIndexInfoJob extends Thread {
                 if (writeCheckSumFile) {
                     int nn = random.nextInt(100 / checkSumPercentage) + 1;
                     if (nn == 1) {
+                        Histogram.Timer writeCheckSumTimer = writeCheckSumLatency.labels("check sum").startTimer();
                         checkSumFileChannel.write(StandardCharsets.UTF_8.encode(indexInfoKey + checkSumDelimiter + (start + totalCount) + "\n"));
+                        writeCheckSumTimer.observeDuration();
                     }
                 }
 
@@ -437,7 +448,6 @@ class BatchPutIndexInfoJob extends Thread {
             } catch (IOException e) {
                 e.printStackTrace();
             }
-            parseTimer.observeDuration();
         }
         try {
             if (writeCheckSumFile) {
