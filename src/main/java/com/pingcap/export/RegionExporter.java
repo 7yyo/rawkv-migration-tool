@@ -5,7 +5,7 @@ import com.alibaba.fastjson.JSONObject;
 import com.pingcap.enums.Model;
 import com.pingcap.pojo.IndexInfo;
 import com.pingcap.pojo.TempIndexInfo;
-import com.pingcap.util.RawKVUtil;
+import com.pingcap.util.RawKvUtil;
 import com.pingcap.util.ThreadPoolUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -34,9 +34,9 @@ public class RegionExporter {
         int corePoolSize = Integer.parseInt(properties.getProperty(Model.CORE_POOL_SIZE));
         int maxPoolSize = Integer.parseInt(properties.getProperty(Model.MAX_POOL_SIZE));
 
-        List<TiRegion> tiRegionList = RawKVUtil.getTiRegionList(tiSession);
+        List<TiRegion> tiRegionList = RawKvUtil.getTiRegionList(tiSession);
 
-        ThreadPoolExecutor threadPoolExecutor = ThreadPoolUtil.startJob(corePoolSize, maxPoolSize, properties, null);
+        ThreadPoolExecutor threadPoolExecutor = ThreadPoolUtil.startJob(corePoolSize, maxPoolSize, null);
         RawKVClient rawKVClient;
         for (TiRegion tiRegion : tiRegionList) {
             // export_regionId.txt

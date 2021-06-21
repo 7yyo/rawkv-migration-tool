@@ -23,12 +23,15 @@ import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
+/**
+ * @author yuyang
+ */
 public class CheckSumUtil {
 
     private static final Logger logger = LoggerFactory.getLogger(Model.LOG);
     private static final Logger checkSumLog = LoggerFactory.getLogger(Model.CHECK_SUM_LOG);
 
-    static final Histogram checkSumLatency = Histogram.build().name("check_sum_latency_seconds").help("Check sum latency in seconds.").labelNames("check_sum_latency").register();
+    static final Histogram CHECK_SUM_LATENCY = Histogram.build().name("check_sum_latency_seconds").help("Check sum latency in seconds.").labelNames("check_sum_latency").register();
 
     public static FileChannel initCheckSumLog(Properties properties, FileChannel fileChannel, File originalFile) {
 
@@ -63,19 +66,19 @@ public class CheckSumUtil {
         String importMode = properties.getProperty(Model.MODE);
         String scenes = properties.getProperty(Model.SCENES);
         String keyDelimiter = properties.getProperty(Model.KEY_DELIMITER);
-        String delimiter_1 = properties.getProperty(Model.DELIMITER_1);
-        String delimiter_2 = properties.getProperty(Model.DELIMITER_2);
+        String delimiter1 = properties.getProperty(Model.DELIMITER_1);
+        String delimiter2 = properties.getProperty(Model.DELIMITER_2);
 
         int checkParseErrorNum = 0;
         int checkNotInsertErrorNum = 0;
         int checkFailNum = 0;
         AtomicInteger totalCheckNum = new AtomicInteger(0);
-        RawKVClient rawKVClient = tiSession.createRawClient();
+        RawKVClient rawKvClient = tiSession.createRawClient();
 
         JSONObject jsonObject;
 
         String originalLine = "";
-        String csFileLine = "";
+        String csFileLine;
         String csKey = "";
         int csFileLineNum = 0;
         int lastFileLine = 0;
@@ -111,14 +114,15 @@ public class CheckSumUtil {
 
         // get original line to check sum
         int originalLineNum;
-        int rowSpan = 0;
+        int rowSpan;
         IndexInfo indexInfo_checkSum;
         TempIndexInfo tempIndexInfo_checkSum;
         IndexInfo indexInfo_original;
         TempIndexInfo tempIndexInfo_original;
         if (checkSumFileIt != null) {
+
             while (checkSumFileIt.hasNext()) {
-                Histogram.Timer iteTimer = checkSumLatency.labels("ite duration").startTimer();
+                Histogram.Timer iteTimer = CHECK_SUM_LATENCY.labels("ite duration").startTimer();
                 originalLineNum = 0;
                 // Total check num
                 totalCheckNum.addAndGet(1);
@@ -149,9 +153,9 @@ public class CheckSumUtil {
                     lastFileLine = Integer.parseInt(csFileLine.split(checkSumDelimiter)[1]);
                     iteTimer.observeDuration();
 
-                    Histogram.Timer checkSumGetTimer = checkSumLatency.labels("check sum get duration").startTimer();
+                    Histogram.Timer checkSumGetTimer = CHECK_SUM_LATENCY.labels("check sum get duration").startTimer();
                     // Get value by check sum file key
-                    value = rawKVClient.get(ByteString.copyFromUtf8(csKey)).toStringUtf8();
+                    value = rawKvClient.get(ByteString.copyFromUtf8(csKey)).toStringUtf8();
                     checkSumGetTimer.observeDuration();
                     if (value.isEmpty()) {
                         checkSumLog.warn(String.format("The key [%s] is not be inserted! Original file line=[%s]", csKey, originalLine));
@@ -159,7 +163,7 @@ public class CheckSumUtil {
                         continue;
                     }
 
-                    Histogram.Timer eqTimer = checkSumLatency.labels("eq duration").startTimer();
+                    Histogram.Timer eqTimer = CHECK_SUM_LATENCY.labels("eq duration").startTimer();
                     // Init checkSum object
                     // Because the check sum is all < json key + line num >, the format is unified, and there is no csv
                     indexInfo_checkSum = new IndexInfo();
@@ -233,7 +237,7 @@ public class CheckSumUtil {
                             }
                             break;
                         case Model.CSV_FORMAT:
-                            indexInfo_original = IndexInfo.initIndexInfo(originalLine, delimiter_1, delimiter_2);
+                            indexInfo_original = IndexInfo.initIndexInfo(originalLine, delimiter1, delimiter2);
                             if (!indexInfo_checkSum.equals(indexInfo_original)) {
                                 checkSumLog.error(String.format("Check sum failed! Line=[%s]", originalLine));
                                 checkFailNum++;
@@ -249,7 +253,7 @@ public class CheckSumUtil {
             try {
                 checkSumFileIt.close();
                 originalFileIt.close();
-                rawKVClient.close();
+                rawKvClient.close();
             } catch (Exception e) {
                 e.printStackTrace();
             }
@@ -279,7 +283,7 @@ public class CheckSumUtil {
 
         JSONObject jsonObject;
 
-        String originalLine = "";
+        String originalLine;
 
         File originalFile = new File(originalFilePath);
         Timer timer = new Timer();

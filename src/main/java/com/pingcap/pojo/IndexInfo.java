@@ -1,8 +1,10 @@
 package com.pingcap.pojo;
 
 import com.alibaba.fastjson.JSON;
-import org.apache.commons.lang.StringUtils;
 
+/**
+ * @author yuyang
+ */
 public class IndexInfo {
 
     public static final String INDEX_INFO_KET_FORMAT = "indexInfo_:_%s_:_%s_:_%s";
@@ -92,18 +94,18 @@ public class IndexInfo {
         return idC && serviceTagC && targetIdC && typeC;
     }
 
-    public static IndexInfo initIndexInfo(String originalLine, String delimiter_1, String delimiter_2) {
+    public static IndexInfo initIndexInfo(String originalLine, String delimiter1, String delimiter_2) {
         IndexInfo indexInfo = new IndexInfo();
 
-        String id = originalLine.split(delimiter_1)[0];
+        String id = originalLine.split(delimiter1)[0];
         indexInfo.setId(id);
-        String type = originalLine.split(delimiter_1)[1];
+        String type = originalLine.split(delimiter1)[1];
         indexInfo.setType(type);
 
-        String targetId = originalLine.split(delimiter_1)[2].split(delimiter_2)[0];
+        String targetId = originalLine.split(delimiter1)[2].split(delimiter_2)[0];
 
-        if (originalLine.split(delimiter_1).length > 3) {
-            String v = originalLine.split(delimiter_1)[2];
+        if (originalLine.split(delimiter1).length > 3) {
+            String v = originalLine.split(delimiter1)[2];
             ServiceTag serviceTag = new ServiceTag();
             serviceTag.setBLKMDL_ID(v.split(delimiter_2)[0]);
             serviceTag.setPD_SALE_FTA_CD(v.split(delimiter_2)[1]);
@@ -121,7 +123,7 @@ public class IndexInfo {
         return indexInfo;
     }
 
-    public static IndexInfo initIndexInfoT(IndexInfo indexInfoT, IndexInfo indexInfoS, String time) {
+    public static void initIndexInfoT(IndexInfo indexInfoT, IndexInfo indexInfoS, String time) {
         // value
         // appId、serviceTag、targetId、updateTime
         indexInfoT.setAppId(indexInfoT.getAppId());
@@ -134,6 +136,5 @@ public class IndexInfo {
         }
         indexInfoT.setTargetId(indexInfoS.getTargetId());
         indexInfoT.setUpdateTime(time);
-        return indexInfoT;
     }
 }

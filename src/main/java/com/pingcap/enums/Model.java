@@ -1,5 +1,8 @@
 package com.pingcap.enums;
 
+/**
+ * @author yuyang
+ */
 public class Model {
 
     public static final String IMPORT = "import";
@@ -55,5 +58,6 @@ public class Model {
     public static final String EXPORT_FILE_PATH = "exporter.out.filePath";
     public static final String EXPORT_MODE = "exporter.tikv.mode";
     public static final String EXPORT_LIMIT = "exporter.tikv.exportLimit";
+    public static final String EXPORT_THREAD = "exporter.tikv.exportThread";
 
 }

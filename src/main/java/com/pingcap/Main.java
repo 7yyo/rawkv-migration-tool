@@ -4,8 +4,8 @@ import com.pingcap.enums.Model;
 import com.pingcap.export.LimitExporter;
 import com.pingcap.export.RegionExporter;
 import com.pingcap.importer.Importer;
-import com.pingcap.importer.IndexType2T;
-import com.pingcap.job.checkSumJsonJob;
+import com.pingcap.importer.IndexTypeImporter;
+import com.pingcap.job.CheckSumJsonJob;
 import com.pingcap.util.*;
 import io.prometheus.client.Counter;
 import io.prometheus.client.exporter.HTTPServer;
@@ -24,11 +24,16 @@ import java.util.Properties;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
+/**
+ * @author yuyang
+ */
 public class Main {
 
     private static final Logger logger = LoggerFactory.getLogger(Model.LOG);
-    // Total import file count
-    static final Counter fileCounter = Counter.build().name("file_counter").help("File counter.").labelNames("file_counter").register();
+    /**
+     * Total import file count
+     */
+    static final Counter FILE_COUNTER = Counter.build().name("file_counter").help("File counter.").labelNames("file_counter").register();
 
     public static void main(String[] args) {
 
@@ -55,11 +60,11 @@ public class Main {
             // Get value by key
             if (Model.GET.equals(System.getProperty("m")) && System.getProperty("k") != null) {
                 String key = System.getProperty("k");
-                RawKVClient rawKVClient = tiSession.createRawClient();
-                String value = RawKVUtil.get(rawKVClient, key);
-                logger.info(String.format("[key]%s\n[value]%s}", key, value));
+                RawKVClient rawKvClient = tiSession.createRawClient();
+                String value = RawKvUtil.get(rawKvClient, key);
+                logger.info(String.format("[key]%s=[value]%s}", key, value));
                 try {
-                    rawKVClient.close();
+                    rawKvClient.close();
                     tiSession.close();
                 } catch (Exception e) {
                     e.printStackTrace();
@@ -68,10 +73,10 @@ public class Main {
             }
             // Check value by key from RawKV
             if (Model.CHECK.equals(System.getProperty("m")) && System.getProperty("f") != null) {
-                RawKVClient rawKVClient = tiSession.createRawClient();
-                RawKVUtil.batchGetCheck(System.getProperty("f"), tiSession, properties);
+                RawKVClient rawKvClient = tiSession.createRawClient();
+                RawKvUtil.batchGetCheck(System.getProperty("f"), tiSession, properties);
                 try {
-                    rawKVClient.close();
+                    rawKvClient.close();
                     tiSession.close();
                 } catch (Exception e) {
                     e.printStackTrace();
@@ -80,13 +85,13 @@ public class Main {
             }
             // Clean up all raw kv data
             if (Model.TRUNCATE.equals(System.getProperty("m"))) {
-                RawKVClient rawKVClient = tiSession.createRawClient();
+                RawKVClient rawKvClient = tiSession.createRawClient();
                 logger.info("Start to clear all data in raw kv...");
                 long startTime = System.currentTimeMillis();
-                rawKVClient.deleteRange(ByteString.EMPTY, ByteString.EMPTY);
+                rawKvClient.deleteRange(ByteString.EMPTY, ByteString.EMPTY);
                 logger.info(String.format("Cleaned up! duration=[%s]s", (System.currentTimeMillis() - startTime) / 1000));
                 try {
-                    rawKVClient.close();
+                    rawKvClient.close();
                     tiSession.close();
                 } catch (Exception e) {
                     e.printStackTrace();
@@ -104,7 +109,7 @@ public class Main {
         String prometheusEnable = properties.getProperty(Model.PROMETHEUS_ENABLE);
         int prometheusPort = Integer.parseInt(properties.getProperty(Model.PROMETHEUS_PORT));
 
-        if (prometheusEnable != null) {
+        if (Model.ON.equals(prometheusEnable)) {
             // Prometheus default port 7777
             try {
                 new HTTPServer(prometheusPort);
@@ -116,6 +121,7 @@ public class Main {
             DefaultExports.initialize();
         }
 
+        logger.info(String.format("Task = [%s]", task));
 
         if (StringUtils.isNotBlank(task)) {
             switch (task) {
@@ -123,11 +129,11 @@ public class Main {
                 case Model.IMPORT:
                     if (StringUtils.isNotBlank(importMode)) {
                         if (Model.INDEX_TYPE.equals(scenes)) {
-                            IndexType2T.runIndexType(properties, tiSession);
+                            IndexTypeImporter.runIndexType(properties, tiSession);
                             return;
                         }
                         logger.info("Start to run importer!");
-                        Importer.RunImporter(properties, tiSession, fileCounter);
+                        Importer.runImporter(properties, tiSession, FILE_COUNTER);
                     } else {
                         logger.error(String.format("The configuration parameter [%s] must not be empty!", Model.MODE));
                     }
@@ -138,14 +144,14 @@ public class Main {
                     String simpleCheckSum = properties.getProperty(Model.SIMPLE_CHECK_SUM);
                     List<File> checkSumFileList;
                     if (!Model.ON.equals(simpleCheckSum)) {
-                        checkSumFileList = FileUtil.showFileList(checkSumFilePath, true, properties);
+                        checkSumFileList = FileUtil.showFileList(checkSumFilePath, true);
                     } else {
-                        checkSumFileList = FileUtil.showFileList(properties.getProperty(Model.FILE_PATH), true, properties);
+                        checkSumFileList = FileUtil.showFileList(properties.getProperty(Model.FILE_PATH), true);
                     }
-                    ThreadPoolExecutor checkSumThreadPoolExecutor = ThreadPoolUtil.startJob(checkSumThreadNum, checkSumThreadNum, properties, checkSumFilePath);
+                    ThreadPoolExecutor checkSumThreadPoolExecutor = ThreadPoolUtil.startJob(checkSumThreadNum, checkSumThreadNum, checkSumFilePath);
                     if (checkSumFileList != null) {
                         for (File checkSumFile : checkSumFileList) {
-                            checkSumThreadPoolExecutor.execute(new checkSumJsonJob(checkSumFile.getAbsolutePath(), checkSumDelimiter, tiSession, properties, fileCounter));
+                            checkSumThreadPoolExecutor.execute(new CheckSumJsonJob(checkSumFile.getAbsolutePath(), checkSumDelimiter, tiSession, properties, FILE_COUNTER));
                         }
                     } else {
                         logger.error(String.format("Check sum file [%s] is not exists!", checkSumFilePath));
@@ -179,8 +185,10 @@ public class Main {
                     }
                     break;
                 default:
-                    logger.error(String.format("The configuration parameter [%s] must be [import] or [checkSum]]!", Model.TASK));
+                    logger.error(String.format("The configuration parameter [%s] error!", Model.TASK));
             }
+        } else {
+            logger.error(String.format("[%s] should not be empty!", Model.TASK));
         }
 
         try {
@@ -188,6 +196,9 @@ public class Main {
         } catch (Exception e) {
             e.printStackTrace();
         }
+
+        logger.info("to_rawKV has finished running.");
+        System.exit(0);
 
     }
 

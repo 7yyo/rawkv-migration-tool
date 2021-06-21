@@ -7,7 +7,10 @@ import org.tikv.common.TiSession;
 
 import java.util.Properties;
 
-public class checkSumJsonJob implements Runnable {
+/**
+ * @author yuyang
+ */
+public class CheckSumJsonJob implements Runnable {
 
     private final String checkSumFilePath;
     private final String checkSumDelimiter;
@@ -15,7 +18,7 @@ public class checkSumJsonJob implements Runnable {
     private final Properties properties;
     private final Counter fileCounter;
 
-    public checkSumJsonJob(String checkSumFilePath, String checkSumDelimiter, TiSession tiSession, Properties properties, Counter fileCounter) {
+    public CheckSumJsonJob(String checkSumFilePath, String checkSumDelimiter, TiSession tiSession, Properties properties, Counter fileCounter) {
         this.checkSumFilePath = checkSumFilePath;
         this.checkSumDelimiter = checkSumDelimiter;
         this.tiSession = tiSession;

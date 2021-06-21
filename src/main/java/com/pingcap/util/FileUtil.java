@@ -7,14 +7,17 @@ import org.slf4j.LoggerFactory;
 import java.io.*;
 import java.util.*;
 
+/**
+ * @author yuyang
+ */
 public class FileUtil {
 
     private static final Logger logger = LoggerFactory.getLogger(Model.LOG);
 
-    private static final List<File> list = new ArrayList<>();
-    private static final List<File> checkSumList = new ArrayList<>();
+    private static final List<File> LIST = new ArrayList<>();
+    private static final List<File> CHECK_SUM_LIST = new ArrayList<>();
 
-    public static List<File> showFileList(String filePath, boolean isCheckSum, Properties properties) {
+    public static List<File> showFileList(String filePath, boolean isCheckSum) {
         List<File> fileList = FileUtil.loadDirectory(new File(filePath), isCheckSum);
         if (fileList == null) {
             logger.warn(String.format("There are no files in this path [%s]", filePath));
@@ -40,9 +43,9 @@ public class FileUtil {
                 insideFiles.add(file);
             } else {
                 if (isCheckSum) {
-                    checkSumList.add(file);
+                    CHECK_SUM_LIST.add(file);
                 } else {
-                    list.add(file);
+                    LIST.add(file);
                 }
             }
         }
@@ -50,9 +53,9 @@ public class FileUtil {
             loadDirectory(file, isCheckSum);
         }
         if (isCheckSum) {
-            return checkSumList;
+            return CHECK_SUM_LIST;
         } else {
-            return list;
+            return LIST;
         }
     }
 

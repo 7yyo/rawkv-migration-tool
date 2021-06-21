@@ -23,16 +23,19 @@ import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
 
-public class RawKVUtil {
+/**
+ * @author yuyang
+ */
+public class RawKvUtil {
 
     private static final Logger logger = LoggerFactory.getLogger(Model.LOG);
     private static final Logger auditLog = LoggerFactory.getLogger(Model.AUDIT_LOG);
 
-    static final Counter requestCounter = Counter.build().name("request_counter").help("Request counter.").labelNames("request_counter").register();
-    static final Counter batchPutFailCounter = Counter.build().name("batch_put_fail_counter").help("Batch put fail counter.").labelNames("batch_put_fail").register();
-    static final Histogram requestLatency = Histogram.build().name("requests_latency_seconds").help("Request latency in seconds.").labelNames("request_latency").register();
+    static final Counter REQUEST_COUNTER = Counter.build().name("request_counter").help("Request counter.").labelNames("request_counter").register();
+    static final Counter BATCH_PUT_FAIL_COUNTER = Counter.build().name("batch_put_fail_counter").help("Batch put fail counter.").labelNames("batch_put_fail").register();
+    static final Histogram REQUEST_LATENCY = Histogram.build().name("requests_latency_seconds").help("Request latency in seconds.").labelNames("request_latency").register();
 
-    public static int batchPut(int totalCount, int todo, int count, int batchSize, RawKVClient rawKVClient, HashMap<ByteString, ByteString> kvPairs, List<String> kvList, File file, AtomicInteger totalLineCount, AtomicInteger totalSkipCount, AtomicInteger totalBatchPutFailCount, int totalLine, Properties properties, FileChannel fileChannel) {
+    public static int batchPut(int totalCount, int todo, int count, int batchSize, RawKVClient rawKvClient, HashMap<ByteString, ByteString> kvPairs, List<String> kvList, File file, AtomicInteger totalLineCount, AtomicInteger totalSkipCount, AtomicInteger totalBatchPutFailCount, int totalLine, Properties properties, FileChannel fileChannel) {
 
         // batch put
         if (totalCount == todo || count == batchSize) {
@@ -40,22 +43,23 @@ public class RawKVUtil {
             String importMode = properties.getProperty(Model.MODE);
             long ttl = Long.parseLong(properties.getProperty(Model.TTL_DAY));
 
-            if (Model.JSON_FORMAT.equals(importMode)) { // Only json file skip exists key.
+            // Only json file skip exists key.
+            if (Model.JSON_FORMAT.equals(importMode)) {
 
                 if (Model.ON.equals(properties.getProperty(Model.CHECK_EXISTS_KEY))) {
                     List<ByteString> list = new ArrayList<>(kvPairs.keySet());
                     if (Model.ON.equals(properties.getProperty(Model.DELETE_FOR_TEST))) {
-                        requestCounter.labels("batch delete").inc();
-                        Histogram.Timer batchDeleteTimer = requestLatency.labels("batch delete").startTimer();
-                        rawKVClient.batchDelete(list);
+                        REQUEST_COUNTER.labels("batch delete").inc();
+                        Histogram.Timer batchDeleteTimer = REQUEST_LATENCY.labels("batch delete").startTimer();
+                        rawKvClient.batchDelete(list);
                         batchDeleteTimer.observeDuration();
                     }
-                    Histogram.Timer batchGetTimer = requestLatency.labels("batch get").startTimer();
-                    List<Kvrpcpb.KvPair> haveList = rawKVClient.batchGet(list);
+                    Histogram.Timer batchGetTimer = REQUEST_LATENCY.labels("batch get").startTimer();
+                    List<Kvrpcpb.KvPair> haveList = rawKvClient.batchGet(list);
                     batchGetTimer.observeDuration();
-                    requestCounter.labels("batch get").inc();
+                    REQUEST_COUNTER.labels("batch get").inc();
                     for (Kvrpcpb.KvPair kv : haveList) {
-                        Histogram.Timer deleteTimer = requestLatency.labels("delete").startTimer();
+                        Histogram.Timer deleteTimer = REQUEST_LATENCY.labels("delete").startTimer();
                         kvPairs.remove(kv.getKey());
                         deleteTimer.observeDuration();
                         auditLog.warn(String.format("Skip key - exists: [ %s ], file is [ %s ], almost line= %s", kv.getKey().toStringUtf8(), file.getAbsolutePath(), totalLine));
@@ -67,18 +71,18 @@ public class RawKVUtil {
 
             if (!kvPairs.isEmpty()) {
                 try {
-                    Histogram.Timer batchPutTimer = requestLatency.labels("batch put").startTimer();
+                    Histogram.Timer batchPutTimer = REQUEST_LATENCY.labels("batch put").startTimer();
                     if (Model.INDEX_INFO.equals(properties.getProperty(Model.SCENES))) {
-                        rawKVClient.batchPut(kvPairs);
-                        requestCounter.labels("batch put").inc();
+                        rawKvClient.batchPut(kvPairs);
+                        REQUEST_COUNTER.labels("batch put").inc();
                     } else if (Model.TEMP_INDEX_INFO.equals(properties.getProperty(Model.SCENES))) {
-                        rawKVClient.batchPut(kvPairs, ttl);
-                        requestCounter.labels("batch put").inc();
+                        rawKvClient.batchPut(kvPairs, ttl);
+                        REQUEST_COUNTER.labels("batch put").inc();
                     }
                     batchPutTimer.observeDuration();
                     totalLineCount.addAndGet(kvPairs.size());
                 } catch (Exception e) {
-                    batchPutFailCounter.labels("batch put fail").inc();
+                    BATCH_PUT_FAIL_COUNTER.labels("batch put fail").inc();
                     for (String kv : kvList) {
                         try {
                             fileChannel.write(StandardCharsets.UTF_8.encode(kv + "\n"));

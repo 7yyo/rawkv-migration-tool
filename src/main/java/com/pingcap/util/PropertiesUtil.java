@@ -3,6 +3,9 @@ package com.pingcap.util;
 import java.io.*;
 import java.util.Properties;
 
+/**
+ * @author yuyang
+ */
 public class PropertiesUtil {
 
     public static Properties getProperties(String filePath) {
