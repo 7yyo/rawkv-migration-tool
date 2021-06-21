@@ -68,3 +68,7 @@ exporter.tikv.exportLimit=1
 java -Dp='importer.properties_file_path' -jar tikv_importer.jar
 ```
 
+# Metrics
+![image](https://github.com/7yyo/to_tikv/blob/master/src/main/resources/img/prometheus_1.png)
+![image](https://github.com/7yyo/to_tikv/blob/master/src/main/resources/img/prometheus_2.png)
+![image](https://github.com/7yyo/to_tikv/blob/master/src/main/resources/img/prometheus_3.png)
