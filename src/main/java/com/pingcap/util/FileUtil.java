@@ -86,7 +86,7 @@ public class FileUtil {
         File deleteFilePath = new File(filePath);
         File[] files = deleteFilePath.listFiles();
         if (files == null) {
-            logger.warn("This file[checkSum/batchPutErr] no need to delete!");
+            logger.warn("This folder [checkSum/batchPutErr] no need to delete!");
             return;
         }
         for (File file : files) {
@@ -97,6 +97,15 @@ public class FileUtil {
             }
         }
         deleteFilePath.delete();
+    }
+
+    public static boolean createFolder(String filePath) {
+        File checkSumFolder = new File(filePath);
+        if (!checkSumFolder.mkdir()) {
+            logger.error(String.format("Failed to mkdir check sum file, folder path = [%s]", filePath));
+            return false;
+        }
+        return true;
     }
 
 }

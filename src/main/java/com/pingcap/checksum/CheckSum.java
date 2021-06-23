@@ -56,10 +56,10 @@ public class CheckSum {
 
         File checkSumFile = new File(checkSumFileName);
         try {
-            checkSumFile.getParentFile().mkdirs();
-            checkSumFile.createNewFile();
-            FileOutputStream fileOutputStream = new FileOutputStream(checkSumFile);
-            fileChannel = fileOutputStream.getChannel();
+            if(checkSumFile.createNewFile()){
+                FileOutputStream fileOutputStream = new FileOutputStream(checkSumFile);
+                fileChannel = fileOutputStream.getChannel();
+            }
         } catch (IOException e) {
             e.printStackTrace();
         }
