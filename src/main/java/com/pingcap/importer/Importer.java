@@ -63,16 +63,19 @@ public class Importer {
         // Clear the check sum & batch put err folder before starting.
         FileUtil.deleteFolder(properties.getProperty(Model.CHECK_SUM_FILE_PATH));
         FileUtil.deleteFolder(properties.getProperty(Model.BATCH_PUT_ERR_FILE_PATH));
+        // Create check sum folder
+        FileUtil.createFolder(checkSumFilePath);
 
         List<String> ttlTypeList = new ArrayList<>(Arrays.asList(ttlType.split(",")));
 
         // Start the Main thread for each file.showFileList.
         ThreadPoolExecutor threadPoolExecutor = ThreadPoolUtil.startJob(corePoolSize, maxPoolSize, filesPath);
         if (fileList != null) {
-            for (File file : fileList) {
+            for (int i = 0; i < fileList.size(); i++) {
+                FileUtil.createFolder(properties.getProperty(Model.CHECK_SUM_FILE_PATH) + "/" + fileList.get(i).getName().replaceAll("\\.", ""));
                 // Pass in the file to be processed and the ttl map.
                 // The ttl map is shared by all file threads, because it is a table for processing, which is summarized here.
-                threadPoolExecutor.execute(new ImporterJob(file.getAbsolutePath(), tiSession, properties, ttlTypeList, fileCounter));
+                threadPoolExecutor.execute(new ImporterJob(fileList.get(i).getAbsolutePath(), tiSession, properties, ttlTypeList, fileCounter));
                 try {
                     Thread.sleep(15000);
                 } catch (InterruptedException e) {
