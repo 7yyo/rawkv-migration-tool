@@ -27,7 +27,7 @@ public class CheckSumTimer extends TimerTask {
 
     @Override
     public void run() {
-        String logStr = String.format("[%s] [%s/%s], Check sum ratio [%s]", filePath, totalCheckNum, totalFileNum, CountUtil.getPercentage(totalCheckNum.get(), totalFileNum));
+        String logStr = String.format("[%s] [%s/%s], Check sum ratio %s", filePath, totalCheckNum, totalFileNum - 1, CountUtil.getPercentage(totalCheckNum.get(), totalFileNum));
         logger.info(logStr + "%");
     }
 

@@ -5,7 +5,7 @@ import com.alibaba.fastjson.JSONObject;
 import com.pingcap.enums.Model;
 import com.pingcap.pojo.IndexInfo;
 import com.pingcap.pojo.TempIndexInfo;
-import com.pingcap.util.RawKvUtil;
+import com.pingcap.rawkv.RawKv;
 import com.pingcap.util.ThreadPoolUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -27,14 +27,24 @@ import java.util.List;
 import java.util.Properties;
 import java.util.concurrent.ThreadPoolExecutor;
 
+/**
+ * @author yuyang
+ * <p>
+ * Export raw kv data with region as the unit.
+ * Because it is not available, it is not complete yet.
+ */
 public class RegionExporter {
 
-    public static void runRegionExporter(String exportFilePath, Properties properties, TiSession tiSession) {
+    public static void runRegionExporter(Properties properties, TiSession tiSession) {
+
+        String exportFilePath = properties.getProperty(Model.EXPORT_FILE_PATH);
+        File exportFile = new File(exportFilePath);
+        exportFile.mkdir();
 
         int corePoolSize = Integer.parseInt(properties.getProperty(Model.CORE_POOL_SIZE));
         int maxPoolSize = Integer.parseInt(properties.getProperty(Model.MAX_POOL_SIZE));
 
-        List<TiRegion> tiRegionList = RawKvUtil.getTiRegionList(tiSession);
+        List<TiRegion> tiRegionList = RawKv.getTiRegionList(tiSession);
 
         ThreadPoolExecutor threadPoolExecutor = ThreadPoolUtil.startJob(corePoolSize, maxPoolSize, null);
         RawKVClient rawKVClient;

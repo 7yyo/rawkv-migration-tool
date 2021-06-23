@@ -2,10 +2,12 @@ package com.pingcap.importer;
 
 import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONObject;
+import com.pingcap.checksum.CheckSum;
 import com.pingcap.enums.Model;
 import com.pingcap.job.CheckSumJsonJob;
 import com.pingcap.pojo.IndexInfo;
 import com.pingcap.pojo.TempIndexInfo;
+import com.pingcap.rawkv.RawKv;
 import com.pingcap.timer.ImportTimer;
 import com.pingcap.util.*;
 import io.prometheus.client.Counter;
@@ -36,10 +38,6 @@ public class Importer {
 
     private static final Logger logger = LoggerFactory.getLogger(Model.LOG);
     static final Counter TOTAL_IMPORT_FILE_COUNTER = Counter.build().name("total_import_file_counter").help("Total_import_file counter.").labelNames("Total_import_file_counter").register();
-
-    /**
-     * Total check sum file count
-     */
     static final Counter TOTAL_CHECK_SUM_FILE_COUNTER = Counter.build().name("total_checkSum_file_counter").help("Total_checkSum_file counter.").labelNames("Total_checkSum_file_counter").register();
 
     public static void runImporter(Properties properties, TiSession tiSession, Counter fileCounter) {
@@ -50,21 +48,24 @@ public class Importer {
         String checkSumDelimiter = properties.getProperty(Model.CHECK_SUM_DELIMITER);
         String checkSumFilePath = properties.getProperty(Model.CHECK_SUM_FILE_PATH);
         String ttlType = properties.getProperty(Model.TTL_TYPE);
+        String scenes = properties.getProperty(Model.SCENES);
 
         long importStartTime = System.currentTimeMillis();
+
+        // Import indexType
+        if (Model.INDEX_TYPE.equals(scenes)) {
+            IndexTypeImporter.runIndexType(properties, tiSession);
+        }
 
         // Traverse all the files that need to be written.
         List<File> fileList = FileUtil.showFileList(filesPath, false);
         if (fileList != null) {
             TOTAL_IMPORT_FILE_COUNTER.labels("import").inc(fileList.size());
         }
-        // Clear the check sum folder before starting.
+        // Clear the check sum & batch put err folder before starting.
         FileUtil.deleteFolder(properties.getProperty(Model.CHECK_SUM_FILE_PATH));
-        FileUtil.deleteFolders(properties.getProperty(Model.CHECK_SUM_FILE_PATH));
-        // Clear the batch out err folder before starting.
         FileUtil.deleteFolder(properties.getProperty(Model.BATCH_PUT_ERR_FILE_PATH));
-        FileUtil.deleteFolders(properties.getProperty(Model.BATCH_PUT_ERR_FILE_PATH));
-        // Generate ttl type map.
+
         List<String> ttlTypeList = new ArrayList<>(Arrays.asList(ttlType.split(",")));
 
         // Start the Main thread for each file.showFileList.
@@ -136,9 +137,6 @@ class ImporterJob implements Runnable {
 
     private final String filePath;
     private final Properties properties;
-    /**
-     * Generate ttl type map.
-     */
     private final List<String> ttlTypeList;
     private final TiSession tiSession;
     private final Counter importFileCounter;
@@ -158,6 +156,8 @@ class ImporterJob implements Runnable {
 
     @Override
     public void run() {
+
+        importFileCounter.labels("import").inc();
 
         int insideThread = Integer.parseInt(properties.getProperty(Model.INTERNAL_THREAD_NUM));
 
@@ -199,9 +199,9 @@ class ImporterJob implements Runnable {
                 result.append("<").append(item.getKey()).append(">").append("[").append(item.getValue()).append("]").append("]");
             }
         }
+
         timer.cancel();
         logger.info(result.toString());
-        importFileCounter.labels("import").inc();
 
     }
 }
@@ -267,11 +267,11 @@ class BatchPutJob extends Thread {
         boolean writeCheckSumFile = Model.ON.equals(enableCheckSum) && !Model.ON.equals(simpleCheckSum);
 
         if (writeCheckSumFile) {
-            checkSumFileChannel = CheckSumUtil.initCheckSumLog(properties, checkSumFileChannel, file);
+            checkSumFileChannel = CheckSum.initCheckSumLog(properties, checkSumFileChannel, file);
         }
 
         // If batch put fails, record the failed batch put data under this path
-        batchPutErrFileChannel = RawKvUtil.initBatchPutErrLog(properties, batchPutErrFileChannel, file);
+        batchPutErrFileChannel = RawKv.initBatchPutErrLog(properties, batchPutErrFileChannel, file);
 
         LineIterator lineIterator = null;
         try {
@@ -282,8 +282,10 @@ class BatchPutJob extends Thread {
 
         // If the data file has a large number of rows, the block time may be slightly longer
         Histogram.Timer fileBlockTimer = FILE_BLOCK_LATENCY.labels("file block").startTimer();
-        for (int m = 0; m < start; m++) {
-            lineIterator.nextLine();
+        if (lineIterator != null) {
+            for (int m = 0; m < start; m++) {
+                lineIterator.nextLine();
+            }
         }
         fileBlockTimer.observeDuration();
 
@@ -302,10 +304,12 @@ class BatchPutJob extends Thread {
         ByteString value;
         SimpleDateFormat simpleDateFormat;
         String time;
+
         IndexInfo indexInfoS;
         IndexInfo indexInfoT = new IndexInfo();
         TempIndexInfo tempIndexInfoS;
         TempIndexInfo tempIndexInfoT = new TempIndexInfo();
+
         String id;
         String type;
 
@@ -339,7 +343,7 @@ class BatchPutJob extends Thread {
                             auditLog.error(String.format("Failed to parse json, file='%s', json='%s',line=%s,", file, line, start + totalCount));
                             totalParseErrorCount.addAndGet(1);
                             // if _todo_ == totalCount in json failed, batch put.
-                            count = RawKvUtil.batchPut(totalCount, todo, count, batchSize, rawKvClient, kvPairs, kvList, file, totalImportCount, totalSkipCount, totalBatchPutFailCount, start + totalCount, properties, batchPutErrFileChannel);
+                            count = RawKv.batchPut(totalCount, todo, count, batchSize, rawKvClient, kvPairs, kvList, file, totalImportCount, totalSkipCount, totalBatchPutFailCount, start + totalCount, properties, batchPutErrFileChannel);
                             continue;
                         }
                         switch (scenes) {
@@ -351,7 +355,7 @@ class BatchPutJob extends Thread {
                                     ttlTypeCountMap.put(indexInfoS.getType(), ttlTypeCountMap.get(indexInfoS.getType()) + 1);
                                     auditLog.warn(String.format("[Skip TTL] [%s] in [%s],line=[%s]", indexInfoKey, file.getAbsolutePath(), start + totalCount));
                                     totalSkipCount.addAndGet(1);
-                                    count = RawKvUtil.batchPut(totalCount, todo, count, batchSize, rawKvClient, kvPairs, kvList, file, totalImportCount, totalSkipCount, totalBatchPutFailCount, start + totalCount, properties, batchPutErrFileChannel);
+                                    count = RawKv.batchPut(totalCount, todo, count, batchSize, rawKvClient, kvPairs, kvList, file, totalImportCount, totalSkipCount, totalBatchPutFailCount, start + totalCount, properties, batchPutErrFileChannel);
                                     continue;
                                 }
                                 if (envId != null) {
@@ -386,6 +390,7 @@ class BatchPutJob extends Thread {
                         break;
                     case Model.CSV_FORMAT:
                         try {
+
                             id = line.split(delimiter1)[0];
                             type = line.split(delimiter1)[1];
 
@@ -401,11 +406,11 @@ class BatchPutJob extends Thread {
                                 ttlTypeCountMap.put(type, ttlTypeCountMap.get(type) + 1);
                                 auditLog.warn(String.format("[Skip TTL] [%s] in [%s],line=[%s]", indexInfoKey, file.getAbsolutePath(), start + totalCount));
                                 totalSkipCount.addAndGet(1);
-                                count = RawKvUtil.batchPut(totalCount, todo, count, batchSize, rawKvClient, kvPairs, kvList, file, totalImportCount, totalSkipCount, totalBatchPutFailCount, start + totalCount, properties, batchPutErrFileChannel);
+                                count = RawKv.batchPut(totalCount, todo, count, batchSize, rawKvClient, kvPairs, kvList, file, totalImportCount, totalSkipCount, totalBatchPutFailCount, start + totalCount, properties, batchPutErrFileChannel);
                                 continue;
                             }
 
-                            indexInfoT = IndexInfo.initIndexInfo(line, delimiter1, delimiter2);
+                            IndexInfo.csv2IndexInfo(indexInfoT, line, delimiter1, delimiter2);
                             indexInfoT.setAppId(appId);
                             indexInfoT.setUpdateTime(time);
                             key = ByteString.copyFromUtf8(indexInfoKey);
@@ -414,7 +419,7 @@ class BatchPutJob extends Thread {
                             logger.error(String.format("Failed to parse csv, file='%s', csv='%s',line=%s,", file, line, start + totalCount));
                             totalParseErrorCount.addAndGet(1);
                             // if _todo_ == totalCount in json failed, batch put.
-                            count = RawKvUtil.batchPut(totalCount, todo, count, batchSize, rawKvClient, kvPairs, kvList, file, totalImportCount, totalSkipCount, totalBatchPutFailCount, start + totalCount, properties, batchPutErrFileChannel);
+                            count = RawKv.batchPut(totalCount, todo, count, batchSize, rawKvClient, kvPairs, kvList, file, totalImportCount, totalSkipCount, totalBatchPutFailCount, start + totalCount, properties, batchPutErrFileChannel);
                             continue;
                         }
 
@@ -438,7 +443,7 @@ class BatchPutJob extends Thread {
                 kvPairs.put(key, value);
                 kvList.add(line);
 
-                count = RawKvUtil.batchPut(totalCount, todo, count, batchSize, rawKvClient, kvPairs, kvList, file, totalImportCount, totalSkipCount, totalBatchPutFailCount, start + totalCount, properties, batchPutErrFileChannel);
+                count = RawKv.batchPut(totalCount, todo, count, batchSize, rawKvClient, kvPairs, kvList, file, totalImportCount, totalSkipCount, totalBatchPutFailCount, start + totalCount, properties, batchPutErrFileChannel);
             } catch (IOException e) {
                 e.printStackTrace();
             }

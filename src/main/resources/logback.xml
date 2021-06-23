@@ -3,13 +3,13 @@
 
     <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
         <encoder>
-            <pattern>%d{HH:mm:ss.SSS} %-5level %logger{36} - %msg%n</pattern>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss} [%p][%M][%L]-> %m%n</pattern>
         </encoder>
     </appender>
 
     <appender name="log" class="ch.qos.logback.core.rolling.RollingFileAppender">
         <encoder>
-            <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss} [%p][%M][%L]-> %m%n</pattern>
             <charset>utf-8</charset>
         </encoder>
         <file>./toTiKV.log</file>
@@ -22,7 +22,7 @@
     </appender>
     <appender name="audit" class="ch.qos.logback.core.rolling.RollingFileAppender">
         <encoder>
-            <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss} [%p][%M][%L]-> %m%n</pattern>
             <charset>utf-8</charset>
         </encoder>
         <file>./audit.log</file>
@@ -35,7 +35,7 @@
     </appender>
     <appender name="checkSum" class="ch.qos.logback.core.rolling.RollingFileAppender">
         <encoder>
-            <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss} [%p][%M][%L]-> %m%n</pattern>
             <charset>utf-8</charset>
         </encoder>
         <file>./checkSum.log</file>

@@ -8,9 +8,11 @@ import java.util.concurrent.*;
 /**
  * @author yuyang
  */
-public class ThreadPoolUtil {
+public class ThreadPoolUtil
+{
 
-    public static ThreadPoolExecutor startJob(int corePoolSize, int maxPoolSize, String fileName) {
+    public static ThreadPoolExecutor startJob(int corePoolSize, int maxPoolSize, String fileName)
+    {
         return new ThreadPoolExecutor(
                 corePoolSize,
                 maxPoolSize,

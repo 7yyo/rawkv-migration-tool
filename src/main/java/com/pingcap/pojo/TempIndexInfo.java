@@ -41,19 +41,30 @@ public class TempIndexInfo {
         this.id = id;
     }
 
-    public boolean equals(TempIndexInfo tmpIndexInfo) {
+    public static void key2TempIndexInfo(TempIndexInfo tempIndexInfo, String key, String keyDelimiter) {
+        tempIndexInfo.setEnvId(key.split(keyDelimiter)[1]);
+        tempIndexInfo.setId(key.split(keyDelimiter)[2]);
+    }
+
+    /**
+     * Compare indexInfo
+     * Comparison strategy: id, targetId
+     *
+     * @param tempIndexInfo: tempIndexInfo object
+     * @return boolean
+     */
+    public boolean equals(TempIndexInfo tempIndexInfo) {
 //        boolean envIdC = this.envId.equals(tmpIndexInfo.getEnvId());
-        boolean idC = this.id.equals(tmpIndexInfo.getId());
 //        boolean appIdC = this.appId.equals(tmpIndexInfo.getId());
-        boolean targetIdC = this.targetId.equals(tmpIndexInfo.getTargetId());
+        boolean idC = this.id.equals(tempIndexInfo.getId());
+        boolean targetIdC = this.targetId.equals(tempIndexInfo.getTargetId());
         return idC && targetIdC;
     }
 
-    public static TempIndexInfo initTempIndexInfo(TempIndexInfo tempIndexInfoT, TempIndexInfo tempIndexInfoS) {
+    public static void initTempIndexInfo(TempIndexInfo tempIndexInfoT, TempIndexInfo tempIndexInfoS) {
         // value -
         // appId、targetId
         tempIndexInfoT.setAppId(tempIndexInfoS.getAppId());
         tempIndexInfoT.setTargetId(tempIndexInfoS.getTargetId());
-        return tempIndexInfoT;
     }
 }

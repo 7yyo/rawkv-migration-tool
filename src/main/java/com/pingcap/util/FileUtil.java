@@ -75,18 +75,18 @@ public class FileUtil {
     }
 
     public static HashMap<String, Long> getTtlTypeMap(List<String> list) {
-        HashMap<String, Long> ttlTypeCountMap = new HashMap<>();
+        HashMap<String, Long> ttlTypeCountMap = new HashMap<>(16);
         for (String ttlType : list) {
             ttlTypeCountMap.put(ttlType, 0L);
         }
         return ttlTypeCountMap;
     }
 
-    public static void deleteFolder(String checkSumFilePath) {
-        File deleteFilePath = new File(checkSumFilePath);
+    public static void deleteFolder(String filePath) {
+        File deleteFilePath = new File(filePath);
         File[] files = deleteFilePath.listFiles();
         if (files == null) {
-            logger.error("Files is not exists!");
+            logger.warn("This file[checkSum/batchPutErr] no need to delete!");
             return;
         }
         for (File file : files) {
@@ -96,18 +96,7 @@ public class FileUtil {
                 deleteFolder(file.getAbsolutePath());
             }
         }
-    }
-
-    public static void deleteFolders(String checkSumFilePath) {
-        File deleteFilePath = new File(checkSumFilePath);
-        File[] files = deleteFilePath.listFiles();
-        if (files == null) {
-            logger.error("Files is not exists!");
-            return;
-        }
-        for (File file : files) {
-            file.delete();
-        }
+        deleteFilePath.delete();
     }
 
 }

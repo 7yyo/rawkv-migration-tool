@@ -29,29 +29,33 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * @author yuyang
+ * <p>
+ * Export every limit data until the raw kv data is completely exported.
  */
 public class LimitExporter {
 
-    private static final Logger logger = LoggerFactory.getLogger(Model.LOG);
-
     static final Histogram IMPORT_LATENCY = Histogram.build().name("import_duration").help("Import duration in seconds.").labelNames("import_duration").register();
+
+    private static final Logger logger = LoggerFactory.getLogger(Model.LOG);
 
     private static final AtomicInteger TOTAL_EXPORT_NUM = new AtomicInteger(0);
     private static final String EXPORT_FILE_PATH = "/export_%s.txt";
 
-    public static void runLimitExporter(String exportFilePath, Properties properties, TiSession tiSession) {
+    public static void runLimitExporter(Properties properties, TiSession tiSession) {
 
         int exportLimit = Integer.parseInt(properties.getProperty(Model.EXPORT_LIMIT));
         int exportThread = Integer.parseInt(properties.getProperty(Model.EXPORT_THREAD));
 
+        String exportFilePath = properties.getProperty(Model.EXPORT_FILE_PATH);
         FileUtil.deleteFolder(exportFilePath);
-        FileUtil.deleteFolders(exportFilePath);
+        new File(exportFilePath).mkdir();
 
         File file;
         FileOutputStream fileOutputStream;
         FileChannel fileChannel;
         List<FileChannel> fileChannelList = new ArrayList<>();
 
+        // Create data export files according to the number of threads
         for (int i = 0; i < exportThread; i++) {
             file = new File(String.format(exportFilePath + EXPORT_FILE_PATH, i));
             try {
@@ -69,8 +73,6 @@ public class LimitExporter {
 
         ThreadPoolExecutor threadPoolExecutor = ThreadPoolUtil.startJob(exportThread, exportThread, null);
 
-        Random random = new Random();
-
         Timer timer = new Timer();
         ExportTimer exportTimer = new ExportTimer(TOTAL_EXPORT_NUM);
         timer.schedule(exportTimer, 5000, interval);
@@ -80,7 +82,8 @@ public class LimitExporter {
         ByteString endKey = null;
         List<Kvrpcpb.KvPair> kvPairList;
         RawKVClient rawKvClient = tiSession.createRawClient();
-
+        Random random = new Random();
+        FileChannel randomFileChannel;
         while (isStart || endKey != null) {
 
             Histogram.Timer scanDuration = IMPORT_LATENCY.labels("scan duration").startTimer();
@@ -89,14 +92,20 @@ public class LimitExporter {
             } else {
                 kvPairList = rawKvClient.scan(endKey, exportLimit);
             }
+            scanDuration.observeDuration();
+
+            // Size = 1 means that the entire raw kv data has been traversed, so exit directly
             if (kvPairList.size() == 1) {
-                logger.info(String.format("Complete data export! Total export num =[%s]", TOTAL_EXPORT_NUM));
+                logger.info(String.format("Complete data export! Total number of exported rows=[%s]", TOTAL_EXPORT_NUM));
                 System.exit(0);
             }
-            threadPoolExecutor.execute(new LimitExportJob(TOTAL_EXPORT_NUM, keyDelimiter, IMPORT_LATENCY, isStart, kvPairList, fileChannelList.get(random.nextInt(fileChannelList.size()))));
+
+            // All threads randomly write a data export file
+            randomFileChannel = fileChannelList.get(random.nextInt(fileChannelList.size()));
+            threadPoolExecutor.execute(new LimitExportJob(TOTAL_EXPORT_NUM, keyDelimiter, IMPORT_LATENCY, isStart, kvPairList, randomFileChannel));
             isStart = false;
             endKey = kvPairList.get(kvPairList.size() - 1).getKey();
-            scanDuration.observeDuration();
+
         }
 
     }
@@ -109,10 +118,10 @@ class LimitExportJob implements Runnable {
     private final List<Kvrpcpb.KvPair> kvPairList;
     private final FileChannel fileChannel;
     private final String keyDelimiter;
-    private AtomicInteger totalExportNum;
+    private final AtomicInteger totalExportNum;
 
-    private static final String INDEX_INFO = "indexInfo_";
-    private static final String TEMP_INDEX_INFO = "tempIndex_";
+    private static final String INDEX_INFO_PREFIX = "indexInfo_";
+    private static final String TEMP_INDEX_INFO_PREFIX = "tempIndex_";
 
     public LimitExportJob(AtomicInteger totalExportNum, String keyDelimiter, Histogram importLatency, boolean isStart, List<Kvrpcpb.KvPair> kvPairList, FileChannel fileChannel) {
         this.keyDelimiter = keyDelimiter;
@@ -145,7 +154,7 @@ class LimitExportJob implements Runnable {
             String key = kvPairList.get(i).getKey().toStringUtf8();
             String value = kvPairList.get(i).getValue().toStringUtf8();
             String json;
-            if (key.startsWith(INDEX_INFO)) {
+            if (key.startsWith(INDEX_INFO_PREFIX)) {
                 jsonObject = JSONObject.parseObject(value);
                 indexInfo = JSON.toJavaObject(jsonObject, IndexInfo.class);
                 // key = indexInfo_:_{envid}_:_{type}_:_{id}
@@ -154,7 +163,7 @@ class LimitExportJob implements Runnable {
                 indexInfo.setId(key.split(keyDelimiter)[3]);
                 json = JSON.toJSONString(indexInfo);
                 kvPair.append(json).append("\n");
-            } else if (key.startsWith(TEMP_INDEX_INFO)) {
+            } else if (key.startsWith(TEMP_INDEX_INFO_PREFIX)) {
                 jsonObject = JSONObject.parseObject(value);
                 tempIndexInfo = JSON.toJavaObject(jsonObject, TempIndexInfo.class);
                 // key = tempIndex_:_{envid}_:_{id}
@@ -163,6 +172,7 @@ class LimitExportJob implements Runnable {
                 json = JSON.toJSONString(tempIndexInfo);
                 kvPair.append(json).append("\n");
             } else {
+                // key@value
                 json = key + "@" + value;
                 kvPair.append(json).append("\n");
             }

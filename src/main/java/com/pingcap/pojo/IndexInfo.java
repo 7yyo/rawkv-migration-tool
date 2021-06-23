@@ -1,6 +1,7 @@
 package com.pingcap.pojo;
 
 import com.alibaba.fastjson.JSON;
+import org.apache.commons.lang.StringUtils;
 
 /**
  * @author yuyang
@@ -83,10 +84,18 @@ public class IndexInfo {
         this.updateTime = updateTime;
     }
 
+
+    /**
+     * Compare indexInfo
+     * Comparison strategy: id, serviceTag, targetId, type
+     *
+     * @param indexInfo: Object indexInfo
+     * @return boolean
+     */
     public boolean equals(IndexInfo indexInfo) {
         boolean idC = this.id.equals(indexInfo.getId());
         boolean serviceTagC = true;
-        if ((this.serviceTag != null && !"".equals(this.serviceTag)) && (indexInfo.getServiceTag() != null && !"".equals(indexInfo.getServiceTag()))) {
+        if (StringUtils.isNotBlank(this.serviceTag) && StringUtils.isNotBlank(indexInfo.getServiceTag())) {
             serviceTagC = this.serviceTag.equals(indexInfo.getServiceTag());
         }
         boolean targetIdC = this.targetId.equals(indexInfo.getTargetId());
@@ -94,32 +103,43 @@ public class IndexInfo {
         return idC && serviceTagC && targetIdC && typeC;
     }
 
-    public static IndexInfo initIndexInfo(String originalLine, String delimiter1, String delimiter_2) {
-        IndexInfo indexInfo = new IndexInfo();
+    public static void key2IndexInfo(IndexInfo indexInfo, String key, String keyDelimiter) {
+        indexInfo.setEnvId(key.split(keyDelimiter)[1]);
+        indexInfo.setType(key.split(keyDelimiter)[2]);
+        indexInfo.setId(key.split(keyDelimiter)[3]);
+    }
+
+    /**
+     * CSV to indexInfo
+     *
+     * @param originalLine: Original file line
+     * @param delimiter1:   First delimiter
+     * @param delimiter2:   Second separator
+     * @return indexInfo
+     */
+    public static IndexInfo csv2IndexInfo(IndexInfo indexInfo, String originalLine, String delimiter1, String delimiter2) {
 
         String id = originalLine.split(delimiter1)[0];
         indexInfo.setId(id);
         String type = originalLine.split(delimiter1)[1];
         indexInfo.setType(type);
 
-        String targetId = originalLine.split(delimiter1)[2].split(delimiter_2)[0];
+        String targetId = originalLine.split(delimiter1)[2].split(delimiter2)[0];
+        indexInfo.setTargetId(targetId);
 
+        // Means 1|2|3##4##5.....
         if (originalLine.split(delimiter1).length > 3) {
             String v = originalLine.split(delimiter1)[2];
             ServiceTag serviceTag = new ServiceTag();
-            serviceTag.setBLKMDL_ID(v.split(delimiter_2)[0]);
-            serviceTag.setPD_SALE_FTA_CD(v.split(delimiter_2)[1]);
-            serviceTag.setACCT_DTL_TYPE(v.split(delimiter_2)[2]);
-            serviceTag.setCORPPRVT_FLAG(v.split(delimiter_2)[3]);
-            serviceTag.setCMTRST_CST_ACCNO(v.split(delimiter_2)[4]);
-            serviceTag.setAR_ID(v.split(delimiter_2)[5]);
-            serviceTag.setQCRCRD_IND(v.split(delimiter_2)[6]);
+            serviceTag.setBLKMDL_ID(v.split(delimiter2)[0]);
+            serviceTag.setPD_SALE_FTA_CD(v.split(delimiter2)[1]);
+            serviceTag.setACCT_DTL_TYPE(v.split(delimiter2)[2]);
+            serviceTag.setCORPPRVT_FLAG(v.split(delimiter2)[3]);
+            serviceTag.setCMTRST_CST_ACCNO(v.split(delimiter2)[4]);
+            serviceTag.setAR_ID(v.split(delimiter2)[5]);
+            serviceTag.setQCRCRD_IND(v.split(delimiter2)[6]);
             indexInfo.setServiceTag(JSON.toJSONString(serviceTag));
-
         }
-
-        indexInfo.setTargetId(targetId);
-
         return indexInfo;
     }
 

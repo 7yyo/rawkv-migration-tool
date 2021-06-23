@@ -1,19 +1,30 @@
 package com.pingcap.util;
 
+import com.pingcap.enums.Model;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.io.*;
 import java.util.Properties;
 
 /**
  * @author yuyang
  */
-public class PropertiesUtil {
+public class PropertiesUtil
+{
 
-    public static Properties getProperties(String filePath) {
+    private static final Logger logger = LoggerFactory.getLogger(Model.LOG);
+
+    public static Properties getProperties(String filePath)
+    {
         Properties properties = new Properties();
-        try {
+        try
+        {
             InputStream inputStream = new BufferedInputStream(new FileInputStream(filePath));
             properties.load(inputStream);
-        } catch (IOException e) {
+            logger.info(String.valueOf(properties));
+        } catch (IOException e)
+        {
             e.printStackTrace();
         }
         return properties;

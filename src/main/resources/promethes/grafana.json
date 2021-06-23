@@ -1598,24 +1598,22 @@
         {
           "aliasColors": {},
           "bars": false,
-          "cacheTimeout": null,
           "dashLength": 10,
           "dashes": false,
           "datasource": "tidb-yuyang",
-          "description": "Number of files imported or verified",
           "fill": 1,
           "gridPos": {
             "h": 5,
-            "w": 10,
+            "w": 12,
             "x": 0,
             "y": 8
           },
-          "id": 2,
+          "id": 36,
           "legend": {
             "alignAsTable": true,
             "avg": false,
             "current": true,
-            "max": false,
+            "max": true,
             "min": false,
             "rightSide": true,
             "show": true,
@@ -1636,10 +1634,11 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "total_import_file_counter_total{Total_import_file_counter=\"import\",}",
+              "expr": "sum(rate(parse_latency_seconds_sum[30s])) by (parse_latency) / sum(rate(parse_latency_seconds_count[30s])) by (parse_latency)",
               "format": "time_series",
-              "intervalFactor": 1,
-              "legendFormat": "{{file_counter}}",
+              "instant": false,
+              "intervalFactor": 2,
+              "legendFormat": "{{parse_latency}}",
               "refId": "A"
             }
           ],
@@ -1647,7 +1646,7 @@
           "timeFrom": null,
           "timeRegions": [],
           "timeShift": null,
-          "title": "Process file count",
+          "title": "Parse json duration",
           "tooltip": {
             "shared": true,
             "sort": 0,
@@ -1663,7 +1662,7 @@
           },
           "yaxes": [
             {
-              "format": "short",
+              "format": "s",
               "label": null,
               "logBase": 1,
               "max": null,
@@ -1685,111 +1684,29 @@
           }
         },
         {
-          "cacheTimeout": null,
-          "colorBackground": false,
-          "colorValue": false,
-          "colors": [
-            "#299c46",
-            "rgba(237, 129, 40, 0.89)",
-            "#d44a3a"
-          ],
-          "datasource": "tidb-yuyang",
-          "format": "none",
-          "gauge": {
-            "maxValue": 100,
-            "minValue": 0,
-            "show": false,
-            "thresholdLabels": false,
-            "thresholdMarkers": true
-          },
-          "gridPos": {
-            "h": 5,
-            "w": 2,
-            "x": 10,
-            "y": 8
-          },
-          "id": 56,
-          "interval": null,
-          "links": [],
-          "mappingType": 1,
-          "mappingTypes": [
-            {
-              "name": "value to text",
-              "value": 1
-            },
-            {
-              "name": "range to text",
-              "value": 2
-            }
-          ],
-          "maxDataPoints": 100,
-          "nullPointMode": "connected",
-          "nullText": null,
-          "pluginVersion": "6.1.6",
-          "postfix": "",
-          "postfixFontSize": "50%",
-          "prefix": "",
-          "prefixFontSize": "50%",
-          "rangeMaps": [
-            {
-              "from": "null",
-              "text": "N/A",
-              "to": "null"
-            }
-          ],
-          "sparkline": {
-            "fillColor": "rgba(31, 118, 189, 0.18)",
-            "full": false,
-            "lineColor": "rgb(31, 120, 193)",
-            "show": false
-          },
-          "tableColumn": "",
-          "targets": [
-            {
-              "expr": "total_import_file_counter_total",
-              "format": "time_series",
-              "intervalFactor": 1,
-              "legendFormat": "",
-              "refId": "A"
-            }
-          ],
-          "thresholds": "",
-          "timeFrom": null,
-          "timeShift": null,
-          "title": "Import total",
-          "type": "singlestat",
-          "valueFontSize": "100%",
-          "valueMaps": [
-            {
-              "op": "=",
-              "text": "N/A",
-              "value": "null"
-            }
-          ],
-          "valueName": "max"
-        },
-        {
           "aliasColors": {},
           "bars": false,
           "dashLength": 10,
           "dashes": false,
           "datasource": "tidb-yuyang",
-          "fill": 0,
+          "fill": 1,
           "gridPos": {
             "h": 5,
             "w": 12,
             "x": 12,
             "y": 8
           },
-          "id": 42,
+          "id": 38,
           "legend": {
             "alignAsTable": true,
-            "avg": true,
+            "avg": false,
             "current": true,
             "max": true,
             "min": false,
             "rightSide": true,
             "show": true,
+            "sort": null,
+            "sortDesc": null,
             "total": false,
             "values": true
           },
@@ -1799,23 +1716,18 @@
           "nullPointMode": "null",
           "percentage": false,
           "pointradius": 2,
-          "points": true,
+          "points": false,
           "renderer": "flot",
-          "seriesOverrides": [
-            {
-              "alias": "file block",
-              "yaxis": 1
-            }
-          ],
+          "seriesOverrides": [],
           "spaceLength": 10,
-          "stack": true,
+          "stack": false,
           "steppedLine": false,
           "targets": [
             {
-              "expr": "sum(rate(file_block_latency_sum[30s])) by (file_block) / sum(rate(file_block_latency_count[30s])) by (file_block)",
-              "format": "time_series",
+              "expr": "sum(rate(write_checkSum_latency_sum[30s])) by (check_sum) / sum(rate(write_checkSum_latency_count[30s])) by (check_sum)",
+              "format": "heatmap",
               "intervalFactor": 2,
-              "legendFormat": "{{file_block}}",
+              "legendFormat": "{{check_sum}}",
               "refId": "A"
             }
           ],
@@ -1823,7 +1735,7 @@
           "timeFrom": null,
           "timeRegions": [],
           "timeShift": null,
-          "title": "File block duration",
+          "title": "Write check sum file duration",
           "tooltip": {
             "shared": true,
             "sort": 0,
@@ -1930,24 +1842,22 @@
           "dashLength": 10,
           "dashes": false,
           "datasource": "tidb-yuyang",
-          "fill": 1,
+          "fill": 0,
           "gridPos": {
             "h": 5,
             "w": 12,
             "x": 12,
             "y": 13
           },
-          "id": 38,
+          "id": 42,
           "legend": {
             "alignAsTable": true,
-            "avg": false,
+            "avg": true,
             "current": true,
             "max": true,
             "min": false,
             "rightSide": true,
             "show": true,
-            "sort": null,
-            "sortDesc": null,
             "total": false,
             "values": true
           },
@@ -1957,18 +1867,23 @@
           "nullPointMode": "null",
           "percentage": false,
           "pointradius": 2,
-          "points": false,
+          "points": true,
           "renderer": "flot",
-          "seriesOverrides": [],
+          "seriesOverrides": [
+            {
+              "alias": "file block",
+              "yaxis": 1
+            }
+          ],
           "spaceLength": 10,
-          "stack": false,
+          "stack": true,
           "steppedLine": false,
           "targets": [
             {
-              "expr": "sum(rate(write_checkSum_latency_sum[30s])) by (check_sum) / sum(rate(write_checkSum_latency_count[30s])) by (check_sum)",
-              "format": "heatmap",
+              "expr": "sum(rate(file_block_latency_sum[30s])) by (file_block) / sum(rate(file_block_latency_count[30s])) by (file_block)",
+              "format": "time_series",
               "intervalFactor": 2,
-              "legendFormat": "{{check_sum}}",
+              "legendFormat": "{{file_block}}",
               "refId": "A"
             }
           ],
@@ -1976,7 +1891,7 @@
           "timeFrom": null,
           "timeRegions": [],
           "timeShift": null,
-          "title": "Write check sum file duration",
+          "title": "File block duration",
           "tooltip": {
             "shared": true,
             "sort": 0,
@@ -2016,22 +1931,24 @@
         {
           "aliasColors": {},
           "bars": false,
+          "cacheTimeout": null,
           "dashLength": 10,
           "dashes": false,
           "datasource": "tidb-yuyang",
+          "description": "Number of files imported or verified",
           "fill": 1,
           "gridPos": {
             "h": 5,
-            "w": 12,
+            "w": 10,
             "x": 0,
             "y": 18
           },
-          "id": 36,
+          "id": 2,
           "legend": {
             "alignAsTable": true,
             "avg": false,
             "current": true,
-            "max": true,
+            "max": false,
             "min": false,
             "rightSide": true,
             "show": true,
@@ -2052,11 +1969,10 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "sum(rate(parse_latency_seconds_sum[30s])) by (parse_latency) / sum(rate(parse_latency_seconds_count[30s])) by (parse_latency)",
+              "expr": "total_import_file_counter_total{Total_import_file_counter=\"import\",}",
               "format": "time_series",
-              "instant": false,
-              "intervalFactor": 2,
-              "legendFormat": "{{parse_latency}}",
+              "intervalFactor": 1,
+              "legendFormat": "{{file_counter}}",
               "refId": "A"
             }
           ],
@@ -2064,7 +1980,7 @@
           "timeFrom": null,
           "timeRegions": [],
           "timeShift": null,
-          "title": "Parse json duration",
+          "title": "Process file count",
           "tooltip": {
             "shared": true,
             "sort": 0,
@@ -2080,7 +1996,7 @@
           },
           "yaxes": [
             {
-              "format": "s",
+              "format": "short",
               "label": null,
               "logBase": 1,
               "max": null,
@@ -2100,304 +2016,94 @@
             "align": false,
             "alignLevel": null
           }
+        },
+        {
+          "cacheTimeout": null,
+          "colorBackground": false,
+          "colorValue": false,
+          "colors": [
+            "#299c46",
+            "rgba(237, 129, 40, 0.89)",
+            "#d44a3a"
+          ],
+          "datasource": "tidb-yuyang",
+          "format": "none",
+          "gauge": {
+            "maxValue": 100,
+            "minValue": 0,
+            "show": false,
+            "thresholdLabels": false,
+            "thresholdMarkers": true
+          },
+          "gridPos": {
+            "h": 5,
+            "w": 2,
+            "x": 10,
+            "y": 18
+          },
+          "id": 56,
+          "interval": null,
+          "links": [],
+          "mappingType": 1,
+          "mappingTypes": [
+            {
+              "name": "value to text",
+              "value": 1
+            },
+            {
+              "name": "range to text",
+              "value": 2
+            }
+          ],
+          "maxDataPoints": 100,
+          "nullPointMode": "connected",
+          "nullText": null,
+          "pluginVersion": "6.1.6",
+          "postfix": "",
+          "postfixFontSize": "50%",
+          "prefix": "",
+          "prefixFontSize": "50%",
+          "rangeMaps": [
+            {
+              "from": "null",
+              "text": "N/A",
+              "to": "null"
+            }
+          ],
+          "sparkline": {
+            "fillColor": "rgba(31, 118, 189, 0.18)",
+            "full": false,
+            "lineColor": "rgb(31, 120, 193)",
+            "show": false
+          },
+          "tableColumn": "",
+          "targets": [
+            {
+              "expr": "total_import_file_counter_total",
+              "format": "time_series",
+              "intervalFactor": 1,
+              "legendFormat": "",
+              "refId": "A"
+            }
+          ],
+          "thresholds": "",
+          "timeFrom": null,
+          "timeShift": null,
+          "title": "Import total",
+          "type": "singlestat",
+          "valueFontSize": "100%",
+          "valueMaps": [
+            {
+              "op": "=",
+              "text": "N/A",
+              "value": "null"
+            }
+          ],
+          "valueName": "max"
         }
       ],
       "title": "Import",
       "type": "row"
-    },
-    {
-      "collapsed": false,
-      "gridPos": {
-        "h": 1,
-        "w": 24,
-        "x": 0,
-        "y": 3
-      },
-      "id": 84,
-      "panels": [],
-      "title": "Check sum",
-      "type": "row"
-    },
-    {
-      "aliasColors": {
-        "check sum": "light-blue"
-      },
-      "bars": false,
-      "dashLength": 10,
-      "dashes": false,
-      "datasource": "tidb-yuyang",
-      "fill": 1,
-      "gridPos": {
-        "h": 5,
-        "w": 12,
-        "x": 0,
-        "y": 4
-      },
-      "id": 86,
-      "legend": {
-        "avg": false,
-        "current": false,
-        "max": false,
-        "min": false,
-        "show": true,
-        "total": false,
-        "values": false
-      },
-      "lines": false,
-      "linewidth": 1,
-      "links": [],
-      "nullPointMode": "null",
-      "percentage": false,
-      "pointradius": 0.5,
-      "points": true,
-      "renderer": "flot",
-      "seriesOverrides": [],
-      "spaceLength": 10,
-      "stack": false,
-      "steppedLine": false,
-      "targets": [
-        {
-          "expr": "file_counter_total{file_counter=\"check sum\",}",
-          "format": "time_series",
-          "intervalFactor": 1,
-          "legendFormat": "{{file_counter}}",
-          "refId": "A"
-        }
-      ],
-      "thresholds": [],
-      "timeFrom": null,
-      "timeRegions": [],
-      "timeShift": null,
-      "title": "Check sum file count",
-      "tooltip": {
-        "shared": true,
-        "sort": 0,
-        "value_type": "individual"
-      },
-      "type": "graph",
-      "xaxis": {
-        "buckets": null,
-        "mode": "time",
-        "name": null,
-        "show": true,
-        "values": []
-      },
-      "yaxes": [
-        {
-          "format": "short",
-          "label": null,
-          "logBase": 1,
-          "max": null,
-          "min": null,
-          "show": true
-        },
-        {
-          "format": "short",
-          "label": null,
-          "logBase": 1,
-          "max": null,
-          "min": null,
-          "show": true
-        }
-      ],
-      "yaxis": {
-        "align": false,
-        "alignLevel": null
-      }
-    },
-    {
-      "cards": {
-        "cardPadding": null,
-        "cardRound": null
-      },
-      "color": {
-        "cardColor": "#b4ff00",
-        "colorScale": "sqrt",
-        "colorScheme": "interpolateSpectral",
-        "exponent": 0.5,
-        "mode": "spectrum"
-      },
-      "dataFormat": "tsbuckets",
-      "datasource": "tidb-yuyang",
-      "gridPos": {
-        "h": 5,
-        "w": 12,
-        "x": 12,
-        "y": 4
-      },
-      "heatmap": {},
-      "hideZeroBuckets": true,
-      "highlightCards": true,
-      "id": 66,
-      "legend": {
-        "show": false
-      },
-      "links": [],
-      "reverseYBuckets": false,
-      "targets": [
-        {
-          "expr": "sum(delta(check_sum_latency_seconds_bucket{check_sum_latency=\"check sum get duration\"}[1m])) by (le)",
-          "format": "heatmap",
-          "intervalFactor": 1,
-          "legendFormat": "{{le}}",
-          "refId": "A"
-        }
-      ],
-      "timeFrom": null,
-      "timeShift": null,
-      "title": "Get duration",
-      "tooltip": {
-        "show": true,
-        "showHistogram": false
-      },
-      "type": "heatmap",
-      "xAxis": {
-        "show": true
-      },
-      "xBucketNumber": null,
-      "xBucketSize": null,
-      "yAxis": {
-        "decimals": 0,
-        "format": "s",
-        "logBase": 1,
-        "max": null,
-        "min": null,
-        "show": true,
-        "splitFactor": null
-      },
-      "yBucketBound": "upper",
-      "yBucketNumber": null,
-      "yBucketSize": null
-    },
-    {
-      "cards": {
-        "cardPadding": null,
-        "cardRound": null
-      },
-      "color": {
-        "cardColor": "#b4ff00",
-        "colorScale": "sqrt",
-        "colorScheme": "interpolateSpectral",
-        "exponent": 0.5,
-        "mode": "spectrum"
-      },
-      "dataFormat": "tsbuckets",
-      "datasource": "tidb-yuyang",
-      "gridPos": {
-        "h": 5,
-        "w": 12,
-        "x": 0,
-        "y": 9
-      },
-      "heatmap": {},
-      "hideZeroBuckets": true,
-      "highlightCards": true,
-      "id": 64,
-      "legend": {
-        "show": false
-      },
-      "links": [],
-      "reverseYBuckets": false,
-      "targets": [
-        {
-          "expr": "sum(delta(check_sum_latency_seconds_bucket{check_sum_latency=\"eq duration\"}[1m])) by (le)",
-          "format": "heatmap",
-          "intervalFactor": 2,
-          "legendFormat": "{{le}}",
-          "refId": "A"
-        }
-      ],
-      "timeFrom": null,
-      "timeShift": null,
-      "title": "Eq duration",
-      "tooltip": {
-        "show": true,
-        "showHistogram": false
-      },
-      "type": "heatmap",
-      "xAxis": {
-        "show": true
-      },
-      "xBucketNumber": null,
-      "xBucketSize": null,
-      "yAxis": {
-        "decimals": 0,
-        "format": "s",
-        "logBase": 1,
-        "max": null,
-        "min": null,
-        "show": true,
-        "splitFactor": null
-      },
-      "yBucketBound": "auto",
-      "yBucketNumber": null,
-      "yBucketSize": null
-    },
-    {
-      "cards": {
-        "cardPadding": null,
-        "cardRound": null
-      },
-      "color": {
-        "cardColor": "#b4ff00",
-        "colorScale": "sqrt",
-        "colorScheme": "interpolateSpectral",
-        "exponent": 0.5,
-        "mode": "spectrum"
-      },
-      "dataFormat": "tsbuckets",
-      "datasource": "tidb-yuyang",
-      "gridPos": {
-        "h": 5,
-        "w": 11,
-        "x": 12,
-        "y": 9
-      },
-      "heatmap": {},
-      "hideZeroBuckets": true,
-      "highlightCards": true,
-      "id": 62,
-      "legend": {
-        "show": false
-      },
-      "links": [],
-      "reverseYBuckets": false,
-      "targets": [
-        {
-          "expr": "sum(delta(check_sum_latency_seconds_bucket{check_sum_latency=\"ite duration\"}[1m])) by (le)",
-          "format": "heatmap",
-          "instant": false,
-          "interval": "",
-          "intervalFactor": 1,
-          "legendFormat": "{{le}}",
-          "refId": "A"
-        }
-      ],
-      "timeFrom": null,
-      "timeShift": null,
-      "title": "Ite duration",
-      "tooltip": {
-        "show": true,
-        "showHistogram": false
-      },
-      "type": "heatmap",
-      "xAxis": {
-        "show": true
-      },
-      "xBucketNumber": null,
-      "xBucketSize": null,
-      "yAxis": {
-        "decimals": 0,
-        "format": "s",
-        "logBase": 1,
-        "max": null,
-        "min": null,
-        "show": true,
-        "splitFactor": null
-      },
-      "yBucketBound": "upper",
-      "yBucketNumber": null,
-      "yBucketSize": null
     },
     {
       "collapsed": true,
@@ -2405,7 +2111,302 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 14
+        "y": 3
+      },
+      "id": 84,
+      "panels": [
+        {
+          "aliasColors": {
+            "check sum": "light-blue"
+          },
+          "bars": false,
+          "dashLength": 10,
+          "dashes": false,
+          "datasource": "tidb-yuyang",
+          "fill": 1,
+          "gridPos": {
+            "h": 5,
+            "w": 12,
+            "x": 0,
+            "y": 4
+          },
+          "id": 86,
+          "legend": {
+            "avg": false,
+            "current": false,
+            "max": false,
+            "min": false,
+            "show": true,
+            "total": false,
+            "values": false
+          },
+          "lines": false,
+          "linewidth": 1,
+          "links": [],
+          "nullPointMode": "null",
+          "percentage": false,
+          "pointradius": 0.5,
+          "points": true,
+          "renderer": "flot",
+          "seriesOverrides": [],
+          "spaceLength": 10,
+          "stack": false,
+          "steppedLine": false,
+          "targets": [
+            {
+              "expr": "file_counter_total{file_counter=\"check sum\",}",
+              "format": "time_series",
+              "intervalFactor": 1,
+              "legendFormat": "{{file_counter}}",
+              "refId": "A"
+            }
+          ],
+          "thresholds": [],
+          "timeFrom": null,
+          "timeRegions": [],
+          "timeShift": null,
+          "title": "Check sum file count",
+          "tooltip": {
+            "shared": true,
+            "sort": 0,
+            "value_type": "individual"
+          },
+          "type": "graph",
+          "xaxis": {
+            "buckets": null,
+            "mode": "time",
+            "name": null,
+            "show": true,
+            "values": []
+          },
+          "yaxes": [
+            {
+              "format": "short",
+              "label": null,
+              "logBase": 1,
+              "max": null,
+              "min": null,
+              "show": true
+            },
+            {
+              "format": "short",
+              "label": null,
+              "logBase": 1,
+              "max": null,
+              "min": null,
+              "show": true
+            }
+          ],
+          "yaxis": {
+            "align": false,
+            "alignLevel": null
+          }
+        },
+        {
+          "cards": {
+            "cardPadding": null,
+            "cardRound": null
+          },
+          "color": {
+            "cardColor": "#b4ff00",
+            "colorScale": "sqrt",
+            "colorScheme": "interpolateSpectral",
+            "exponent": 0.5,
+            "mode": "spectrum"
+          },
+          "dataFormat": "tsbuckets",
+          "datasource": "tidb-yuyang",
+          "gridPos": {
+            "h": 5,
+            "w": 12,
+            "x": 12,
+            "y": 4
+          },
+          "heatmap": {},
+          "hideZeroBuckets": true,
+          "highlightCards": true,
+          "id": 66,
+          "legend": {
+            "show": false
+          },
+          "links": [],
+          "reverseYBuckets": false,
+          "targets": [
+            {
+              "expr": "sum(delta(check_sum_latency_seconds_bucket{check_sum_latency=\"check sum get duration\"}[1m])) by (le)",
+              "format": "heatmap",
+              "intervalFactor": 2,
+              "legendFormat": "{{le}}",
+              "refId": "A"
+            }
+          ],
+          "timeFrom": null,
+          "timeShift": null,
+          "title": "Get duration",
+          "tooltip": {
+            "show": true,
+            "showHistogram": false
+          },
+          "type": "heatmap",
+          "xAxis": {
+            "show": true
+          },
+          "xBucketNumber": null,
+          "xBucketSize": null,
+          "yAxis": {
+            "decimals": 0,
+            "format": "s",
+            "logBase": 1,
+            "max": null,
+            "min": null,
+            "show": true,
+            "splitFactor": null
+          },
+          "yBucketBound": "upper",
+          "yBucketNumber": null,
+          "yBucketSize": null
+        },
+        {
+          "cards": {
+            "cardPadding": null,
+            "cardRound": null
+          },
+          "color": {
+            "cardColor": "#b4ff00",
+            "colorScale": "sqrt",
+            "colorScheme": "interpolateSpectral",
+            "exponent": 0.5,
+            "mode": "spectrum"
+          },
+          "dataFormat": "tsbuckets",
+          "datasource": "tidb-yuyang",
+          "gridPos": {
+            "h": 5,
+            "w": 12,
+            "x": 0,
+            "y": 9
+          },
+          "heatmap": {},
+          "hideZeroBuckets": true,
+          "highlightCards": true,
+          "id": 64,
+          "legend": {
+            "show": false
+          },
+          "links": [],
+          "reverseYBuckets": false,
+          "targets": [
+            {
+              "expr": "sum(delta(check_sum_latency_seconds_bucket{check_sum_latency=\"eq duration\"}[1m])) by (le)",
+              "format": "heatmap",
+              "intervalFactor": 2,
+              "legendFormat": "{{le}}",
+              "refId": "A"
+            }
+          ],
+          "timeFrom": null,
+          "timeShift": null,
+          "title": "Eq duration",
+          "tooltip": {
+            "show": true,
+            "showHistogram": false
+          },
+          "type": "heatmap",
+          "xAxis": {
+            "show": true
+          },
+          "xBucketNumber": null,
+          "xBucketSize": null,
+          "yAxis": {
+            "decimals": 0,
+            "format": "s",
+            "logBase": 1,
+            "max": null,
+            "min": null,
+            "show": true,
+            "splitFactor": null
+          },
+          "yBucketBound": "auto",
+          "yBucketNumber": null,
+          "yBucketSize": null
+        },
+        {
+          "cards": {
+            "cardPadding": null,
+            "cardRound": null
+          },
+          "color": {
+            "cardColor": "#b4ff00",
+            "colorScale": "sqrt",
+            "colorScheme": "interpolateSpectral",
+            "exponent": 0.5,
+            "mode": "spectrum"
+          },
+          "dataFormat": "tsbuckets",
+          "datasource": "tidb-yuyang",
+          "gridPos": {
+            "h": 5,
+            "w": 12,
+            "x": 12,
+            "y": 9
+          },
+          "heatmap": {},
+          "hideZeroBuckets": true,
+          "highlightCards": true,
+          "id": 62,
+          "legend": {
+            "show": false
+          },
+          "links": [],
+          "reverseYBuckets": false,
+          "targets": [
+            {
+              "expr": "sum(delta(check_sum_latency_seconds_bucket{check_sum_latency=\"ite duration\"}[1m])) by (le)",
+              "format": "heatmap",
+              "instant": false,
+              "interval": "",
+              "intervalFactor": 2,
+              "legendFormat": "{{le}}",
+              "refId": "A"
+            }
+          ],
+          "timeFrom": null,
+          "timeShift": null,
+          "title": "Ite duration",
+          "tooltip": {
+            "show": true,
+            "showHistogram": false
+          },
+          "type": "heatmap",
+          "xAxis": {
+            "show": true
+          },
+          "xBucketNumber": null,
+          "xBucketSize": null,
+          "yAxis": {
+            "decimals": 0,
+            "format": "s",
+            "logBase": 1,
+            "max": null,
+            "min": null,
+            "show": true,
+            "splitFactor": null
+          },
+          "yBucketBound": "upper",
+          "yBucketNumber": null,
+          "yBucketSize": null
+        }
+      ],
+      "title": "Check sum",
+      "type": "row"
+    },
+    {
+      "collapsed": true,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 4
       },
       "id": 80,
       "panels": [
@@ -2615,7 +2616,7 @@
     "list": []
   },
   "time": {
-    "from": "now-3h",
+    "from": "now-1h",
     "to": "now"
   },
   "timepicker": {
@@ -2646,5 +2647,5 @@
   "timezone": "browser",
   "title": "Raw KV importer",
   "uid": "lKLPZC6Gz",
-  "version": 19
+  "version": 21
 }

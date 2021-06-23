@@ -1,17 +1,37 @@
 package com.pingcap.util;
 
 import com.pingcap.enums.Model;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.tikv.common.TiConfiguration;
 import org.tikv.common.TiSession;
 
 import java.util.Properties;
 
-public class TiSessionUtil {
+/**
+ * @author yuyang
+ */
+public class TiSessionUtil
+{
 
-    public static TiSession getTiSession(Properties properties) {
+    private static final Logger logger = LoggerFactory.getLogger(Model.LOG);
+
+    public static TiSession getTiSession(Properties properties)
+    {
         String pd = properties.getProperty(Model.PD);
-        TiConfiguration conf = TiConfiguration.createRawDefault(pd);
-        return TiSession.create(conf);
+        TiConfiguration conf;
+        TiSession tiSession = null;
+        try
+        {
+            conf = TiConfiguration.createRawDefault(pd);
+            tiSession = TiSession.create(conf);
+            logger.info("Create global TiSession success!");
+        } catch (Exception e)
+        {
+            logger.error("Failed to create TiSession!");
+            System.exit(0);
+        }
+        return tiSession;
     }
 
 }

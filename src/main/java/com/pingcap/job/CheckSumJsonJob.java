@@ -1,7 +1,7 @@
 package com.pingcap.job;
 
 import com.pingcap.enums.Model;
-import com.pingcap.util.CheckSumUtil;
+import com.pingcap.checksum.CheckSum;
 import io.prometheus.client.Counter;
 import org.tikv.common.TiSession;
 
@@ -31,10 +31,9 @@ public class CheckSumJsonJob implements Runnable {
         fileCounter.labels("check sum").inc();
         String simpleCheckSum = properties.getProperty(Model.SIMPLE_CHECK_SUM);
         if (!Model.ON.equals(simpleCheckSum)) {
-            CheckSumUtil.checkSum(checkSumFilePath, checkSumDelimiter, tiSession, properties);
+            CheckSum.checkSum(checkSumFilePath, checkSumDelimiter, tiSession, properties);
         } else {
-            CheckSumUtil.simpleCheckSum(checkSumFilePath, tiSession, properties);
+            CheckSum.simpleCheckSum(checkSumFilePath, tiSession, properties);
         }
-
     }
 }
