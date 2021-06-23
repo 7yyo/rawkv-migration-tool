@@ -1805,7 +1805,7 @@
             {
               "expr": "sum(delta(file_block_latency_bucket[30s])) by (le)",
               "format": "heatmap",
-              "intervalFactor": 1,
+              "intervalFactor": 2,
               "legendFormat": "{{le}}",
               "refId": "A"
             }
@@ -2128,7 +2128,7 @@
             "h": 5,
             "w": 12,
             "x": 0,
-            "y": 4
+            "y": 14
           },
           "id": 86,
           "legend": {
@@ -2220,7 +2220,7 @@
             "h": 5,
             "w": 12,
             "x": 12,
-            "y": 4
+            "y": 14
           },
           "heatmap": {},
           "hideZeroBuckets": true,
@@ -2284,7 +2284,7 @@
             "h": 5,
             "w": 12,
             "x": 0,
-            "y": 9
+            "y": 19
           },
           "heatmap": {},
           "hideZeroBuckets": true,
@@ -2348,7 +2348,7 @@
             "h": 5,
             "w": 12,
             "x": 12,
-            "y": 9
+            "y": 19
           },
           "heatmap": {},
           "hideZeroBuckets": true,
@@ -2647,5 +2647,5 @@
   "timezone": "browser",
   "title": "Raw KV importer",
   "uid": "lKLPZC6Gz",
-  "version": 21
+  "version": 22
 }
