@@ -45,26 +45,28 @@ public class LimitExporter {
 
         int exportLimit = Integer.parseInt(properties.getProperty(Model.EXPORT_LIMIT));
         int exportThread = Integer.parseInt(properties.getProperty(Model.EXPORT_THREAD));
-
         String exportFilePath = properties.getProperty(Model.EXPORT_FILE_PATH);
-        FileUtil.deleteFolder(exportFilePath);
-        new File(exportFilePath).mkdir();
 
         File file;
         FileOutputStream fileOutputStream;
         FileChannel fileChannel;
         List<FileChannel> fileChannelList = new ArrayList<>();
 
-        // Create data export files according to the number of threads
-        for (int i = 0; i < exportThread; i++) {
-            file = new File(String.format(exportFilePath + EXPORT_FILE_PATH, i));
-            try {
-                file.createNewFile();
-                fileOutputStream = new FileOutputStream(file);
-                fileChannel = fileOutputStream.getChannel();
-                fileChannelList.add(fileChannel);
-            } catch (IOException e) {
-                e.printStackTrace();
+        FileUtil.deleteFolder(exportFilePath);
+
+        if (new File(exportFilePath).mkdir()) {
+            // Create data export files according to the number of threads
+            for (int i = 0; i < exportThread; i++) {
+                file = new File(String.format(exportFilePath + EXPORT_FILE_PATH, i));
+                try {
+                    if (file.createNewFile()) {
+                        fileOutputStream = new FileOutputStream(file);
+                        fileChannel = fileOutputStream.getChannel();
+                        fileChannelList.add(fileChannel);
+                    }
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
             }
         }
 
