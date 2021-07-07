@@ -56,7 +56,7 @@ public class CheckSum {
 
         File checkSumFile = new File(checkSumFileName);
         try {
-            if(checkSumFile.createNewFile()){
+            if (checkSumFile.createNewFile()) {
                 FileOutputStream fileOutputStream = new FileOutputStream(checkSumFile);
                 fileChannel = fileOutputStream.getChannel();
             }

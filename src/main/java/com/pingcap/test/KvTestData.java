@@ -12,7 +12,7 @@ public class KvTestData {
     private static final int WRITE_NUM = 1000000;
 
     public static void main(String[] args) throws IOException {
-        String filePath = "/Users/yuyang/IdeaProjects/tikv_importer/src/main/resources/testFile/indexInfo_json/data.txt";
+        String filePath = "/Users/yuyang/IdeaProjects/tikv_importer/src/main/resources/testFile/indexInfo_json/output-000004.json";
         BufferedWriter bufferedWriter = new BufferedWriter(new FileWriter(filePath));
         for (int i = 1; i < WRITE_NUM + 1; i++) {
             bufferedWriter.write("{\"id\":\"" +

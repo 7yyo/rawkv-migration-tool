@@ -9,6 +9,8 @@ public class Model {
     public static final String CHECK_SUM = "checkSum";
     public static final String JSON_FORMAT = "json";
     public static final String CSV_FORMAT = "csv";
+    public static final String PARSE_JSON = "parser_json";
+    public static final String PARSE_CSV = "parse_csv";
     public static final String ON = "1";
 
     public static final String P = "p";
@@ -64,5 +66,12 @@ public class Model {
     public static final String EXPORT_MODE = "exporter.tikv.mode";
     public static final String EXPORT_LIMIT = "exporter.tikv.exportLimit";
     public static final String EXPORT_THREAD = "exporter.tikv.exportThread";
+
+    public static final String IMPORT_TABLE = "importer.parser.table";
+    public static final String IMPORT_KEY = "importer.parser.key";
+    public static final String IMPORT_VALUE = "importer.parser.value";
+    public static final String IMPORT_BEAN = "importer.parser.bean";
+
+    public static final String IMPORT_CSV_FORMAT = "importer.parser.csv.format";
 
 }

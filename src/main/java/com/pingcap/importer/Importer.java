@@ -76,11 +76,6 @@ public class Importer {
                 // Pass in the file to be processed and the ttl map.
                 // The ttl map is shared by all file threads, because it is a table for processing, which is summarized here.
                 threadPoolExecutor.execute(new ImporterJob(file.getAbsolutePath(), tiSession, properties, ttlTypeList, fileCounter));
-                try {
-                    Thread.sleep(15000);
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                }
             }
         }
 
@@ -146,6 +141,7 @@ class ImporterJob implements Runnable {
     private final AtomicInteger totalSkipCount = new AtomicInteger(0);
     private final AtomicInteger totalParseErrorCount = new AtomicInteger(0);
     private final AtomicInteger totalBatchPutFailCount = new AtomicInteger(0);
+    private final AtomicInteger totalDuplicateKeyCount = new AtomicInteger(0);
 
     public ImporterJob(String filePath, TiSession tiSession, Properties properties, List<String> ttlTypeList, Counter importFileCounter) {
         this.filePath = filePath;
@@ -184,7 +180,7 @@ class ImporterJob implements Runnable {
 
         // s: File block
         for (String s : threadPerLineList) {
-            BatchPutJob batchPutIndexInfoJob = new BatchPutJob(tiSession, totalImportCount, totalSkipCount, totalParseErrorCount, totalBatchPutFailCount, filePath, ttlTypeList, ttlTypeCountMap, s, properties, countDownLatch);
+            BatchPutJob batchPutIndexInfoJob = new BatchPutJob(tiSession, totalImportCount, totalSkipCount, totalParseErrorCount, totalBatchPutFailCount, filePath, ttlTypeList, ttlTypeCountMap, s, properties, countDownLatch, totalDuplicateKeyCount);
             batchPutIndexInfoJob.start();
         }
         try {
@@ -193,7 +189,7 @@ class ImporterJob implements Runnable {
             e.printStackTrace();
         }
         long duration = System.currentTimeMillis() - startTime;
-        StringBuilder result = new StringBuilder("[Import Report] File[" + file.getAbsolutePath() + "],TotalRows[" + lines + "],ImportedRows[" + totalImportCount + "],SkipRows[" + totalSkipCount + "],ParseERROR[" + totalParseErrorCount + "],BatchPutERROR[" + totalBatchPutFailCount + "],Duration[" + duration / 1000 + "s],");
+        StringBuilder result = new StringBuilder("[Import Report] File[" + file.getAbsolutePath() + "],TotalRows[" + lines + "],ImportedRows[" + totalImportCount + "],SkipRows[" + totalSkipCount + "],ParseERROR[" + totalParseErrorCount + "],BatchPutERROR[" + totalBatchPutFailCount + "], DuplicateKey=[" + totalDuplicateKeyCount + "],Duration[" + duration / 1000 + "s],");
         result.append("Skip type[");
         if (ttlTypeCountMap != null) {
             for (Map.Entry<String, Long> item : ttlTypeCountMap.entrySet()) {
@@ -226,12 +222,13 @@ class BatchPutJob extends Thread {
     private final AtomicInteger totalSkipCount;
     private final AtomicInteger totalParseErrorCount;
     private final AtomicInteger totalBatchPutFailCount;
+    private final AtomicInteger totalDuplicateKeyCount;
     private final Properties properties;
     private FileChannel checkSumFileChannel;
     private FileChannel batchPutErrFileChannel;
     private final CountDownLatch countDownLatch;
 
-    public BatchPutJob(TiSession tiSession, AtomicInteger totalImportCount, AtomicInteger totalSkipCount, AtomicInteger totalParseErrorCount, AtomicInteger totalBatchPutFailCount, String filePath, List<String> ttlTypeList, HashMap<String, Long> ttlTypeCountMap, String fileBlock, Properties properties, CountDownLatch countDownLatch) {
+    public BatchPutJob(TiSession tiSession, AtomicInteger totalImportCount, AtomicInteger totalSkipCount, AtomicInteger totalParseErrorCount, AtomicInteger totalBatchPutFailCount, String filePath, List<String> ttlTypeList, HashMap<String, Long> ttlTypeCountMap, String fileBlock, Properties properties, CountDownLatch countDownLatch, AtomicInteger totalDuplicateKeyCount) {
         this.totalImportCount = totalImportCount;
         this.tiSession = tiSession;
         this.totalSkipCount = totalSkipCount;
@@ -243,6 +240,7 @@ class BatchPutJob extends Thread {
         this.fileBlock = fileBlock;
         this.properties = properties;
         this.countDownLatch = countDownLatch;
+        this.totalDuplicateKeyCount = totalDuplicateKeyCount;
     }
 
     @Override
@@ -301,8 +299,8 @@ class BatchPutJob extends Thread {
         String checkSumDelimiter = properties.getProperty(Model.CHECK_SUM_DELIMITER);
 
         Random random = new Random();
-        ByteString key;
-        ByteString value;
+        ByteString key = null;
+        ByteString value = null;
         SimpleDateFormat simpleDateFormat;
         String time;
 
@@ -326,8 +324,6 @@ class BatchPutJob extends Thread {
                     logger.warn(String.format("This is blank in file=%s, line=%s", file.getAbsolutePath(), start + totalCount));
                     continue;
                 }
-                key = null;
-                value = null;
 
                 simpleDateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
                 time = simpleDateFormat.format(new Date());
@@ -423,7 +419,6 @@ class BatchPutJob extends Thread {
                             count = RawKv.batchPut(totalCount, todo, count, batchSize, rawKvClient, kvPairs, kvList, file, totalImportCount, totalSkipCount, totalBatchPutFailCount, start + totalCount, properties, batchPutErrFileChannel);
                             continue;
                         }
-
                         break;
                     default:
                         logger.error(String.format("Illegal format: %s", importMode));
@@ -440,8 +435,10 @@ class BatchPutJob extends Thread {
                     }
                 }
 
-                assert key != null;
-                kvPairs.put(key, value);
+                ByteString result = kvPairs.put(key, value);
+                if (result != null) {
+                    totalDuplicateKeyCount.addAndGet(1);
+                }
                 kvList.add(line);
 
                 count = RawKv.batchPut(totalCount, todo, count, batchSize, rawKvClient, kvPairs, kvList, file, totalImportCount, totalSkipCount, totalBatchPutFailCount, start + totalCount, properties, batchPutErrFileChannel);
