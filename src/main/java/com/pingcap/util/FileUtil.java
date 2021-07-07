@@ -60,12 +60,12 @@ public class FileUtil {
     }
 
     public static int getFileLines(File file) {
-        FileReader in;
         int lines = 0;
         try {
-            in = new FileReader(file);
+            FileReader in = new FileReader(file);
             LineNumberReader reader = new LineNumberReader(in);
-            reader.skip(Long.MAX_VALUE);
+            long n = reader.skip(Long.MAX_VALUE);
+            logger.debug(String.format("Skip line = [%s]", n));
             lines = reader.getLineNumber();
             reader.close();
         } catch (IOException e) {
@@ -91,21 +91,23 @@ public class FileUtil {
         }
         for (File file : files) {
             if (!file.isDirectory()) {
-                file.delete();
+                if (!file.delete()) {
+                    logger.error(String.format("Delete folder [%s] failed.", file.getAbsolutePath()));
+                }
             } else {
                 deleteFolder(file.getAbsolutePath());
             }
         }
-        deleteFilePath.delete();
+        if (!deleteFilePath.delete()) {
+            logger.error(String.format("Delete folder [%s] failed.", deleteFilePath.getAbsolutePath()));
+        }
     }
 
-    public static boolean createFolder(String filePath) {
+    public static void createFolder(String filePath) {
         File checkSumFolder = new File(filePath);
         if (!checkSumFolder.mkdir()) {
             logger.error(String.format("Failed to mkdir check sum file, folder path = [%s]", filePath));
-            return false;
         }
-        return true;
     }
 
 }
