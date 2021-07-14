@@ -24,6 +24,7 @@ import org.tikv.shade.com.google.protobuf.ByteString;
 import java.io.*;
 import java.nio.channels.FileChannel;
 import java.nio.charset.StandardCharsets;
+import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.concurrent.*;
@@ -213,6 +214,8 @@ class BatchPutJob extends Thread {
 
     static final Histogram FILE_BLOCK_LATENCY = Histogram.build().name("file_block_latency").help("File block latency.").labelNames("file_block").register();
 
+    private static final SimpleDateFormat simpleDateFormat = new SimpleDateFormat("yyyy-MM-dd hh:mm:ss");
+
     private final String filePath;
     private final TiSession tiSession;
     private final List<String> ttlTypeList;
@@ -301,16 +304,19 @@ class BatchPutJob extends Thread {
         Random random = new Random();
         ByteString key = null;
         ByteString value = null;
-        SimpleDateFormat simpleDateFormat;
-        String time;
 
         IndexInfo indexInfoS;
         IndexInfo indexInfoT = new IndexInfo();
+        IndexInfo existsIndexInfo;
         TempIndexInfo tempIndexInfoS;
         TempIndexInfo tempIndexInfoT = new TempIndexInfo();
+        TempIndexInfo existsTempIndexInfo;
 
         String id;
         String type;
+
+        Date date = new Date();
+        SimpleDateFormat simpleDateFormat = new SimpleDateFormat("yyyy-MM-dd hh:mm:ss");
 
         for (int n = 0; n < todo; n++) {
 
@@ -324,9 +330,6 @@ class BatchPutJob extends Thread {
                     logger.warn(String.format("This is blank in file=%s, line=%s", file.getAbsolutePath(), start + totalCount));
                     continue;
                 }
-
-                simpleDateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
-                time = simpleDateFormat.format(new Date());
 
                 Histogram.Timer parseJsonTimer = PARSE_LATENCY.labels("parse json").startTimer();
                 Histogram.Timer toObjTimer = PARSE_LATENCY.labels("to obj").startTimer();
@@ -343,6 +346,7 @@ class BatchPutJob extends Thread {
                             count = RawKv.batchPut(totalCount, todo, count, batchSize, rawKvClient, kvPairs, kvList, file, totalImportCount, totalSkipCount, totalBatchPutFailCount, start + totalCount, properties, batchPutErrFileChannel);
                             continue;
                         }
+                        ByteString existsValue;
                         switch (scenes) {
                             case Model.INDEX_INFO:
                                 indexInfoS = JSON.toJavaObject(jsonObject, IndexInfo.class);
@@ -360,23 +364,70 @@ class BatchPutJob extends Thread {
                                 } else {
                                     indexInfoKey = String.format(IndexInfo.INDEX_INFO_KET_FORMAT, indexInfoS.getEnvId(), indexInfoS.getType(), indexInfoS.getId());
                                 }
+
+                                // Compare with kvPairs
+                                existsValue = kvPairs.get(ByteString.copyFromUtf8(indexInfoKey));
+                                if (existsValue != null) {
+                                    JSONObject existsJSONObject = JSONObject.parseObject(existsValue.toStringUtf8());
+                                    existsIndexInfo = JSON.toJavaObject(existsJSONObject, IndexInfo.class);
+                                    if (compareTime(existsIndexInfo.getUpdateTime(), indexInfoS.getUpdateTime())) {
+                                        auditLog.warn(String.format("Skip key : [ %s ], file is [ %s ], line= %s", indexInfoKey, file.getAbsolutePath(), start + totalCount));
+                                        continue;
+                                    }
+                                }
+
+                                // Compare with Raw KV
+                                existsValue = rawKvClient.get(ByteString.copyFromUtf8(indexInfoKey));
+                                if (!existsValue.isEmpty()) {
+                                    JSONObject existsJSONObject = JSONObject.parseObject(existsValue.toStringUtf8());
+                                    existsIndexInfo = JSON.toJavaObject(existsJSONObject, IndexInfo.class);
+                                    if (compareTime(existsIndexInfo.getUpdateTime(), indexInfoS.getUpdateTime())) {
+                                        auditLog.warn(String.format("Skip key : [ %s ], file is [ %s ], line= %s", indexInfoKey, file.getAbsolutePath(), start + totalCount));
+                                        continue;
+                                    }
+                                }
+
                                 // TiKV indexInfo
-                                IndexInfo.initIndexInfoT(indexInfoT, indexInfoS, time);
+                                IndexInfo.initIndexInfoT(indexInfoT, indexInfoS);
                                 indexInfoT.setAppId(indexInfoS.getAppId());
                                 key = ByteString.copyFromUtf8(indexInfoKey);
                                 value = ByteString.copyFromUtf8(JSONObject.toJSONString(indexInfoT));
                                 logger.debug(String.format("[%s], K=%s, V={%s}", file.getAbsolutePath(), indexInfoKey, JSONObject.toJSONString(indexInfoT)));
                                 break;
                             case Model.TEMP_INDEX_INFO:
+
                                 tempIndexInfoS = JSON.toJavaObject(jsonObject, TempIndexInfo.class);
+                                tempIndexInfoS.setUpdateTime(simpleDateFormat.format(date));
                                 toObjTimer.observeDuration();
                                 if (envId != null) {
                                     indexInfoKey = String.format(TempIndexInfo.TEMP_INDEX_INFO_KEY_FORMAT, envId, tempIndexInfoS.getId());
                                 } else {
                                     indexInfoKey = String.format(TempIndexInfo.TEMP_INDEX_INFO_KEY_FORMAT, tempIndexInfoS.getEnvId(), tempIndexInfoS.getId());
                                 }
+
                                 // TiKV tempIndexInfo
                                 TempIndexInfo.initTempIndexInfo(tempIndexInfoT, tempIndexInfoS);
+
+                                existsValue = rawKvClient.get(ByteString.copyFromUtf8(indexInfoKey));
+                                if (!existsValue.isEmpty()) {
+                                    JSONObject existsJSONObject = JSONObject.parseObject(existsValue.toStringUtf8());
+                                    existsTempIndexInfo = JSON.toJavaObject(existsJSONObject, TempIndexInfo.class);
+                                    if (compareTime(existsTempIndexInfo.getUpdateTime(), tempIndexInfoS.getUpdateTime())) {
+                                        auditLog.warn(String.format("Skip key - exists: [ %s ], file is [ %s ], line= %s", indexInfoKey, file.getAbsolutePath(), start + totalCount));
+                                        continue;
+                                    }
+                                }
+
+                                existsValue = kvPairs.get(ByteString.copyFromUtf8(indexInfoKey));
+                                if (!existsValue.isEmpty()) {
+                                    JSONObject existsJSONObject = JSONObject.parseObject(existsValue.toStringUtf8());
+                                    existsTempIndexInfo = JSON.toJavaObject(existsJSONObject, TempIndexInfo.class);
+                                    if (compareTime(existsTempIndexInfo.getUpdateTime(), tempIndexInfoS.getUpdateTime())) {
+                                        auditLog.warn(String.format("Skip key - exists: [ %s ], file is [ %s ], line= %s", indexInfoKey, file.getAbsolutePath(), start + totalCount));
+                                        continue;
+                                    }
+                                }
+
                                 key = ByteString.copyFromUtf8(indexInfoKey);
                                 value = ByteString.copyFromUtf8(JSONObject.toJSONString(tempIndexInfoT));
                                 logger.debug(String.format("[%s], K=%s, V={%s}", file.getAbsolutePath(), indexInfoKey, JSONObject.toJSONString(tempIndexInfoT)));
@@ -409,7 +460,6 @@ class BatchPutJob extends Thread {
 
                             IndexInfo.csv2IndexInfo(indexInfoT, line, delimiter1, delimiter2);
                             indexInfoT.setAppId(appId);
-                            indexInfoT.setUpdateTime(time);
                             key = ByteString.copyFromUtf8(indexInfoKey);
                             value = ByteString.copyFromUtf8(JSONObject.toJSONString(indexInfoT));
                         } catch (Exception e) {
@@ -457,6 +507,25 @@ class BatchPutJob extends Thread {
         }
         countDownLatch.countDown();
 
+    }
+
+
+    public static boolean compareTime(String d1, String d2) {
+        int result = 0;
+        try {
+            Date date1 = simpleDateFormat.parse(d1);
+            Date date2 = simpleDateFormat.parse(d2);
+            result = date1.compareTo(date2);
+        } catch (ParseException e) {
+            e.printStackTrace();
+        }
+        if (result > 0) {
+            return true;
+        } else if (result == 0) {
+            return false;
+        } else {
+            return false;
+        }
     }
 
 }

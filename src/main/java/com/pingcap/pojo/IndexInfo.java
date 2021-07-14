@@ -143,7 +143,7 @@ public class IndexInfo {
         return indexInfo;
     }
 
-    public static void initIndexInfoT(IndexInfo indexInfoT, IndexInfo indexInfoS, String time) {
+    public static void initIndexInfoT(IndexInfo indexInfoT, IndexInfo indexInfoS) {
         // value
         // appId、serviceTag、targetId、updateTime
         indexInfoT.setAppId(indexInfoT.getAppId());
@@ -155,6 +155,6 @@ public class IndexInfo {
             indexInfoT.setServiceTag(indexInfoS.getServiceTag());
         }
         indexInfoT.setTargetId(indexInfoS.getTargetId());
-        indexInfoT.setUpdateTime(time);
+        indexInfoT.setUpdateTime(indexInfoS.getUpdateTime());
     }
 }

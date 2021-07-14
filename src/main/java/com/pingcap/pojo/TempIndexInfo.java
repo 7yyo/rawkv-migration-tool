@@ -8,6 +8,7 @@ public class TempIndexInfo {
     private String id;
     private String appId;
     private String targetId;
+    private String updateTime;
 
     public String getAppId() {
         return appId;
@@ -39,6 +40,14 @@ public class TempIndexInfo {
 
     public void setId(String id) {
         this.id = id;
+    }
+
+    public String getUpdateTime() {
+        return updateTime;
+    }
+
+    public void setUpdateTime(String updateTime) {
+        this.updateTime = updateTime;
     }
 
     public static void key2TempIndexInfo(TempIndexInfo tempIndexInfo, String key, String keyDelimiter) {

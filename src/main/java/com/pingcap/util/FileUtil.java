@@ -67,6 +67,9 @@ public class FileUtil {
             long n = reader.skip(Long.MAX_VALUE);
             logger.debug(String.format("Skip line = [%s]", n));
             lines = reader.getLineNumber();
+            if (!isLinux()) {
+                lines++;
+            }
             reader.close();
         } catch (IOException e) {
             e.printStackTrace();
@@ -108,6 +111,10 @@ public class FileUtil {
         if (!checkSumFolder.mkdir()) {
             logger.error(String.format("Failed to mkdir check sum file, folder path = [%s]", filePath));
         }
+    }
+
+    public static boolean isLinux() {
+        return System.getProperty("os.name").toLowerCase().contains("linux");
     }
 
 }

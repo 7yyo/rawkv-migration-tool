@@ -62,32 +62,31 @@ public class RawKv {
             // Only json file skip exists key.
             if (Model.JSON_FORMAT.equals(importMode)) {
 
-                if (Model.ON.equals(properties.getProperty(Model.CHECK_EXISTS_KEY))) {
-                    List<ByteString> list = new ArrayList<>(kvPairs.keySet());
-                    if (Model.ON.equals(properties.getProperty(Model.DELETE_FOR_TEST))) {
-                        REQUEST_COUNTER.labels("batch delete").inc();
-                        Histogram.Timer batchDeleteTimer = REQUEST_LATENCY.labels("batch delete").startTimer();
-                        rawKvClient.batchDelete(list);
-                        batchDeleteTimer.observeDuration();
-                    }
-                    Histogram.Timer batchGetTimer = REQUEST_LATENCY.labels("batch get").startTimer();
-                    List<Kvrpcpb.KvPair> haveList = new ArrayList<>();
-                    try {
-                        haveList = rawKvClient.batchGet(list);
-                    } catch (Exception e) {
-                        logger.error(String.format("Failed to batch get in data file[%s]", file.getAbsolutePath()), e);
-                    }
-                    batchGetTimer.observeDuration();
-                    REQUEST_COUNTER.labels("batch get").inc();
-                    for (Kvrpcpb.KvPair kv : haveList) {
-                        Histogram.Timer deleteTimer = REQUEST_LATENCY.labels("delete").startTimer();
-                        kvPairs.remove(kv.getKey());
-                        deleteTimer.observeDuration();
-                        auditLog.warn(String.format("Skip key - exists: [ %s ], file is [ %s ], almost line= %s", kv.getKey().toStringUtf8(), file.getAbsolutePath(), totalLine));
-                    }
-                    totalSkipCount.addAndGet(haveList.size());
+//                if (Model.ON.equals(properties.getProperty(Model.CHECK_EXISTS_KEY))) {
+                List<ByteString> list = new ArrayList<>(kvPairs.keySet());
+                if (Model.ON.equals(properties.getProperty(Model.DELETE_FOR_TEST))) {
+                    REQUEST_COUNTER.labels("batch delete").inc();
+                    Histogram.Timer batchDeleteTimer = REQUEST_LATENCY.labels("batch delete").startTimer();
+                    rawKvClient.batchDelete(list);
+                    batchDeleteTimer.observeDuration();
                 }
-
+//                Histogram.Timer batchGetTimer = REQUEST_LATENCY.labels("batch get").startTimer();
+//                List<Kvrpcpb.KvPair> haveList = new ArrayList<>();
+//                try {
+//                    haveList = rawKvClient.batchGet(list);
+//                } catch (Exception e) {
+//                    logger.error(String.format("Failed to batch get in data file[%s]", file.getAbsolutePath()), e);
+//                }
+//                batchGetTimer.observeDuration();
+//                REQUEST_COUNTER.labels("batch get").inc();
+//                for (Kvrpcpb.KvPair kv : haveList) {
+//                    Histogram.Timer deleteTimer = REQUEST_LATENCY.labels("delete").startTimer();
+//                    kvPairs.remove(kv.getKey());
+//                    deleteTimer.observeDuration();
+//                    auditLog.warn(String.format("Skip key - exists: [ %s ], file is [ %s ], almost line= %s", kv.getKey().toStringUtf8(), file.getAbsolutePath(), totalLine));
+//                }
+//                totalSkipCount.addAndGet(haveList.size());
+//                }
             }
 
             if (!kvPairs.isEmpty()) {
