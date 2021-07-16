@@ -25,6 +25,7 @@ import java.nio.channels.FileChannel;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
@@ -41,10 +42,10 @@ public class LimitExporter {
     private static final AtomicInteger TOTAL_EXPORT_NUM = new AtomicInteger(0);
     private static final String EXPORT_FILE_PATH = "/export_%s.txt";
 
-    public static void runLimitExporter(Properties properties, TiSession tiSession) {
+    public static void run(Properties properties, TiSession tiSession) {
 
-        int exportLimit = Integer.parseInt(properties.getProperty(Model.EXPORT_LIMIT));
-        int exportThread = Integer.parseInt(properties.getProperty(Model.EXPORT_THREAD));
+        int limit = Integer.parseInt(properties.getProperty(Model.EXPORT_LIMIT)) + 1;
+        int thread = Integer.parseInt(properties.getProperty(Model.EXPORT_THREAD));
         String exportFilePath = properties.getProperty(Model.EXPORT_FILE_PATH);
 
         File file;
@@ -56,7 +57,7 @@ public class LimitExporter {
 
         if (new File(exportFilePath).mkdir()) {
             // Create data export files according to the number of threads
-            for (int i = 0; i < exportThread; i++) {
+            for (int i = 0; i < thread; i++) {
                 file = new File(String.format(exportFilePath + EXPORT_FILE_PATH, i));
                 try {
                     if (file.createNewFile()) {
@@ -73,40 +74,44 @@ public class LimitExporter {
         int interval = Integer.parseInt(properties.getProperty(Model.TIMER_INTERVAL));
         String keyDelimiter = properties.getProperty(Model.KEY_DELIMITER);
 
-        ThreadPoolExecutor threadPoolExecutor = ThreadPoolUtil.startJob(exportThread, exportThread, null);
+        ThreadPoolExecutor threadPoolExecutor = ThreadPoolUtil.startJob(thread, thread);
 
         Timer timer = new Timer();
         ExportTimer exportTimer = new ExportTimer(TOTAL_EXPORT_NUM);
         timer.schedule(exportTimer, 5000, interval);
 
-        boolean isStart = true;
         ByteString startKey = ByteString.EMPTY;
-        ByteString endKey = null;
+        ByteString lastStartKey = ByteString.EMPTY;
         List<Kvrpcpb.KvPair> kvPairList;
         RawKVClient rawKvClient = tiSession.createRawClient();
+        boolean isStart = true;
         Random random = new Random();
-        FileChannel randomFileChannel;
-        while (isStart || endKey != null) {
+        while (isStart || startKey != null) {
 
             Histogram.Timer scanDuration = IMPORT_LATENCY.labels("scan duration").startTimer();
-            if (isStart) {
-                kvPairList = rawKvClient.scan(startKey, exportLimit);
-            } else {
-                kvPairList = rawKvClient.scan(endKey, exportLimit);
-            }
+            kvPairList = rawKvClient.scan(startKey, limit);
             scanDuration.observeDuration();
-
-            // Size = 1 means that the entire raw kv data has been traversed, so exit directly
-            if (kvPairList.size() == 1) {
-                logger.info(String.format("Complete data export! Total number of exported rows=[%s]", TOTAL_EXPORT_NUM));
-                System.exit(0);
+            if (!kvPairList.isEmpty()) {
+                String l = lastStartKey == null ? "null" : lastStartKey.toStringUtf8();
+                String s = startKey.toStringUtf8();
+                if (!isStart && l.equals(s)) {
+                    threadPoolExecutor.shutdown();
+                    try {
+                        threadPoolExecutor.awaitTermination(Long.MAX_VALUE, TimeUnit.SECONDS);
+                        System.exit(0);
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                    logger.info(String.format("Complete data export! Total number of exported rows=[%s]", TOTAL_EXPORT_NUM));
+                }
+                // All threads randomly write a data export file
+                FileChannel randomFileChannel = fileChannelList.get(random.nextInt(fileChannelList.size()));
+                threadPoolExecutor.execute(new LimitExportJob(TOTAL_EXPORT_NUM, keyDelimiter, IMPORT_LATENCY, isStart, kvPairList, randomFileChannel));
+                isStart = false;
+                lastStartKey = startKey;
+                startKey = kvPairList.get(kvPairList.size() - 1).getKey();
             }
 
-            // All threads randomly write a data export file
-            randomFileChannel = fileChannelList.get(random.nextInt(fileChannelList.size()));
-            threadPoolExecutor.execute(new LimitExportJob(TOTAL_EXPORT_NUM, keyDelimiter, IMPORT_LATENCY, isStart, kvPairList, randomFileChannel));
-            isStart = false;
-            endKey = kvPairList.get(kvPairList.size() - 1).getKey();
 
         }
 
@@ -122,8 +127,8 @@ class LimitExportJob implements Runnable {
     private final String keyDelimiter;
     private final AtomicInteger totalExportNum;
 
-    private static final String INDEX_INFO_PREFIX = "indexInfo_";
-    private static final String TEMP_INDEX_INFO_PREFIX = "tempIndex_";
+    private static final String INDEX_INFO_PREFIX = "indexInfo";
+    private static final String TEMP_INDEX_INFO_PREFIX = "tempIndex";
 
     public LimitExportJob(AtomicInteger totalExportNum, String keyDelimiter, Histogram importLatency, boolean isStart, List<Kvrpcpb.KvPair> kvPairList, FileChannel fileChannel) {
         this.keyDelimiter = keyDelimiter;

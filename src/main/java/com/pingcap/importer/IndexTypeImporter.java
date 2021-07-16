@@ -24,7 +24,7 @@ public class IndexTypeImporter {
     private static final HashMap<ByteString, ByteString> KV_PAIRS = new HashMap<>();
     private static final String INDEX_TYPE_DELIMITER = "@";
 
-    public static void runIndexType(Properties properties, TiSession tiSession) {
+    public static void run(Properties properties, TiSession tiSession) {
 
         String filePath = properties.getProperty(Model.FILE_PATH);
         List<File> fileList = FileUtil.showFileList(filePath, false);

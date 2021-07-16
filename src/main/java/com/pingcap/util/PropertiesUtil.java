@@ -7,24 +7,17 @@ import org.slf4j.LoggerFactory;
 import java.io.*;
 import java.util.Properties;
 
-/**
- * @author yuyang
- */
-public class PropertiesUtil
-{
+public class PropertiesUtil {
 
     private static final Logger logger = LoggerFactory.getLogger(Model.LOG);
 
-    public static Properties getProperties(String filePath)
-    {
+    public static Properties getProperties(String filePath) {
         Properties properties = new Properties();
-        try
-        {
+        try {
             InputStream inputStream = new BufferedInputStream(new FileInputStream(filePath));
             properties.load(inputStream);
             logger.info(String.valueOf(properties));
-        } catch (IOException e)
-        {
+        } catch (IOException e) {
             e.printStackTrace();
         }
         return properties;

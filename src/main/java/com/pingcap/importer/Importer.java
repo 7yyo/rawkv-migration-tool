@@ -39,9 +39,9 @@ public class Importer {
     static final Counter TOTAL_IMPORT_FILE_COUNTER = Counter.build().name("total_import_file_counter").help("Total_import_file counter.").labelNames("Total_import_file_counter").register();
     static final Counter TOTAL_CHECK_SUM_FILE_COUNTER = Counter.build().name("total_checkSum_file_counter").help("Total_checkSum_file counter.").labelNames("Total_checkSum_file_counter").register();
 
-    public static void runImporter(Properties properties, TiSession tiSession, Counter fileCounter) {
+    public static void run(Properties properties, TiSession tiSession, Counter fileCounter) {
 
-        String filesPath = properties.getProperty(Model.FILE_PATH);
+        String importFilePath = properties.getProperty(Model.IMPORT_FILE_PATH);
         int corePoolSize = Integer.parseInt(properties.getProperty(Model.CORE_POOL_SIZE));
         int maxPoolSize = Integer.parseInt(properties.getProperty(Model.MAX_POOL_SIZE));
         String checkSumDelimiter = properties.getProperty(Model.CHECK_SUM_DELIMITER);
@@ -51,13 +51,13 @@ public class Importer {
 
         long importStartTime = System.currentTimeMillis();
 
-        // Import indexType
+        // Import index_type key@value
         if (Model.INDEX_TYPE.equals(scenes)) {
-            IndexTypeImporter.runIndexType(properties, tiSession);
+            IndexTypeImporter.run(properties, tiSession);
         }
 
         // Traverse all the files that need to be written.
-        List<File> fileList = FileUtil.showFileList(filesPath, false);
+        List<File> fileList = FileUtil.showFileList(importFilePath, false);
         if (fileList != null) {
             TOTAL_IMPORT_FILE_COUNTER.labels("import").inc(fileList.size());
         }
@@ -70,7 +70,7 @@ public class Importer {
         List<String> ttlTypeList = new ArrayList<>(Arrays.asList(ttlType.split(",")));
 
         // Start the Main thread for each file.showFileList.
-        ThreadPoolExecutor threadPoolExecutor = ThreadPoolUtil.startJob(corePoolSize, maxPoolSize, filesPath);
+        ThreadPoolExecutor threadPoolExecutor = ThreadPoolUtil.startJob(corePoolSize, maxPoolSize);
         if (fileList != null) {
             for (File file : fileList) {
                 FileUtil.createFolder(properties.getProperty(Model.CHECK_SUM_FILE_PATH) + "/" + file.getName().replaceAll("\\.", ""));
@@ -100,10 +100,10 @@ public class Importer {
             ThreadPoolExecutor checkSumThreadPoolExecutor;
             String simpleCheckSum = properties.getProperty(Model.SIMPLE_CHECK_SUM);
             if (Model.ON.equals(simpleCheckSum)) {
-                checkSumFilePath = filesPath;
+                checkSumFilePath = importFilePath;
             }
             List<File> checkSumFileList = FileUtil.showFileList(checkSumFilePath, true);
-            checkSumThreadPoolExecutor = ThreadPoolUtil.startJob(checkSumThreadNum, checkSumThreadNum, filesPath);
+            checkSumThreadPoolExecutor = ThreadPoolUtil.startJob(checkSumThreadNum, checkSumThreadNum);
             if (checkSumFileList != null) {
                 TOTAL_CHECK_SUM_FILE_COUNTER.labels("check sum").inc(checkSumFileList.size());
             }
@@ -370,6 +370,7 @@ class BatchPutJob extends Thread {
                                 if (existsValue != null) {
                                     JSONObject existsJSONObject = JSONObject.parseObject(existsValue.toStringUtf8());
                                     existsIndexInfo = JSON.toJavaObject(existsJSONObject, IndexInfo.class);
+                                    // exist time > update time
                                     if (compareTime(existsIndexInfo.getUpdateTime(), indexInfoS.getUpdateTime())) {
                                         auditLog.warn(String.format("Skip key : [ %s ], file is [ %s ], line= %s", indexInfoKey, file.getAbsolutePath(), start + totalCount));
                                         continue;
@@ -381,6 +382,7 @@ class BatchPutJob extends Thread {
                                 if (!existsValue.isEmpty()) {
                                     JSONObject existsJSONObject = JSONObject.parseObject(existsValue.toStringUtf8());
                                     existsIndexInfo = JSON.toJavaObject(existsJSONObject, IndexInfo.class);
+                                    // exist time > update time
                                     if (compareTime(existsIndexInfo.getUpdateTime(), indexInfoS.getUpdateTime())) {
                                         auditLog.warn(String.format("Skip key : [ %s ], file is [ %s ], line= %s", indexInfoKey, file.getAbsolutePath(), start + totalCount));
                                         continue;
@@ -408,20 +410,22 @@ class BatchPutJob extends Thread {
                                 // TiKV tempIndexInfo
                                 TempIndexInfo.initTempIndexInfo(tempIndexInfoT, tempIndexInfoS);
 
-                                existsValue = rawKvClient.get(ByteString.copyFromUtf8(indexInfoKey));
+                                existsValue = kvPairs.get(ByteString.copyFromUtf8(indexInfoKey));
                                 if (!existsValue.isEmpty()) {
                                     JSONObject existsJSONObject = JSONObject.parseObject(existsValue.toStringUtf8());
                                     existsTempIndexInfo = JSON.toJavaObject(existsJSONObject, TempIndexInfo.class);
+                                    // exist time > update time
                                     if (compareTime(existsTempIndexInfo.getUpdateTime(), tempIndexInfoS.getUpdateTime())) {
                                         auditLog.warn(String.format("Skip key - exists: [ %s ], file is [ %s ], line= %s", indexInfoKey, file.getAbsolutePath(), start + totalCount));
                                         continue;
                                     }
                                 }
 
-                                existsValue = kvPairs.get(ByteString.copyFromUtf8(indexInfoKey));
+                                existsValue = rawKvClient.get(ByteString.copyFromUtf8(indexInfoKey));
                                 if (!existsValue.isEmpty()) {
                                     JSONObject existsJSONObject = JSONObject.parseObject(existsValue.toStringUtf8());
                                     existsTempIndexInfo = JSON.toJavaObject(existsJSONObject, TempIndexInfo.class);
+                                    // exist time > update time
                                     if (compareTime(existsTempIndexInfo.getUpdateTime(), tempIndexInfoS.getUpdateTime())) {
                                         auditLog.warn(String.format("Skip key - exists: [ %s ], file is [ %s ], line= %s", indexInfoKey, file.getAbsolutePath(), start + totalCount));
                                         continue;

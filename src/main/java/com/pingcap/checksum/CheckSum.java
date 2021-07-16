@@ -491,7 +491,7 @@ public class CheckSum {
     /**
      * Start check sum
      */
-    public static void startCheckSum(Properties properties, TiSession tiSession, Counter fileCounter) {
+    public static void run(Properties properties, TiSession tiSession, Counter fileCounter) {
 
         long checkStartTime = System.currentTimeMillis();
         String simpleCheckSum = properties.getProperty(Model.SIMPLE_CHECK_SUM);
@@ -503,9 +503,9 @@ public class CheckSum {
         if (!Model.ON.equals(simpleCheckSum)) {
             checkSumFileList = FileUtil.showFileList(checkSumFilePath, true);
         } else {
-            checkSumFileList = FileUtil.showFileList(properties.getProperty(Model.FILE_PATH), true);
+            checkSumFileList = FileUtil.showFileList(properties.getProperty(Model.IMPORT_FILE_PATH), true);
         }
-        ThreadPoolExecutor checkSumThreadPoolExecutor = ThreadPoolUtil.startJob(checkSumThreadNum, checkSumThreadNum, checkSumFilePath);
+        ThreadPoolExecutor checkSumThreadPoolExecutor = ThreadPoolUtil.startJob(checkSumThreadNum, checkSumThreadNum);
         if (checkSumFileList != null) {
             for (File checkSumFile : checkSumFileList) {
                 checkSumThreadPoolExecutor.execute(new CheckSumJsonJob(checkSumFile.getAbsolutePath(), checkSumDelimiter, tiSession, properties, fileCounter));

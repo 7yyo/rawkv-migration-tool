@@ -3,7 +3,6 @@ package com.pingcap;
 import com.pingcap.checksum.CheckSum;
 import com.pingcap.enums.Model;
 import com.pingcap.export.LimitExporter;
-import com.pingcap.export.RegionExporter;
 import com.pingcap.importer.Importer;
 import com.pingcap.metrics.Prometheus;
 import com.pingcap.rawkv.RawKv;
@@ -29,7 +28,7 @@ public class Main {
 
     public static void main(String[] args) throws Exception {
 
-        logger.info("Welcome.");
+        logger.info("Welcome to raw kv bridge.");
 
         String propertiesPath = System.getProperty(Model.P) == null ? PERSONAL_PROPERTIES_PATH : System.getProperty(Model.P);
         Properties properties = PropertiesUtil.getProperties(propertiesPath);
@@ -60,27 +59,17 @@ public class Main {
             if (StringUtils.isNotBlank(task)) {
                 switch (task) {
                     case Model.IMPORT:
-                        Importer.runImporter(properties, tiSession, FILE_COUNTER);
+                        Importer.run(properties, tiSession, FILE_COUNTER);
                         break;
                     case Model.CHECK_SUM:
-                        CheckSum.startCheckSum(properties, tiSession, FILE_COUNTER);
+                        CheckSum.run(properties, tiSession, FILE_COUNTER);
                         break;
                     case Model.EXPORT:
-                        String exportMode = properties.getProperty(Model.EXPORT_MODE);
-                        switch (exportMode) {
-                            case Model.REGION_EXPORT:
-                                RegionExporter.runRegionExporter(properties, tiSession);
-                                break;
-                            case Model.LIMIT_EXPORT:
-                                LimitExporter.runLimitExporter(properties, tiSession);
-                                break;
-                            default:
-                        }
-                        break;
+                        LimitExporter.run(properties, tiSession);
                     default:
                 }
             } else {
-                logger.error(String.format("[%s] can not be empty.", Model.TASK));
+                logger.error("{} can not be empty.", Model.TASK);
             }
         }
         tiSession.close();
