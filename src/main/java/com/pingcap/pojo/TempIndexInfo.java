@@ -70,10 +70,18 @@ public class TempIndexInfo {
         return idC && targetIdC;
     }
 
-    public static void initTempIndexInfo(TempIndexInfo tempIndexInfoT, TempIndexInfo tempIndexInfoS) {
-        // value -
-        // appId、targetId
-        tempIndexInfoT.setAppId(tempIndexInfoS.getAppId());
-        tempIndexInfoT.setTargetId(tempIndexInfoS.getTargetId());
+    /**
+     * value = appId + targetId
+     *
+     * @param tempIndexInfoTiKV      To tikv.
+     * @param tempIndexInfoCassandra From cassandra.
+     */
+    public static void initValueTempIndexInfo(TempIndexInfo tempIndexInfoTiKV, TempIndexInfo tempIndexInfoCassandra) {
+        // appId
+        tempIndexInfoTiKV.setAppId(tempIndexInfoCassandra.getAppId());
+        // target id
+        tempIndexInfoTiKV.setTargetId(tempIndexInfoCassandra.getTargetId());
+        // update time
+        tempIndexInfoTiKV.setUpdateTime(tempIndexInfoCassandra.getUpdateTime());
     }
 }

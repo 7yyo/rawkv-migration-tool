@@ -9,7 +9,6 @@ import com.pingcap.pojo.TempIndexInfo;
 import com.pingcap.timer.CheckSumTimer;
 import com.pingcap.util.FileUtil;
 import com.pingcap.util.ThreadPoolUtil;
-import io.prometheus.client.Counter;
 import io.prometheus.client.Histogram;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.LineIterator;
@@ -29,68 +28,49 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
-/**
- * Data verification, divided into full data verification and percentage sampling data verification
- *
- * @author yuyang
- */
 public class CheckSum {
 
     private static final Logger logger = LoggerFactory.getLogger(Model.LOG);
     private static final Logger checkSumLog = LoggerFactory.getLogger(Model.CHECK_SUM_LOG);
 
-    static final Histogram CHECK_SUM_LATENCY = Histogram.build().name("check_sum_latency_seconds").help("Check sum latency in seconds.").labelNames("check_sum_latency").register();
+    static final Histogram DURATION = Histogram.build().name("everything_duration").help("Duration.").labelNames("type").register();
 
-    /**
-     * Initialize the check sum log file
-     *
-     * @param properties:   Configuration file
-     * @param fileChannel:  NIO
-     * @param originalFile: Original data file
-     * @return fileChannel
-     */
-    public static FileChannel initCheckSumLog(Properties properties, FileChannel fileChannel, File originalFile) {
+    public static FileChannel initCheckSumLog(Map<String, String> properties, File originalFile, int fileNum) {
 
-        String checkSumFilePath = properties.getProperty(Model.CHECK_SUM_FILE_PATH);
-        String checkSumFileName = checkSumFilePath.replaceAll("\"", "") + "/" + originalFile.getName().replaceAll("\\.", "") + "/" + Thread.currentThread().getId() + ".txt";
+        String checkSumFilePath = properties.get(Model.CHECK_SUM_FILE_PATH);
+        String checkSumFileName = checkSumFilePath.replaceAll("\"", "") + "/" + originalFile.getName().replaceAll("\\.", "") + "-" + fileNum + "/" + Thread.currentThread().getId() + ".txt";
 
-        File checkSumFile = new File(checkSumFileName);
+        File checkSumFile = FileUtil.createFile(checkSumFileName);
+        FileOutputStream fileOutputStream;
+        FileChannel fileChannel;
         try {
-            if (checkSumFile.createNewFile()) {
-                FileOutputStream fileOutputStream = new FileOutputStream(checkSumFile);
-                fileChannel = fileOutputStream.getChannel();
-            }
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-
-        try {
+            fileOutputStream = new FileOutputStream(checkSumFile);
+            fileChannel = fileOutputStream.getChannel();
             // The path of the original data file is recorded in the first line of the check sum file, so take it out first
             ByteBuffer originalLine = StandardCharsets.UTF_8.encode(originalFile.getAbsolutePath() + "\n");
             fileChannel.write(originalLine);
-        } catch (
-                IOException e) {
+            return fileChannel;
+        } catch (IOException e) {
             e.printStackTrace();
         }
-        return fileChannel;
+        return null;
     }
 
     /**
      * See detail <html>https://github.com/7yyo/to_tikv/blob/master/src/main/resources/img/checksum.png</html>
      *
-     * @param checkSumFilePath:  check sum file path
-     * @param checkSumDelimiter: check sum file delimiter
+     * @param checkSumFilePath: check sum file path
      */
-    public static void checkSum(String checkSumFilePath, String checkSumDelimiter, TiSession tiSession, Properties properties) {
+    public static void checkSum(String checkSumFilePath, TiSession tiSession, Map<String, String> properties) {
 
         logger.info(String.format("************ Start check sum for [%s] ************", checkSumFilePath));
 
-        long interval = Long.parseLong(properties.getProperty(Model.TIMER_INTERVAL));
-        String importMode = properties.getProperty(Model.MODE);
-        String scenes = properties.getProperty(Model.SCENES);
-        String keyDelimiter = properties.getProperty(Model.KEY_DELIMITER);
-        String delimiter1 = properties.getProperty(Model.DELIMITER_1);
-        String delimiter2 = properties.getProperty(Model.DELIMITER_2);
+        String importMode = properties.get(Model.MODE);
+        String scenes = properties.get(Model.SCENES);
+        String keyDelimiter = properties.get(Model.KEY_DELIMITER);
+        String checkSumDelimiter = properties.get(Model.CHECK_SUM_DELIMITER);
+        String delimiter1 = properties.get(Model.DELIMITER_1);
+        String delimiter2 = properties.get(Model.DELIMITER_2);
 
         int checkParseErrorNum = 0;
         int checkNotInsertErrorNum = 0;
@@ -111,6 +91,7 @@ public class CheckSum {
 
         Timer timer = new Timer();
         CheckSumTimer checkSumTimer = new CheckSumTimer(checkSumFilePath, totalCheckNum, FileUtil.getFileLines(checkSumFile));
+        long interval = Long.parseLong(properties.get(Model.TIMER_INTERVAL));
         timer.schedule(checkSumTimer, 5000, interval);
 
         // CheckSum file iterator
@@ -150,7 +131,7 @@ public class CheckSum {
             // and compare it, not a one-to-many traversal mode.
             while (checkSumFileIt.hasNext()) {
 
-                Histogram.Timer iteTimer = CHECK_SUM_LATENCY.labels("ite duration").startTimer();
+                Histogram.Timer iteTimer = DURATION.labels("ite duration").startTimer();
 
                 originalLineNum = 0;
                 // Total check num
@@ -186,7 +167,7 @@ public class CheckSum {
                     // Begin to comparison original & checkSum
 
                     // Get value by check sum file key
-                    Histogram.Timer checkSumGetTimer = CHECK_SUM_LATENCY.labels("check sum get duration").startTimer();
+                    Histogram.Timer checkSumGetTimer = DURATION.labels("check sum get duration").startTimer();
                     value = rawKvClient.get(ByteString.copyFromUtf8(checkSumKey)).toStringUtf8();
                     checkSumGetTimer.observeDuration();
                     if (value.isEmpty()) {
@@ -227,7 +208,7 @@ public class CheckSum {
                     /*
                       Init original object
                      */
-                    Histogram.Timer eqTimer = CHECK_SUM_LATENCY.labels("eq duration").startTimer();
+                    Histogram.Timer eqTimer = DURATION.labels("eq duration").startTimer();
                     switch (importMode) {
 
                         // Json to jsonObject
@@ -297,24 +278,11 @@ public class CheckSum {
 
     }
 
-    /**
-     * For the full check sum, directly compare with the original data file after the import, and no longer write the sampling check sum file.
-     * Note that when this configuration is 1, no matter how much checkSumPercentage is, the full check sum will be performed
-     *
-     * @param originalFilePath: original file path
-     */
-    public static void simpleCheckSum(String originalFilePath, TiSession tiSession, Properties properties) {
+    public static void doRedo(String originalFilePath, TiSession tiSession, Map<String, String> properties) {
 
-        logger.info(String.format("************ Start simple check sum for [%s] ************", originalFilePath));
+        logger.info("************ Start to redo for {} ************", originalFilePath);
 
-        long interval = Long.parseLong(properties.getProperty(Model.TIMER_INTERVAL));
-        String importMode = properties.getProperty(Model.MODE);
-        String scenes = properties.getProperty(Model.SCENES);
-        String delimiter1 = properties.getProperty(Model.DELIMITER_1);
-        String delimiter2 = properties.getProperty(Model.DELIMITER_2);
-        String keyDelimiter = properties.getProperty(Model.KEY_DELIMITER);
-        String envId = properties.getProperty(Model.ENV_ID);
-        String ttlType = properties.getProperty(Model.TTL_TYPE);
+        long interval = Long.parseLong(properties.get(Model.TIMER_INTERVAL));
 
         int checkParseErrorNum = 0;
         int checkNotInsertErrorNum = 0;
@@ -322,8 +290,6 @@ public class CheckSum {
         AtomicInteger totalCheckNum = new AtomicInteger(0);
 
         RawKVClient rawKvClient = tiSession.createRawClient();
-
-        JSONObject jsonObject;
 
         File originalFile = new File(originalFilePath);
         String originalLine;
@@ -347,13 +313,22 @@ public class CheckSum {
         String key;
         String value;
 
+        String importMode = properties.get(Model.MODE);
+        String scenes = properties.get(Model.SCENES);
+
+        String keyDelimiter = properties.get(Model.KEY_DELIMITER);
+        String delimiter1 = properties.get(Model.DELIMITER_1);
+        String delimiter2 = properties.get(Model.DELIMITER_2);
+
+        String envId = properties.get(Model.ENV_ID);
+        String ttlType = properties.get(Model.TTL_TYPE);
+
+        JSONObject jsonObject;
         if (originalFileIt != null) {
-
             while (originalFileIt.hasNext()) {
-
                 totalCheckNum.addAndGet(1);
 
-                Histogram.Timer iteTimer = CHECK_SUM_LATENCY.labels("ite duration").startTimer();
+                Histogram.Timer iteTimer = DURATION.labels("ite duration").startTimer();
                 originalLine = originalFileIt.nextLine();
                 iteTimer.observeDuration();
 
@@ -361,28 +336,21 @@ public class CheckSum {
                 Init original object
                  */
                 switch (importMode) {
-
                     case Model.JSON_FORMAT:
-
                         jsonObject = JSONObject.parseObject(originalLine);
-
                         switch (scenes) {
-
                             case Model.INDEX_INFO:
-
                                 try {
-
                                     indexInfoOriginal = JSON.toJavaObject(jsonObject, IndexInfo.class);
-
                                     // key = indexInfo_:_{envid}_:_{type}_:_{id}
                                     key = String.format(IndexInfo.INDEX_INFO_KET_FORMAT, envId, indexInfoOriginal.getType(), indexInfoOriginal.getId());
+
                                     if (ttlType.contains(key.split(keyDelimiter)[2])) {
                                         continue;
                                     }
 
                                     IndexInfo.key2IndexInfo(indexInfoOriginal, key, keyDelimiter);
-
-                                    Histogram.Timer checkSumGetTimer = CHECK_SUM_LATENCY.labels("check sum get duration").startTimer();
+                                    Histogram.Timer checkSumGetTimer = DURATION.labels("check sum get duration").startTimer();
                                     value = rawKvClient.get(ByteString.copyFromUtf8(key)).toStringUtf8();
                                     checkSumGetTimer.observeDuration();
 
@@ -392,7 +360,7 @@ public class CheckSum {
                                         continue;
                                     }
 
-                                    Histogram.Timer eqTimer = CHECK_SUM_LATENCY.labels("eq duration").startTimer();
+                                    Histogram.Timer eqTimer = DURATION.labels("eq duration").startTimer();
                                     jsonObject = JSONObject.parseObject(value);
                                     indexInfoRawKv = JSON.toJavaObject(jsonObject, IndexInfo.class);
                                     IndexInfo.key2IndexInfo(indexInfoRawKv, key, keyDelimiter);
@@ -427,7 +395,7 @@ public class CheckSum {
                                         continue;
                                     }
 
-                                    Histogram.Timer eqTimer = CHECK_SUM_LATENCY.labels("eq duration").startTimer();
+                                    Histogram.Timer eqTimer = DURATION.labels("eq duration").startTimer();
                                     jsonObject = JSONObject.parseObject(value);
                                     tempIndexInfoRawKv = JSON.toJavaObject(jsonObject, TempIndexInfo.class);
                                     TempIndexInfo.key2TempIndexInfo(tempIndexInfoRawKv, key, keyDelimiter);
@@ -462,7 +430,7 @@ public class CheckSum {
                                 continue;
                             }
 
-                            Histogram.Timer eqTimer = CHECK_SUM_LATENCY.labels("eq duration").startTimer();
+                            Histogram.Timer eqTimer = DURATION.labels("eq duration").startTimer();
                             jsonObject = JSONObject.parseObject(value);
                             indexInfoRawKv = JSON.toJavaObject(jsonObject, IndexInfo.class);
                             if (!indexInfoRawKv.equals(indexInfoOriginal)) {
@@ -491,39 +459,36 @@ public class CheckSum {
     /**
      * Start check sum
      */
-    public static void run(Properties properties, TiSession tiSession, Counter fileCounter) {
+    public static void run(Map<String, String> properties, TiSession tiSession) {
 
         long checkStartTime = System.currentTimeMillis();
-        String simpleCheckSum = properties.getProperty(Model.SIMPLE_CHECK_SUM);
-        String checkSumFilePath = properties.getProperty(Model.CHECK_SUM_FILE_PATH);
-        String checkSumDelimiter = properties.getProperty(Model.CHECK_SUM_DELIMITER);
-        int checkSumThreadNum = Integer.parseInt(properties.getProperty(Model.CHECK_SUM_THREAD_NUM));
+        String simpleCheckSum = properties.get(Model.SIMPLE_CHECK_SUM);
+        String checkSumFilePath = properties.get(Model.CHECK_SUM_FILE_PATH);
+        int checkSumThreadNum = Integer.parseInt(properties.get(Model.CHECK_SUM_THREAD_NUM));
         List<File> checkSumFileList;
 
         if (!Model.ON.equals(simpleCheckSum)) {
-            checkSumFileList = FileUtil.showFileList(checkSumFilePath, true);
+            checkSumFileList = FileUtil.showFileList(checkSumFilePath);
         } else {
-            checkSumFileList = FileUtil.showFileList(properties.getProperty(Model.IMPORT_FILE_PATH), true);
+            checkSumFileList = FileUtil.showFileList(properties.get(Model.IMPORT_FILE_PATH));
         }
         ThreadPoolExecutor checkSumThreadPoolExecutor = ThreadPoolUtil.startJob(checkSumThreadNum, checkSumThreadNum);
-        if (checkSumFileList != null) {
-            for (File checkSumFile : checkSumFileList) {
-                checkSumThreadPoolExecutor.execute(new CheckSumJsonJob(checkSumFile.getAbsolutePath(), checkSumDelimiter, tiSession, properties, fileCounter));
-            }
-        } else {
-            logger.error(String.format("Check sum file [%s] is not exists!", checkSumFilePath));
-            return;
+        for (File checkSumFile : checkSumFileList) {
+            checkSumThreadPoolExecutor.execute(new CheckSumJsonJob(checkSumFile.getAbsolutePath(), tiSession, properties));
         }
+
         checkSumThreadPoolExecutor.shutdown();
+
         try {
             if (checkSumThreadPoolExecutor.awaitTermination(Long.MAX_VALUE, TimeUnit.SECONDS)) {
                 long duration = System.currentTimeMillis() - checkStartTime;
-                logger.info(String.format("All files check sum is complete! It takes [%s] seconds", (duration / 1000)));
+                logger.info("All files check sum is complete! It takes {} seconds", (duration / 1000));
                 System.exit(0);
             }
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
+
     }
 
 }

@@ -2,78 +2,72 @@ package com.pingcap;
 
 import com.pingcap.checksum.CheckSum;
 import com.pingcap.enums.Model;
-import com.pingcap.export.LimitExporter;
+import com.pingcap.export.Exporter;
 import com.pingcap.importer.Importer;
 import com.pingcap.metrics.Prometheus;
 import com.pingcap.rawkv.RawKv;
 import com.pingcap.util.*;
-import io.prometheus.client.Counter;
 import org.apache.commons.lang.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.tikv.common.TiSession;
 
-import java.util.Properties;
+import java.util.Map;
 
-/**
- * @author yuyang
- * <p>
- * The entrance of the data migration tool currently implements full data import, full data export, full or sampled data verification, and some other APIs
- */
 public class Main {
 
     private static final Logger logger = LoggerFactory.getLogger(Model.LOG);
-    private static final String PERSONAL_PROPERTIES_PATH = "src/main/resources/importer.properties";
-    static final Counter FILE_COUNTER = Counter.build().name("file_counter").help("File counter.").labelNames("file_counter").register();
+    private static final String PERSONAL_PROPERTIES_PATH = "src/main/resources/rawkv.properties";
 
     public static void main(String[] args) throws Exception {
 
-        logger.info("Welcome to raw kv bridge.");
+        logger.info("Welcome to Raw KV Migration tool.");
 
         String propertiesPath = System.getProperty(Model.P) == null ? PERSONAL_PROPERTIES_PATH : System.getProperty(Model.P);
-        Properties properties = PropertiesUtil.getProperties(propertiesPath);
+        Map<String, String> properties = PropertiesUtil.getProperties(propertiesPath);
         TiSession tiSession = TiSessionUtil.getTiSession(properties);
 
         // Some API.
-        if (System.getProperty(Model.M) != null) {
+        if (!StringUtils.isEmpty(System.getProperty(Model.M))) {
             switch (System.getProperty(Model.M)) {
                 case Model.GET:
                     RawKv.get(tiSession, System.getProperty(Model.K));
-                    break;
-                case Model.CHECK:
-                    RawKv.batchGetCheck(System.getProperty(Model.F), tiSession, properties);
                     break;
                 case Model.TRUNCATE:
                     RawKv.truncateRawKv(tiSession);
                     break;
                 default:
+                    throw new IllegalStateException(System.getProperty(Model.M));
             }
         } else {
-            // Full import, export, data verification
-            String task = properties.getProperty(Model.TASK);
-            String prometheusEnable = properties.getProperty(Model.PROMETHEUS_ENABLE);
-            int prometheusPort = Integer.parseInt(properties.getProperty(Model.PROMETHEUS_PORT));
+            // Full import, full export, data verification
+            String task = properties.get(Model.TASK);
+            String prometheusEnable = properties.get(Model.PROMETHEUS_ENABLE);
+            int prometheusPort = Integer.parseInt(properties.get(Model.PROMETHEUS_PORT));
             if (Model.ON.equals(prometheusEnable)) {
                 Prometheus.initPrometheus(prometheusPort);
             }
-            if (StringUtils.isNotBlank(task)) {
+            if (!StringUtils.isEmpty(task)) {
                 switch (task) {
                     case Model.IMPORT:
-                        Importer.run(properties, tiSession, FILE_COUNTER);
+                        Importer.run(properties, tiSession);
                         break;
                     case Model.CHECK_SUM:
-                        CheckSum.run(properties, tiSession, FILE_COUNTER);
+                        CheckSum.run(properties, tiSession);
                         break;
                     case Model.EXPORT:
-                        LimitExporter.run(properties, tiSession);
+                        Exporter.run(properties, tiSession);
                     default:
+                        throw new IllegalStateException(task);
                 }
             } else {
-                logger.error("{} can not be empty.", Model.TASK);
+                logger.error("{} cannot be empty.", Model.TASK);
             }
         }
+
         tiSession.close();
         System.exit(0);
+
     }
 
 }

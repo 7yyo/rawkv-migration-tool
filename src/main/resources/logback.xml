@@ -46,6 +46,19 @@
             <MaxFileSize>100MB</MaxFileSize>
         </triggeringPolicy>
     </appender>
+    <appender name="redo" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <encoder>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss} [%p][%M][%L]-> %m%n</pattern>
+            <charset>utf-8</charset>
+        </encoder>
+        <file>./redo.log</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.FixedWindowRollingPolicy">
+            <fileNamePattern>./toTiKV.log.%i</fileNamePattern>
+        </rollingPolicy>
+        <triggeringPolicy class="ch.qos.logback.core.rolling.SizeBasedTriggeringPolicy">
+            <MaxFileSize>100MB</MaxFileSize>
+        </triggeringPolicy>
+    </appender>
 
     <logger name="logger" level="INFO" additivity="true">
         <appender-ref ref="log"/>
@@ -57,6 +70,10 @@
 
     <logger name="checkSumLog" level="INFO" additivity="true">
         <appender-ref ref="checkSum"/>
+    </logger>
+
+    <logger name="redoLog" level="INFO" additivity="true">
+        <appender-ref ref="redo"/>
     </logger>
 
     <root level="ERROR">

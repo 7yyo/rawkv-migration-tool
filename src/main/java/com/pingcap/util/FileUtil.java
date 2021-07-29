@@ -7,70 +7,58 @@ import org.slf4j.LoggerFactory;
 import java.io.*;
 import java.util.*;
 
-/**
- * @author yuyang
- */
 public class FileUtil {
 
     private static final Logger logger = LoggerFactory.getLogger(Model.LOG);
 
-    private static final List<File> LIST = new ArrayList<>();
-    private static final List<File> CHECK_SUM_LIST = new ArrayList<>();
-
-    public static List<File> showFileList(String filePath, boolean isCheckSum) {
-        List<File> fileList = FileUtil.loadDirectory(new File(filePath), isCheckSum);
+    public static List<File> showFileList(String filePath) {
+        List<File> totalFileList = new ArrayList<>();
+        List<File> fileList = loadDirectory(new File(filePath), totalFileList);
         if (fileList == null) {
-            logger.warn(String.format("There are no files in this path [%s]", filePath));
-            return null;
+            logger.warn("There are no files in this path {}", filePath);
+            System.exit(0);
         } else {
             for (int i = 0; i < fileList.size(); i++) {
-                logger.info(String.format("No.%s-[%s]", i + 1, fileList.get(i).getAbsolutePath()));
+                logger.info("No.{}={}", i + 1, fileList.get(i).getAbsolutePath());
             }
         }
-        logger.info(String.format("Need to process the above files, total=[%s]", fileList.size()));
+        logger.info("The above files will be processed, total={}", fileList.size());
         return fileList;
     }
 
-    public static List<File> loadDirectory(File fileList, boolean isCheckSum) {
+    public static List<File> loadDirectory(File fileList, List<File> totalFileList) {
         File[] files = fileList.listFiles();
         if (files == null) {
-            logger.error("There is no file in this file path!");
+            logger.error("There is no file in this path {}", fileList);
             return null;
         }
-        List<File> insideFiles = new ArrayList<>();
+        List<File> insideFilesList = new ArrayList<>();
         for (File file : files) {
             if (file.isDirectory()) {
-                insideFiles.add(file);
+                insideFilesList.add(file);
             } else {
-                if (isCheckSum) {
-                    CHECK_SUM_LIST.add(file);
-                } else {
-                    LIST.add(file);
-                }
+                totalFileList.add(file);
             }
         }
-        for (File file : insideFiles) {
-            loadDirectory(file, isCheckSum);
+        for (File file : insideFilesList) {
+            loadDirectory(file, totalFileList);
         }
-        if (isCheckSum) {
-            return CHECK_SUM_LIST;
-        } else {
-            return LIST;
-        }
+        return totalFileList;
     }
 
     public static int getFileLines(File file) {
+        FileReader fileReader;
         int lines = 0;
         try {
-            FileReader in = new FileReader(file);
-            LineNumberReader reader = new LineNumberReader(in);
-            long n = reader.skip(Long.MAX_VALUE);
-            logger.debug(String.format("Skip line = [%s]", n));
-            lines = reader.getLineNumber();
+            fileReader = new FileReader(file);
+            LineNumberReader lineNumberReader = new LineNumberReader(fileReader);
+            long characters = lineNumberReader.skip(Long.MAX_VALUE);
+            logger.debug("Skip characters={}, file={}", characters, file);
+            lines = lineNumberReader.getLineNumber();
             if (!isLinux()) {
                 lines++;
             }
-            reader.close();
+            lineNumberReader.close();
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -85,32 +73,45 @@ public class FileUtil {
         return ttlTypeCountMap;
     }
 
-    public static void deleteFolder(String filePath) {
-        File deleteFilePath = new File(filePath);
-        File[] files = deleteFilePath.listFiles();
-        if (files == null) {
-            logger.warn("This folder [checkSum/batchPutErr] no need to delete!");
+    public static synchronized void createFolder(String folderPath) {
+        File checkSumFolder = new File(folderPath);
+        if (checkSumFolder.exists()) {
             return;
         }
-        for (File file : files) {
+        if (!checkSumFolder.mkdir()) {
+            logger.error("Failed to mkdir folder={}", folderPath);
+        }
+    }
+
+    public static void deleteFolder(String folderPath) {
+        File deleteFolder = new File(folderPath);
+        File[] fileList = deleteFolder.listFiles();
+        if (fileList == null) {
+            return;
+        }
+        for (File file : fileList) {
             if (!file.isDirectory()) {
                 if (!file.delete()) {
-                    logger.error(String.format("Delete folder [%s] failed.", file.getAbsolutePath()));
+                    logger.error("Failed to delete file={}", file);
                 }
             } else {
                 deleteFolder(file.getAbsolutePath());
             }
         }
-        if (!deleteFilePath.delete()) {
-            logger.error(String.format("Delete folder [%s] failed.", deleteFilePath.getAbsolutePath()));
+        if (!deleteFolder.delete()) {
+            logger.error("Failed to delete folder={}", folderPath);
         }
     }
 
-    public static void createFolder(String filePath) {
-        File checkSumFolder = new File(filePath);
-        if (!checkSumFolder.mkdir()) {
-            logger.error(String.format("Failed to mkdir check sum file, folder path = [%s]", filePath));
+    public static File createFile(String filePath) {
+        File file = new File(filePath);
+        try {
+            boolean result = file.createNewFile();
+            logger.debug("Result=" + result);
+        } catch (IOException e) {
+            e.printStackTrace();
         }
+        return file;
     }
 
     public static boolean isLinux() {

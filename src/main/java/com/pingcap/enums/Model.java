@@ -7,27 +7,30 @@ public class Model {
 
     public static final String IMPORT = "import";
     public static final String CHECK_SUM = "checkSum";
+
     public static final String JSON_FORMAT = "json";
     public static final String CSV_FORMAT = "csv";
+
     public static final String ON = "true";
+    public static final Integer COMPLETE = 1;
 
     public static final String P = "p";
     public static final String M = "m";
     public static final String K = "k";
-    public static final String F = "f";
 
     public static final String GET = "get";
     public static final String TRUNCATE = "truncate";
-    public static final String CHECK = "check";
     public static final String EXPORT = "export";
 
     public static final String INDEX_INFO = "indexInfo";
     public static final String TEMP_INDEX_INFO = "tempIndexInfo";
     public static final String INDEX_TYPE = "indexType";
+    public static final String INDEX_TYPE_DELIMITER = "@";
 
     public static final String LOG = "logger";
     public static final String CHECK_SUM_LOG = "checkSumLog";
     public static final String AUDIT_LOG = "auditLog";
+    public static final String REDO_LOG = "redoLog";
 
     public static final String TASK = "tikv.task";
     public static final String PD = "importer.tikv.pd";
@@ -45,7 +48,7 @@ public class Model {
     public static final String IMPORT_FILE_PATH = "importer.in.filePath";
     public static final String MODE = "importer.in.mode";
     public static final String SCENES = "importer.in.scenes";
-    public static final String BATCH_PUT_ERR_FILE_PATH = "importer.in.batchPutErrFilePath";
+    public static final String REDO_FILE_PATH = "importer.in.batchPutErrFilePath";
     public static final String DELIMITER_1 = "importer.in.delimiter_1";
     public static final String DELIMITER_2 = "importer.in.delimiter_2";
     public static final String KEY_DELIMITER = "importer.in.keyDelimiter";

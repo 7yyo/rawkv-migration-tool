@@ -19,9 +19,9 @@ public class Prometheus {
         try {
             new HTTPServer(prometheusPort);
             DefaultExports.initialize();
-            logger.info(String.format("Successfully run prometheus metrics! Port=[%s]", prometheusPort));
+            logger.info(String.format("Successfully run prometheus metrics! Port[%s]", prometheusPort));
         } catch (IOException e) {
-            logger.error(String.format("Failed to run prometheus metrics! port=[%s]", prometheusPort), e);
+            logger.error(String.format("Failed to run prometheus metrics! port[%s]", prometheusPort), e);
             System.exit(0);
         }
     }

@@ -1,21 +1,19 @@
 package com.pingcap.rawkv;
 
 import com.pingcap.enums.Model;
+import com.pingcap.util.FileUtil;
 import io.prometheus.client.Counter;
 import io.prometheus.client.Histogram;
-import org.apache.commons.io.FileUtils;
-import org.apache.commons.io.LineIterator;
 import org.apache.commons.lang.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.tikv.common.TiSession;
-import org.tikv.common.key.Key;
-import org.tikv.common.region.TiRegion;
 import org.tikv.kvproto.Kvrpcpb;
 import org.tikv.raw.RawKVClient;
 import org.tikv.shade.com.google.protobuf.ByteString;
 
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.channels.FileChannel;
@@ -23,10 +21,6 @@ import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
-
-/**
- * @author yuyang
- */
 public class RawKv {
 
     private static final Logger logger = LoggerFactory.getLogger(Model.LOG);
@@ -36,66 +30,45 @@ public class RawKv {
     static final Counter BATCH_PUT_FAIL_COUNTER = Counter.build().name("batch_put_fail_counter").help("Batch put fail counter.").labelNames("batch_put_fail").register();
     static final Histogram REQUEST_LATENCY = Histogram.build().name("requests_latency_seconds").help("Request latency in seconds.").labelNames("request_latency").register();
 
-    /**
-     * When the maximum value or batchsize that should be processed is reached, the batch put process is executed
-     *
-     * @param totalCount:             The total number of traversed by the current thread
-     * @param todo:                   The number of items that this thread should handle
-     * @param count:                  Number of loop processing
-     * @param batchSize:              Number of batches
-     * @param kvPairs:                Kv map to be processed
-     * @param kvList:                 Record kv
-     * @param file:                   Raw data file
-     * @param totalLineCount:         The total number of rows that should be processed
-     * @param totalSkipCount:         Total number of skipped rows
-     * @param totalBatchPutFailCount: The total number of failed batch put
-     * @param totalLine:              The total number of rows inserted
-     * @return Count after clearing
-     */
-    public static int batchPut(int totalCount, int todo, int count, int batchSize, RawKVClient rawKvClient, HashMap<ByteString, ByteString> kvPairs, List<String> kvList, File file, AtomicInteger totalLineCount, AtomicInteger totalSkipCount, AtomicInteger totalBatchPutFailCount, int totalLine, Properties properties, FileChannel fileChannel) {
 
+    public static int batchPut(int totalCount, int todo, int count, int batchSize, RawKVClient rawKvClient, HashMap<ByteString, ByteString> kvPairs, List<String> fileLineList, File file, AtomicInteger totalLineCount, AtomicInteger totalSkipCount, AtomicInteger totalBatchPutFailCount, int totalLine, Map<String, String> properties) {
         if (totalCount == todo || count == batchSize) {
-
-            String importMode = properties.getProperty(Model.MODE);
-            long ttl = Long.parseLong(properties.getProperty(Model.TTL_DAY));
-
-            // Only json file skip exists key.
-            if (Model.JSON_FORMAT.equals(importMode)) {
-
-//                if (Model.ON.equals(properties.getProperty(Model.CHECK_EXISTS_KEY))) {
-                List<ByteString> list = new ArrayList<>(kvPairs.keySet());
-                if (Model.ON.equals(properties.getProperty(Model.DELETE_FOR_TEST))) {
-                    REQUEST_COUNTER.labels("batch delete").inc();
-                    Histogram.Timer batchDeleteTimer = REQUEST_LATENCY.labels("batch delete").startTimer();
-                    rawKvClient.batchDelete(list);
-                    batchDeleteTimer.observeDuration();
-                }
-//                Histogram.Timer batchGetTimer = REQUEST_LATENCY.labels("batch get").startTimer();
-//                List<Kvrpcpb.KvPair> haveList = new ArrayList<>();
-//                try {
-//                    haveList = rawKvClient.batchGet(list);
-//                } catch (Exception e) {
-//                    logger.error(String.format("Failed to batch get in data file[%s]", file.getAbsolutePath()), e);
-//                }
-//                batchGetTimer.observeDuration();
-//                REQUEST_COUNTER.labels("batch get").inc();
-//                for (Kvrpcpb.KvPair kv : haveList) {
-//                    Histogram.Timer deleteTimer = REQUEST_LATENCY.labels("delete").startTimer();
-//                    kvPairs.remove(kv.getKey());
-//                    deleteTimer.observeDuration();
-//                    auditLog.warn(String.format("Skip key - exists: [ %s ], file is [ %s ], almost line= %s", kv.getKey().toStringUtf8(), file.getAbsolutePath(), totalLine));
-//                }
-//                totalSkipCount.addAndGet(haveList.size());
-//                }
-            }
-
+//            logger.info("start batch put. {}=={},{}=={}", totalCount, todo, count, batchSize);
             if (!kvPairs.isEmpty()) {
+
+                // Only json file skip exists key.
+                String importMode = properties.get(Model.MODE);
+                if (Model.JSON_FORMAT.equals(importMode)) {
+
+                    // For batch get to check exists kv
+                    List<ByteString> kvList = new ArrayList<>(kvPairs.keySet());
+                    // Just for test
+                    if (Model.ON.equals(properties.get(Model.DELETE_FOR_TEST))) {
+                        REQUEST_COUNTER.labels("batch delete").inc();
+                        Histogram.Timer batchDeleteTimer = REQUEST_LATENCY.labels("batch delete").startTimer();
+                        rawKvClient.batchDelete(kvList);
+                        batchDeleteTimer.observeDuration();
+                    }
+
+                    // Batch get from raw kv.
+                    Histogram.Timer batchGetTimer = REQUEST_LATENCY.labels("batch get").startTimer();
+                    List<Kvrpcpb.KvPair> kvHaveList = rawKvClient.batchGet(kvList);
+                    batchGetTimer.observeDuration();
+
+                    for (Kvrpcpb.KvPair kv : kvHaveList) {
+                        kvPairs.remove(kv.getKey());
+                        auditLog.warn("Skip exists key[{}], file[{}], almost line[{}]", kv.getKey().toStringUtf8(), file.getAbsolutePath(), totalLine);
+                    }
+                    totalSkipCount.addAndGet(kvHaveList.size());
+                }
+
+                long ttl = Long.parseLong(properties.get(Model.TTL_DAY));
                 try {
                     Histogram.Timer batchPutTimer = REQUEST_LATENCY.labels("batch put").startTimer();
-                    if (Model.INDEX_INFO.equals(properties.getProperty(Model.SCENES))) {
+                    if (Model.INDEX_INFO.equals(properties.get(Model.SCENES))) {
                         rawKvClient.batchPut(kvPairs);
                         REQUEST_COUNTER.labels("batch put").inc();
-                    } else if (Model.TEMP_INDEX_INFO.equals(properties.getProperty(Model.SCENES))) {
+                    } else if (Model.TEMP_INDEX_INFO.equals(properties.get(Model.SCENES))) {
                         rawKvClient.batchPut(kvPairs, ttl);
                         REQUEST_COUNTER.labels("batch put").inc();
                     }
@@ -103,22 +76,25 @@ public class RawKv {
                     totalLineCount.addAndGet(kvPairs.size());
                 } catch (Exception e) {
                     BATCH_PUT_FAIL_COUNTER.labels("batch put fail").inc();
-                    for (String kv : kvList) {
+                    // If batch put fails, record the failed batch put data under this path
+                    FileChannel batchPutErrFileChannel = RawKv.initBatchPutErrLog(properties, file);
+                    for (String kv : fileLineList) {
                         try {
                             // When batch put fails, record the kv pairs that failed batch put
-                            fileChannel.write(StandardCharsets.UTF_8.encode(kv + "\n"));
+                            batchPutErrFileChannel.write(StandardCharsets.UTF_8.encode(kv + "\n"));
                         } catch (IOException ioException) {
                             ioException.printStackTrace();
                         }
                     }
                     totalBatchPutFailCount.addAndGet(kvPairs.size());
-                    logger.error(String.format("Failed to batch put in data file[%s]", file.getAbsolutePath()), e);
+                    logger.error("Failed to batch put, file={}", file.getAbsolutePath(), e);
                 } finally {
                     kvPairs.clear();
-                    kvList.clear();
+                    fileLineList.clear();
                     count = 0;
                 }
             }
+//            logger.info("Batch put finish. Count = {}", count);
         }
         return count;
     }
@@ -128,22 +104,27 @@ public class RawKv {
      *
      * @param originalFile: The original file name should be included in the log name
      */
-    public static FileChannel initBatchPutErrLog(Properties properties, FileChannel fileChannel, File originalFile) {
+    public static FileChannel initBatchPutErrLog(Map<String, String> properties, File originalFile) {
 
-        String batchPutErrFilePath = properties.getProperty(Model.BATCH_PUT_ERR_FILE_PATH);
-        String batchPutErrFileName = batchPutErrFilePath.replaceAll("\"", "") + "/" + originalFile.getName().replaceAll("\\.", "") + "/" + Thread.currentThread().getId() + ".txt";
+        // If first batch put fail, create redo folder.
+        String redoFolderPath = properties.get(Model.REDO_FILE_PATH);
+        FileUtil.createFolder(redoFolderPath);
 
-        File batchPutErrFile = new File(batchPutErrFileName);
+        // Redo inside folder
+        String redoFolderInPath = redoFolderPath.replaceAll("\"", "") + "/" + originalFile.getName().replaceAll("\\.", "");
+        FileUtil.createFolder(redoFolderInPath);
+
+        String redoFileName = redoFolderPath.replaceAll("\"", "") + "/" + originalFile.getName().replaceAll("\\.", "") + "/" + Thread.currentThread().getId() + ".txt";
+        File redoFile = FileUtil.createFile(redoFileName);
+
+        FileChannel redoFileChannel = null;
         try {
-            batchPutErrFile.getParentFile().mkdirs();
-            batchPutErrFile.createNewFile();
-            FileOutputStream fileOutputStream = new FileOutputStream(new File(batchPutErrFileName));
-            fileChannel = fileOutputStream.getChannel();
-        } catch (IOException e) {
-            e.printStackTrace();
+            FileOutputStream fileOutputStream = new FileOutputStream(redoFile);
+            redoFileChannel = fileOutputStream.getChannel();
+        } catch (FileNotFoundException fileNotFoundException) {
+            fileNotFoundException.printStackTrace();
         }
-
-        return fileChannel;
+        return redoFileChannel;
     }
 
     /**
@@ -152,92 +133,26 @@ public class RawKv {
      * @param key: The key to be queried
      */
     public static void get(TiSession tiSession, String key) {
-        if (StringUtils.isBlank(key)) {
-            logger.info("key cannot be empty.");
-            return;
+        if (StringUtils.isEmpty(key)) {
+            logger.warn("Please enter the key, the key cannot be empty.");
+        } else {
+            RawKVClient rawKvClient = tiSession.createRawClient();
+            String value = rawKvClient.get(ByteString.copyFromUtf8(key)).toStringUtf8();
+            logger.info("Key={}, Value={}", key, value);
+            rawKvClient.close();
         }
-        RawKVClient rawKvClient = tiSession.createRawClient();
-        String value = rawKvClient.get(ByteString.copyFromUtf8(key)).toStringUtf8();
-        logger.info(String.format("K[%s] => V[%s]", key, value));
-        rawKvClient.close();
-    }
-
-    /**
-     * Obtain the corresponding data in raw kv from the original data file and output it to the corresponding path
-     *
-     * @param filePath: The specific path of the data file
-     */
-    public static void batchGetCheck(String filePath, TiSession tiSession, Properties properties) {
-        RawKVClient rawKvClient = tiSession.createRawClient();
-        File file = new File(filePath);
-        List<ByteString> keyList = new ArrayList<>();
-        LineIterator lineIterator = null;
-        try {
-            lineIterator = FileUtils.lineIterator(file, "UTF-8");
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-        if (lineIterator != null) {
-            lineIterator.nextLine();
-            logger.info(String.format("Start to verify the data of [%s]", filePath));
-            String line;
-            ByteString key;
-            while (lineIterator.hasNext()) {
-                line = lineIterator.nextLine().split(properties.getProperty(Model.CHECK_SUM_DELIMITER))[0];
-                key = ByteString.copyFromUtf8(line);
-                keyList.add(key);
-            }
-        }
-        List<Kvrpcpb.KvPair> kvPairs = rawKvClient.batchGet(keyList);
-        String newFileName = file.getAbsolutePath() + "_check_sum.txt";
-        File newFile = new File(newFileName);
-        try {
-            newFile.createNewFile();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-        logger.info(String.format("The data content in tikv has been queried according to the path file, and it is being written to the same level directory of [%s].", filePath));
-        String newLine;
-        for (Kvrpcpb.KvPair kv : kvPairs) {
-            newLine = String.format("key=%s, value=%s\n", kv.getKey().toStringUtf8(), kv.getValue().toStringUtf8());
-            try {
-                FileUtils.write(newFile, newLine, "utf-8");
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-        }
-        rawKvClient.close();
     }
 
     /**
      * Clear all data in raw KV
      */
     public static void truncateRawKv(TiSession tiSession) {
-        logger.info("Start to clear all data in raw kv...");
+        logger.info("Start to truncate raw kv...");
         RawKVClient rawKvClient = tiSession.createRawClient();
         long startTime = System.currentTimeMillis();
         rawKvClient.deleteRange(ByteString.EMPTY, ByteString.EMPTY);
         rawKvClient.close();
-        logger.info(String.format("Cleaned up! duration=[%s]s", (System.currentTimeMillis() - startTime) / 1000));
-    }
-
-    /**
-     * Get the region list in raw kv at the moment
-     *
-     * @return region list: The region list in raw kv at the moment
-     */
-    public static List<TiRegion> getTiRegionList(TiSession tiSession) {
-        List<TiRegion> regionList = new ArrayList<>();
-        ByteString key = ByteString.EMPTY;
-        boolean isStart = true;
-        TiRegion tiRegion;
-        while (isStart || !key.isEmpty()) {
-            isStart = false;
-            tiRegion = tiSession.getRegionManager().getRegionByKey(key);
-            regionList.add(tiRegion);
-            key = Key.toRawKey(tiRegion.getEndKey()).toByteString();
-        }
-        return regionList;
+        logger.info("Truncate complete. Duration={}s", (System.currentTimeMillis() - startTime) / 1000);
     }
 
 }

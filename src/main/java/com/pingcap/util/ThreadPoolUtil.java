@@ -16,7 +16,7 @@ public class ThreadPoolUtil {
                 maxPoolSize,
                 0,
                 TimeUnit.SECONDS,
-                new LinkedBlockingDeque<Runnable>(maxPoolSize),
+                new LinkedBlockingDeque<>(maxPoolSize),
                 new ThreadFactoryBuilder().setDaemon(true).build(),
                 new ThreadPoolExecutor.CallerRunsPolicy());
     }
