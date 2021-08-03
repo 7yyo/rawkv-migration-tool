@@ -159,6 +159,7 @@ class ExportJob implements Runnable {
             }
             String key = kvPairList.get(i).getKey().toStringUtf8();
             String value = kvPairList.get(i).getValue().toStringUtf8();
+            System.out.println(key + "===" + value);
             String json;
             if (key.startsWith(INDEX_INFO_PREFIX)) {
                 jsonObject = JSONObject.parseObject(value);

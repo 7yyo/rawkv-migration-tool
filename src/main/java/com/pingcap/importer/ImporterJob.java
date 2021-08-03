@@ -20,7 +20,7 @@ public class ImporterJob implements Runnable {
     private final String importFilePath;
     private final Map<String, String> properties;
     private final TiSession tiSession;
-    private final int checkSumFilePathNum;
+//    private final int checkSumFilePathNum;
 
     private final AtomicInteger totalImportCount = new AtomicInteger(0);
     private final AtomicInteger totalSkipCount = new AtomicInteger(0);
@@ -28,11 +28,11 @@ public class ImporterJob implements Runnable {
     private final AtomicInteger totalBatchPutFailCount = new AtomicInteger(0);
     private final AtomicInteger totalDuplicateCount = new AtomicInteger(0);
 
-    public ImporterJob(String importFilePath, TiSession tiSession, Map<String, String> properties, int checkSumFilePathNum) {
+    public ImporterJob(String importFilePath, TiSession tiSession, Map<String, String> properties) {
         this.importFilePath = importFilePath;
         this.properties = properties;
         this.tiSession = tiSession;
-        this.checkSumFilePathNum = checkSumFilePathNum;
+//        this.checkSumFilePathNum = checkSumFilePathNum;
     }
 
     @Override
@@ -62,7 +62,7 @@ public class ImporterJob implements Runnable {
         final CountDownLatch countDownLatch = new CountDownLatch(threadPerLineList.size());
 
         for (String fileBlock : threadPerLineList) {
-            BatchPutJob batchPutJob = new BatchPutJob(tiSession, totalImportCount, totalSkipCount, totalParseErrorCount, totalBatchPutFailCount, importFilePath, ttlTypeList, ttlTypeMap, fileBlock, properties, countDownLatch, totalDuplicateCount, checkSumFilePathNum);
+            BatchPutJob batchPutJob = new BatchPutJob(tiSession, totalImportCount, totalSkipCount, totalParseErrorCount, totalBatchPutFailCount, importFilePath, ttlTypeList, ttlTypeMap, fileBlock, properties, countDownLatch, totalDuplicateCount);
             batchPutJob.start();
         }
 
@@ -74,15 +74,15 @@ public class ImporterJob implements Runnable {
 
         long duration = System.currentTimeMillis() - startTime;
         StringBuilder result = new StringBuilder(
-                "[Import Report] " +
-                        "File[" + file.getAbsolutePath() + "], " +
-                        "Total[" + importFileLines + "], " +
-                        "Imported[" + totalImportCount + "], " +
-                        "Skip[" + totalSkipCount + "], " +
-                        "ParseErr[" + totalParseErrorCount + "], " +
-                        "BatchPutErr[" + totalBatchPutFailCount + "], " +
-                        "Duplicate[" + totalDuplicateCount + "], " +
-                        "Duration[" + duration / 1000 + "]s, ");
+                "[Import Summary] " +
+                        "File=" + file.getAbsolutePath() + ", " +
+                        "Total=" + importFileLines + ", " +
+                        "Imported=" + totalImportCount + ", " +
+                        "Skip=" + totalSkipCount + ", " +
+                        "ParseErr=" + totalParseErrorCount + ", " +
+                        "PutErr=" + totalBatchPutFailCount + ", " +
+                        "Duplicate=" + totalDuplicateCount + ", " +
+                        "Duration=" + duration / 1000 + "s, ");
         result.append("Skip type[");
         for (Map.Entry<String, Long> item : ttlTypeMap.entrySet()) {
             result.append("<").append(item.getKey()).append(">").append("[").append(item.getValue()).append("]").append("]");

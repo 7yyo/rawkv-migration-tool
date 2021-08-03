@@ -6,6 +6,7 @@ import com.pingcap.export.Exporter;
 import com.pingcap.importer.Importer;
 import com.pingcap.metrics.Prometheus;
 import com.pingcap.rawkv.RawKv;
+import com.pingcap.redo.Redo;
 import com.pingcap.util.*;
 import org.apache.commons.lang.StringUtils;
 import org.slf4j.Logger;
@@ -21,7 +22,7 @@ public class Main {
 
     public static void main(String[] args) throws Exception {
 
-        logger.info("Welcome to Raw KV Migration tool.");
+        logger.info("Welcome to Raw KV Migration tool!");
 
         String propertiesPath = System.getProperty(Model.P) == null ? PERSONAL_PROPERTIES_PATH : System.getProperty(Model.P);
         Map<String, String> properties = PropertiesUtil.getProperties(propertiesPath);
@@ -57,6 +58,10 @@ public class Main {
                         break;
                     case Model.EXPORT:
                         Exporter.run(properties, tiSession);
+                        break;
+                    case Model.REDO:
+                        Redo.run(properties, tiSession);
+                        break;
                     default:
                         throw new IllegalStateException(task);
                 }
@@ -66,6 +71,7 @@ public class Main {
         }
 
         tiSession.close();
+
         System.exit(0);
 
     }

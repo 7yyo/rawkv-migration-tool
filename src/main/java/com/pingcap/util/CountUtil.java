@@ -20,7 +20,7 @@ public class CountUtil {
         // Average number of items processed by each thread
         long avg = line / threadNum;
         long remainder = line % threadNum;
-        logger.info("The total number of lines in the {}={}, and each thread processes={}, and the remainder={}", fileName, line, avg, remainder);
+        logger.info("file={}, line={}, each processes={}, remainder={}", fileName, line, avg, remainder);
         List<String> list = new ArrayList<>();
         long startIndex; // The index at which each thread started processing.
         long todo; // How many.
@@ -52,8 +52,8 @@ public class CountUtil {
         SimpleDateFormat simpleDateFormat = new SimpleDateFormat("yyyy-MM-dd hh:mm:ss");
         int result = 0;
         try {
-            Date date1 = simpleDateFormat.parse(d1);
-            Date date2 = simpleDateFormat.parse(d2);
+            Date date1 = simpleDateFormat.parse(d1.replaceAll("T", " ").replaceAll("z", ""));
+            Date date2 = simpleDateFormat.parse(d2.replaceAll("T", " ").replaceAll("z", ""));
             result = date1.compareTo(date2);
         } catch (ParseException e) {
             e.printStackTrace();

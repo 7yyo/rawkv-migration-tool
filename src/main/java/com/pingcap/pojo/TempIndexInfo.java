@@ -2,13 +2,12 @@ package com.pingcap.pojo;
 
 public class TempIndexInfo {
 
-    public static final String TEMP_INDEX_INFO_KEY_FORMAT = "tempIndex_:_%s_:_%s";
+    public static final String KEY_FORMAT = "tempIndex_:_%s_:_%s";
 
     private String envId;
     private String id;
     private String appId;
     private String targetId;
-    private String updateTime;
 
     public String getAppId() {
         return appId;
@@ -42,26 +41,11 @@ public class TempIndexInfo {
         this.id = id;
     }
 
-    public String getUpdateTime() {
-        return updateTime;
-    }
-
-    public void setUpdateTime(String updateTime) {
-        this.updateTime = updateTime;
-    }
-
     public static void key2TempIndexInfo(TempIndexInfo tempIndexInfo, String key, String keyDelimiter) {
         tempIndexInfo.setEnvId(key.split(keyDelimiter)[1]);
         tempIndexInfo.setId(key.split(keyDelimiter)[2]);
     }
 
-    /**
-     * Compare indexInfo
-     * Comparison strategy: id, targetId
-     *
-     * @param tempIndexInfo: tempIndexInfo object
-     * @return boolean
-     */
     public boolean equals(TempIndexInfo tempIndexInfo) {
 //        boolean envIdC = this.envId.equals(tmpIndexInfo.getEnvId());
 //        boolean appIdC = this.appId.equals(tmpIndexInfo.getId());
@@ -70,18 +54,10 @@ public class TempIndexInfo {
         return idC && targetIdC;
     }
 
-    /**
-     * value = appId + targetId
-     *
-     * @param tempIndexInfoTiKV      To tikv.
-     * @param tempIndexInfoCassandra From cassandra.
-     */
     public static void initValueTempIndexInfo(TempIndexInfo tempIndexInfoTiKV, TempIndexInfo tempIndexInfoCassandra) {
         // appId
         tempIndexInfoTiKV.setAppId(tempIndexInfoCassandra.getAppId());
         // target id
         tempIndexInfoTiKV.setTargetId(tempIndexInfoCassandra.getTargetId());
-        // update time
-        tempIndexInfoTiKV.setUpdateTime(tempIndexInfoCassandra.getUpdateTime());
     }
 }

@@ -1,6 +1,8 @@
 package com.pingcap.util;
 
 import com.pingcap.enums.Model;
+import org.apache.commons.io.FileUtils;
+import org.apache.commons.io.LineIterator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -15,14 +17,14 @@ public class FileUtil {
         List<File> totalFileList = new ArrayList<>();
         List<File> fileList = loadDirectory(new File(filePath), totalFileList);
         if (fileList == null) {
-            logger.warn("There are no files in this path {}", filePath);
+            logger.warn("Path={} has no file.", filePath);
             System.exit(0);
         } else {
             for (int i = 0; i < fileList.size(); i++) {
                 logger.info("No.{}={}", i + 1, fileList.get(i).getAbsolutePath());
             }
         }
-        logger.info("The above files will be processed, total={}", fileList.size());
+        logger.info("Total={}", fileList.size());
         return fileList;
     }
 
@@ -32,6 +34,7 @@ public class FileUtil {
             logger.error("There is no file in this path {}", fileList);
             return null;
         }
+        Arrays.sort(files, new ComparerByLastModified());
         List<File> insideFilesList = new ArrayList<>();
         for (File file : files) {
             if (file.isDirectory()) {
@@ -118,4 +121,26 @@ public class FileUtil {
         return System.getProperty("os.name").toLowerCase().contains("linux");
     }
 
+    public static LineIterator createLineIterator(File file) {
+        LineIterator lineIterator = null;
+        try {
+            lineIterator = FileUtils.lineIterator(file, "UTF-8");
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return lineIterator;
+    }
+
+}
+
+class ComparerByLastModified implements Comparator<File> {
+    public int compare(File f1, File f2) {
+        long diff = f1.lastModified() - f2.lastModified();
+        if (diff > 0)
+            return 1;
+        else if (diff == 0)
+            return 0;
+        else
+            return -1;
+    }
 }

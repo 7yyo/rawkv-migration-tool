@@ -1,7 +1,7 @@
 package com.pingcap.importer;
 
 import com.pingcap.enums.Model;
-import com.pingcap.job.CheckSumJsonJob;
+import com.pingcap.checksum.CheckSumJsonJob;
 import com.pingcap.util.*;
 import io.prometheus.client.Counter;
 import org.slf4j.Logger;
@@ -39,23 +39,23 @@ public class Importer {
 
         // Remove check sum & redo folder
         FileUtil.deleteFolder(properties.get(Model.CHECK_SUM_FILE_PATH));
-        FileUtil.deleteFolder(properties.get(Model.REDO_FILE_PATH));
+        FileUtil.deleteFolder(properties.get(Model.BATCH_PUT_ERR_FILE_PATH));
 
         // Create check sum folder
-        String checkSumFilePath = properties.get(Model.CHECK_SUM_FILE_PATH);
-        FileUtil.createFolder(checkSumFilePath);
+//        String checkSumFilePath = properties.get(Model.CHECK_SUM_FILE_PATH);
+//        FileUtil.createFolder(checkSumFilePath);
 
         // Start the Main thread for each file.showFileList.
         ThreadPoolExecutor threadPoolExecutor = ThreadPoolUtil.startJob(
                 Integer.parseInt(properties.get(Model.CORE_POOL_SIZE)),
                 Integer.parseInt(properties.get(Model.MAX_POOL_SIZE)));
 
-        for (int i = 0; i < importFileList.size(); i++) {
+        for (File file : importFileList) {
             // Create a check sum folder for each import task
-            String checkSumFileName = properties.get(Model.CHECK_SUM_FILE_PATH) + "/" + importFileList.get(i).getName().replaceAll("\\.", "") + "-" + i;
+//            String checkSumFileName = properties.get(Model.CHECK_SUM_FILE_PATH) + "/" + importFileList.get(i).getName().replaceAll("\\.", "") + "-" + i;
 //            System.out.println(checkSumFileName);
-            FileUtil.createFolder(checkSumFileName);
-            threadPoolExecutor.execute(new ImporterJob(importFileList.get(i).getAbsolutePath(), tiSession, properties, i));
+//            FileUtil.createFolder(checkSumFileName);
+            threadPoolExecutor.execute(new ImporterJob(file.getAbsolutePath(), tiSession, properties));
         }
 
         threadPoolExecutor.shutdown();
@@ -64,7 +64,7 @@ public class Importer {
 
         try {
             if (threadPoolExecutor.awaitTermination(Long.MAX_VALUE, TimeUnit.SECONDS)) {
-                logger.info("All files import is complete! It takes {} seconds", (duration / 1000));
+                logger.info("All files import is complete! Duration={}s.", (duration / 1000));
             }
         } catch (InterruptedException e) {
             e.printStackTrace();
@@ -77,12 +77,9 @@ public class Importer {
             int checkSumThreadNum = Integer.parseInt(properties.get(Model.CHECK_SUM_THREAD_NUM));
 
             // If turn on simple check sum, check sum file is import file.
-            String simpleCheckSum = properties.get(Model.SIMPLE_CHECK_SUM);
-            if (Model.ON.equals(simpleCheckSum)) {
-                checkSumFilePath = importFilePath;
-            }
+//            String simpleCheckSum = properties.get(Model.SIMPLE_CHECK_SUM);
 
-            List<File> checkSumFileList = FileUtil.showFileList(checkSumFilePath);
+            List<File> checkSumFileList = FileUtil.showFileList(importFilePath);
             ThreadPoolExecutor checkSumThreadPoolExecutor = ThreadPoolUtil.startJob(checkSumThreadNum, checkSumThreadNum);
             TOTAL_CHECK_SUM_FILE_COUNT.labels("check sum").inc(checkSumFileList.size());
 
@@ -95,16 +92,12 @@ public class Importer {
             try {
                 if (checkSumThreadPoolExecutor.awaitTermination(Long.MAX_VALUE, TimeUnit.SECONDS)) {
                     duration = System.currentTimeMillis() - checkSumStartTime;
-                    logger.info("All files check sum is complete! It takes {} seconds", (duration / 1000));
+                    logger.info("All files check sum is complete. Duration={}s.", (duration / 1000));
                     System.exit(0);
                 }
             } catch (InterruptedException e) {
                 e.printStackTrace();
             }
-
-            checkSumThreadPoolExecutor.shutdown();
-            duration = System.currentTimeMillis() - checkSumStartTime;
-            logger.info("All files check sum complete! It takes [{}]s.", (duration / 1000));
 
         }
 

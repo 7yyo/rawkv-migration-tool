@@ -5,7 +5,7 @@ import org.apache.commons.lang.StringUtils;
 
 public class IndexInfo {
 
-    public static final String INDEX_INFO_KET_FORMAT = "indexInfo_:_%s_:_%s_:_%s";
+    public static final String KET_FORMAT = "indexInfo_:_%s_:_%s_:_%s";
 
     private String envId;
     private String type;
@@ -73,14 +73,14 @@ public class IndexInfo {
     }
 
     public boolean equals(IndexInfo indexInfo) {
-        boolean idC = this.id.equals(indexInfo.getId());
+        boolean appIdC = this.appId.equals(indexInfo.getAppId());
         boolean serviceTagC = true;
         if (!StringUtils.isEmpty(this.serviceTag) && !StringUtils.isEmpty(indexInfo.getServiceTag())) {
             serviceTagC = this.serviceTag.equals(indexInfo.getServiceTag());
         }
         boolean targetIdC = this.targetId.equals(indexInfo.getTargetId());
-        boolean typeC = this.type.equals(indexInfo.getType());
-        return idC && serviceTagC && targetIdC && typeC;
+//        boolean typeC = this.type.equals(indexInfo.getType());
+        return appIdC && serviceTagC && targetIdC;
     }
 
     public static void key2IndexInfo(IndexInfo indexInfo, String key, String keyDelimiter) {
@@ -126,7 +126,7 @@ public class IndexInfo {
         indexInfoTiKV.setAppId(indexInfoCassandra.getAppId());
         // serviceTag
         if (indexInfoCassandra.getServiceTag() == null) {
-            indexInfoTiKV.setServiceTag("");
+            indexInfoTiKV.setServiceTag(null);
         } else {
             indexInfoTiKV.setServiceTag(indexInfoCassandra.getServiceTag());
         }

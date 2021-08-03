@@ -3,7 +3,6 @@ package com.pingcap.checksum;
 import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONObject;
 import com.pingcap.enums.Model;
-import com.pingcap.job.CheckSumJsonJob;
 import com.pingcap.pojo.IndexInfo;
 import com.pingcap.pojo.TempIndexInfo;
 import com.pingcap.timer.CheckSumTimer;
@@ -56,11 +55,6 @@ public class CheckSum {
         return null;
     }
 
-    /**
-     * See detail <html>https://github.com/7yyo/to_tikv/blob/master/src/main/resources/img/checksum.png</html>
-     *
-     * @param checkSumFilePath: check sum file path
-     */
     public static void checkSum(String checkSumFilePath, TiSession tiSession, Map<String, String> properties) {
 
         logger.info(String.format("************ Start check sum for [%s] ************", checkSumFilePath));
@@ -308,7 +302,7 @@ public class CheckSum {
 
         IndexInfo indexInfoRawKv;
         TempIndexInfo tempIndexInfoRawKv;
-        IndexInfo indexInfoOriginal = null;
+        IndexInfo indexInfoOriginal = new IndexInfo();
         TempIndexInfo tempIndexInfoOriginal;
         String key;
         String value;
@@ -343,7 +337,7 @@ public class CheckSum {
                                 try {
                                     indexInfoOriginal = JSON.toJavaObject(jsonObject, IndexInfo.class);
                                     // key = indexInfo_:_{envid}_:_{type}_:_{id}
-                                    key = String.format(IndexInfo.INDEX_INFO_KET_FORMAT, envId, indexInfoOriginal.getType(), indexInfoOriginal.getId());
+                                    key = String.format(IndexInfo.KET_FORMAT, envId, indexInfoOriginal.getType(), indexInfoOriginal.getId());
 
                                     if (ttlType.contains(key.split(keyDelimiter)[2])) {
                                         continue;
@@ -384,7 +378,7 @@ public class CheckSum {
                                     tempIndexInfoOriginal = JSON.toJavaObject(jsonObject, TempIndexInfo.class);
 
                                     // key = tempIndex_:_{envid}_:_{id}
-                                    key = String.format(TempIndexInfo.TEMP_INDEX_INFO_KEY_FORMAT, envId, tempIndexInfoOriginal.getId());
+                                    key = String.format(TempIndexInfo.KEY_FORMAT, envId, tempIndexInfoOriginal.getId());
                                     value = rawKvClient.get(ByteString.copyFromUtf8(key)).toStringUtf8();
 
                                     TempIndexInfo.key2TempIndexInfo(tempIndexInfoOriginal, key, keyDelimiter);
@@ -400,7 +394,7 @@ public class CheckSum {
                                     tempIndexInfoRawKv = JSON.toJavaObject(jsonObject, TempIndexInfo.class);
                                     TempIndexInfo.key2TempIndexInfo(tempIndexInfoRawKv, key, keyDelimiter);
                                     if (!tempIndexInfoRawKv.equals(tempIndexInfoOriginal)) {
-                                        checkSumLog.error(String.format("Check sum failed! Line = %s", originalLine));
+                                        checkSumLog.error("Check sum failed! Line={}", originalLine);
                                         checkFailNum++;
                                         continue;
                                     }
@@ -422,10 +416,10 @@ public class CheckSum {
                             }
 
                             // key = indexInfo_:_{envid}_:_{type}_:_{id}
-                            key = String.format(IndexInfo.INDEX_INFO_KET_FORMAT, envId, indexInfoOriginal.getType(), indexInfoOriginal.getId());
+                            key = String.format(IndexInfo.KET_FORMAT, envId, indexInfoOriginal.getType(), indexInfoOriginal.getId());
                             value = rawKvClient.get(ByteString.copyFromUtf8(key)).toStringUtf8();
                             if (StringUtils.isBlank(value)) {
-                                checkSumLog.warn(String.format("The original file line = [%s] is not be inserted!", originalLine));
+                                checkSumLog.warn("The original file line ={} is not be inserted!", originalLine);
                                 checkNotInsertErrorNum++;
                                 continue;
                             }
@@ -434,7 +428,7 @@ public class CheckSum {
                             jsonObject = JSONObject.parseObject(value);
                             indexInfoRawKv = JSON.toJavaObject(jsonObject, IndexInfo.class);
                             if (!indexInfoRawKv.equals(indexInfoOriginal)) {
-                                checkSumLog.error(String.format("Check sum failed! Line = %s", originalLine));
+                                checkSumLog.error("Check sum failed! Line={}", originalLine);
                                 checkFailNum++;
                                 continue;
                             }
@@ -456,14 +450,12 @@ public class CheckSum {
 
     }
 
-    /**
-     * Start check sum
-     */
     public static void run(Map<String, String> properties, TiSession tiSession) {
 
         long checkStartTime = System.currentTimeMillis();
         String simpleCheckSum = properties.get(Model.SIMPLE_CHECK_SUM);
-        String checkSumFilePath = properties.get(Model.CHECK_SUM_FILE_PATH);
+//        String checkSumFilePath = properties.get(Model.CHECK_SUM_FILE_PATH);
+        String checkSumFilePath = properties.get(Model.IMPORT_FILE_PATH);
         int checkSumThreadNum = Integer.parseInt(properties.get(Model.CHECK_SUM_THREAD_NUM));
         List<File> checkSumFileList;
 
@@ -482,7 +474,7 @@ public class CheckSum {
         try {
             if (checkSumThreadPoolExecutor.awaitTermination(Long.MAX_VALUE, TimeUnit.SECONDS)) {
                 long duration = System.currentTimeMillis() - checkStartTime;
-                logger.info("All files check sum is complete! It takes {} seconds", (duration / 1000));
+                logger.info("All files check sum is complete. Duration={}s", (duration / 1000));
                 System.exit(0);
             }
         } catch (InterruptedException e) {

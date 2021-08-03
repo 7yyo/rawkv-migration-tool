@@ -7,12 +7,12 @@ public class Model {
 
     public static final String IMPORT = "import";
     public static final String CHECK_SUM = "checkSum";
+    public static final String REDO = "redo";
 
     public static final String JSON_FORMAT = "json";
     public static final String CSV_FORMAT = "csv";
 
     public static final String ON = "true";
-    public static final Integer COMPLETE = 1;
 
     public static final String P = "p";
     public static final String M = "m";
@@ -26,6 +26,7 @@ public class Model {
     public static final String TEMP_INDEX_INFO = "tempIndexInfo";
     public static final String INDEX_TYPE = "indexType";
     public static final String INDEX_TYPE_DELIMITER = "@";
+    public static final String DELETE = "<<deleteFlag>>";
 
     public static final String LOG = "logger";
     public static final String CHECK_SUM_LOG = "checkSumLog";
@@ -40,15 +41,19 @@ public class Model {
     public static final String CHECK_SUM_THREAD_NUM = "importer.checkSum.checkSumThreadNum";
     public static final String BATCH_SIZE = "importer.tikv.batchSize";
     public static final String DELETE_FOR_TEST = "importer.tikv.deleteForTest";
+
     public static final String ENABLE_CHECK_SUM = "importer.checkSum.enabledCheckSum";
     public static final String CHECK_SUM_FILE_PATH = "importer.checkSum.checkSumFilePath";
     public static final String CHECK_SUM_DELIMITER = "importer.checkSum.checkSumDelimiter";
     public static final String CHECK_SUM_PERCENTAGE = "importer.checkSum.checkSumPercentage";
     public static final String SIMPLE_CHECK_SUM = "importer.checkSum.simpleCheckSum";
+    public static final String CHECK_SUM_LIMIT = "importer.checkSum.limit";
+    public static final String CHECK_SUM_FAIL_FILE_PATH = "importer.checkSum.failFilePath";
+
     public static final String IMPORT_FILE_PATH = "importer.in.filePath";
     public static final String MODE = "importer.in.mode";
     public static final String SCENES = "importer.in.scenes";
-    public static final String REDO_FILE_PATH = "importer.in.batchPutErrFilePath";
+    public static final String BATCH_PUT_ERR_FILE_PATH = "importer.in.batchPutErrFilePath";
     public static final String DELIMITER_1 = "importer.in.delimiter_1";
     public static final String DELIMITER_2 = "importer.in.delimiter_2";
     public static final String KEY_DELIMITER = "importer.in.keyDelimiter";
@@ -63,6 +68,11 @@ public class Model {
     public static final String EXPORT_FILE_PATH = "exporter.out.filePath";
     public static final String EXPORT_LIMIT = "exporter.tikv.exportLimit";
     public static final String EXPORT_THREAD = "exporter.tikv.exportThread";
+
+    public static final String REDO_TYPE = "redo.type";
+    public static final String REDO_FILE_PATH = "redo.filePath";
+    public static final String REDO_BATCH_SIZE = "redo.batchSize";
+    public static final String REDO_MOVE_PATH = "redo.movePath";
 
 
 }

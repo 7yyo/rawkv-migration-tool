@@ -33,7 +33,7 @@ public class RawKv {
 
     public static int batchPut(int totalCount, int todo, int count, int batchSize, RawKVClient rawKvClient, HashMap<ByteString, ByteString> kvPairs, List<String> fileLineList, File file, AtomicInteger totalLineCount, AtomicInteger totalSkipCount, AtomicInteger totalBatchPutFailCount, int totalLine, Map<String, String> properties) {
         if (totalCount == todo || count == batchSize) {
-//            logger.info("start batch put. {}=={},{}=={}", totalCount, todo, count, batchSize);
+
             if (!kvPairs.isEmpty()) {
 
                 // Only json file skip exists key.
@@ -94,7 +94,6 @@ public class RawKv {
                     count = 0;
                 }
             }
-//            logger.info("Batch put finish. Count = {}", count);
         }
         return count;
     }
@@ -107,7 +106,7 @@ public class RawKv {
     public static FileChannel initBatchPutErrLog(Map<String, String> properties, File originalFile) {
 
         // If first batch put fail, create redo folder.
-        String redoFolderPath = properties.get(Model.REDO_FILE_PATH);
+        String redoFolderPath = properties.get(Model.BATCH_PUT_ERR_FILE_PATH);
         FileUtil.createFolder(redoFolderPath);
 
         // Redo inside folder
@@ -134,7 +133,7 @@ public class RawKv {
      */
     public static void get(TiSession tiSession, String key) {
         if (StringUtils.isEmpty(key)) {
-            logger.warn("Please enter the key, the key cannot be empty.");
+            logger.warn("The key cannot be empty.");
         } else {
             RawKVClient rawKvClient = tiSession.createRawClient();
             String value = rawKvClient.get(ByteString.copyFromUtf8(key)).toStringUtf8();
