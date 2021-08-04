@@ -24,8 +24,7 @@ public class ImportTimer extends TimerTask {
 
     @Override
     public void run() {
-        String log = String.format("[%s] [%s/%s], Insert ratio %s", this.filePath, totalFileLine, totalLines, CountUtil.getPercentage(totalFileLine.get(), totalLines));
-        logger.info(log + "%");
+        logger.info("[{}] [{}/{}], Insert ratio {}%", this.filePath, totalFileLine, totalLines, CountUtil.getPercentage(totalFileLine.get(), totalLines));
     }
 }
 

@@ -474,7 +474,7 @@ public class CheckSum {
         try {
             if (checkSumThreadPoolExecutor.awaitTermination(Long.MAX_VALUE, TimeUnit.SECONDS)) {
                 long duration = System.currentTimeMillis() - checkStartTime;
-                logger.info("All files check sum is complete. Duration={}s", (duration / 1000));
+                logger.info("All check sum complete. Duration={}s", (duration / 1000));
                 System.exit(0);
             }
         } catch (InterruptedException e) {

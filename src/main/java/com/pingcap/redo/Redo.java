@@ -29,6 +29,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import static com.pingcap.enums.Model.DELETE;
 import static com.pingcap.enums.Model.ENV_ID;
 
 public class Redo {
@@ -39,9 +40,9 @@ public class Redo {
 
         long startTime = System.currentTimeMillis();
 
-        // redo 文件夹路径
+        // Redo 文件夹路径
         String redoFilePath = properties.get(Model.REDO_FILE_PATH);
-        // move 文件夹路径
+        // Move 文件夹路径
         String moveFilePath = properties.get(Model.REDO_MOVE_PATH);
         // indexInfo 或 tempIndexInfo
         String type = properties.get(Model.REDO_TYPE);
@@ -51,11 +52,12 @@ public class Redo {
         // 创建 redo 每天迁移目录，格式为 moveFilePath/yyyyMMddhhmmss
         SimpleDateFormat simpleDateFormat = new SimpleDateFormat("yyyyMMddhhmmss");
         String now = simpleDateFormat.format(new Date());
-        // Redo 迁移文件夹
+        // 创建 Redo 迁移文件夹
         FileUtil.createFolder(moveFilePath);
-        // Redo 每日迁移文件夹
+        // 创建 Redo 每日迁移文件夹
         FileUtil.createFolder(moveFilePath + "/" + now);
 
+        // RedoFail 文件
         String redoFailPath = moveFilePath + "/" + now + "/" + "redoFail.txt";
         File redoFailFile = FileUtil.createFile(redoFailPath);
         FileOutputStream fileOutputStream;
@@ -67,6 +69,7 @@ public class Redo {
             e.printStackTrace();
         }
 
+        // RedoNotExists 文件
         String redoNotExistsPath = moveFilePath + "/" + now + "/" + "redoNotExists.txt";
         File redoNotExistsFile = FileUtil.createFile(redoNotExistsPath);
         FileOutputStream fileOutputStream1;
@@ -88,7 +91,7 @@ public class Redo {
 
         // indexInfo 对比时间戳
         IndexInfo indexInfoRedo, indexInfoRedoValue, indexInfoTiKVValue;
-        // indexInfo 不对比时间戳
+        // tempIndexInfo 不对比时间戳
         TempIndexInfo tempIndexInfoRedo, tempIndexInfoRedoValue;
 //        TempIndexInfo tempIndexInfoTiKVValue;
 
@@ -109,7 +112,7 @@ public class Redo {
                     aroundCount++;
                     redoLine = lineIterator.nextLine();
                     try {
-                        replaceRedoLine = redoLine.replaceAll("<<deleteFlag>>", "");
+                        replaceRedoLine = redoLine.replaceAll(DELETE, "");
                         jsonObject = JSONObject.parseObject(replaceRedoLine);
                     } catch (Exception e) {
                         redoLog.error("Parse failed, file={}, data={}, line={}", redoFile, totalCount, totalCount);
@@ -131,8 +134,8 @@ public class Redo {
                             // 查询 raw kv 是否有这条数据，如果有则对比时间戳，进行 put 或 delete，若没有则记录 redo log
                             if (!v.isEmpty()) {
                                 indexInfoTiKVValue = JSON.parseObject(v, IndexInfo.class);
-                                // 如果 redo > tikv, 则进行 batch put 或 delete
-                                if (CountUtil.compareTime(indexInfoRedo.getUpdateTime(), indexInfoTiKVValue.getUpdateTime()) == 1) {
+                                // 如果 redo 大于等于 tikv, 则进行 batch put 或 delete
+                                if (CountUtil.compareTime(indexInfoRedo.getUpdateTime(), indexInfoTiKVValue.getUpdateTime()) >= 0) {
                                     // delete redo
                                     if (redoLine.startsWith(Model.DELETE)) {
                                         delete(rawKVClient, k, redoSummary, redoFileFileChannel, redoLine);

@@ -9,6 +9,7 @@ import com.pingcap.enums.Model;
 import com.pingcap.pojo.IndexInfo;
 import com.pingcap.pojo.TempIndexInfo;
 import com.pingcap.timer.CheckSumTimer;
+import com.pingcap.util.CountUtil;
 import com.pingcap.util.FileUtil;
 import io.prometheus.client.Histogram;
 import org.apache.commons.io.LineIterator;
@@ -79,9 +80,11 @@ public class CheckSumJsonJob implements Runnable {
         List<ByteString> keyList = new ArrayList<>();
         List<Kvrpcpb.KvPair> kvList = new ArrayList<>();
         JSONObject jsonObject;
-        String key, envId, checkSumFileLine;
+        String key, value, envId, checkSumFileLine, tempLine;
         int limit = 0, totalCount = 0;
         int limitSize = Integer.parseInt(properties.get(CHECK_SUM_LIMIT));
+        String delimiter1 = properties.get(DELIMITER_1);
+        String delimiter2 = properties.get(DELIMITER_2);
         int lineCount = FileUtil.getFileLines(checkSumFile); // 数据文件行数
 
         LineIterator originalLineIterator = FileUtil.createLineIterator(checkSumFile);
@@ -92,11 +95,12 @@ public class CheckSumJsonJob implements Runnable {
                 totalCount++;
                 totalLine.addAndGet(1);
                 checkSumFileLine = originalLineIterator.nextLine();
+                tempLine = checkSumFileLine.replaceAll(DELETE, "");// 去掉 delete 的 json
                 switch (properties.get(MODE)) {
                     case JSON_FORMAT:
                         try {
                             // 解析数据文件为 json object
-                            jsonObject = JSONObject.parseObject(checkSumFileLine);
+                            jsonObject = JSONObject.parseObject(tempLine);
                         } catch (Exception e) {
                             // 直接跳过
                             parseErr++;
@@ -114,6 +118,20 @@ public class CheckSumJsonJob implements Runnable {
                                 }
                                 // 解析 indexInfo key
                                 key = String.format(IndexInfo.KET_FORMAT, envId, indexInfoOriginal.getType(), indexInfoOriginal.getId());
+                                // delete 具有前缀
+                                if (checkSumFileLine.startsWith(DELETE)) {
+                                    value = rawKvClient.get(ByteString.copyFromUtf8(key)).toStringUtf8();
+                                    // 如果 delete 的数据存在，则需要判断当前数据的时间戳和 delete 的时间戳做对比
+                                    // 如果 TiKV > delete 则校验失败，若 delete > tikv，则正常。
+                                    if (!value.isEmpty()) {
+                                        indexInfoRawKv = JSONObject.parseObject(value, IndexInfo.class);
+                                        if (CountUtil.compareTime(indexInfoRawKv.getUpdateTime(), indexInfoOriginal.getUpdateTime()) <= 0) {
+                                            logger.error("Check sum key={} delete fail, rawkv tso={} > delete tso={}", key, indexInfoRawKv.getUpdateTime(), indexInfoOriginal.getUpdateTime());
+                                            checkSumFail++;
+                                        }
+                                    }
+                                    continue;
+                                }
                                 // map 组成为 key 和 value 的对象
                                 originalIndexInfoMap.put(key, indexInfoOriginal);
                                 keyList.add(ByteString.copyFromUtf8(key));
@@ -128,6 +146,15 @@ public class CheckSumJsonJob implements Runnable {
                                 }
                                 // 解析 tempIndexInfo key
                                 key = String.format(TempIndexInfo.KEY_FORMAT, envId, tempIndexInfoOriginal.getId());
+                                if (checkSumFileLine.startsWith(DELETE)) {
+                                    value = rawKvClient.get(ByteString.copyFromUtf8(key)).toStringUtf8();
+                                    // tempIndexInfo 没有时间戳，如果 key 还存在则直接 check sum 失败
+                                    if (!value.isEmpty()) {
+                                        logger.error("Check sum key={} delete fail.", key);
+                                        checkSumFail++;
+                                    }
+                                    continue;
+                                }
                                 originalTempIndexInfoMap.put(key, tempIndexInfoOriginal);
                                 keyList.add(ByteString.copyFromUtf8(key));
                                 break;
@@ -135,6 +162,10 @@ public class CheckSumJsonJob implements Runnable {
                         }
                         break;
                     case CSV_FORMAT:
+                        indexInfoOriginal = new IndexInfo();
+                        IndexInfo.csv2IndexInfo(indexInfoOriginal, checkSumFileLine, delimiter1, delimiter2);
+                        key = String.format(IndexInfo.KET_FORMAT, indexInfoOriginal.getEnvId(), indexInfoOriginal.getType(), indexInfoOriginal.getId());
+                        originalIndexInfoMap.put(key, indexInfoOriginal);
                         break;
                     default:
                 }

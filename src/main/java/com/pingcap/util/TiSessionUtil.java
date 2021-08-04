@@ -23,9 +23,9 @@ public class TiSessionUtil {
         try {
             conf = TiConfiguration.createRawDefault(pd);
             tiSession = TiSession.create(conf);
-            logger.info("Create global TiSession success!");
+            logger.info("Create TiSession success.");
         } catch (Exception e) {
-            logger.error("Failed to create TiSession!");
+            logger.error("Create TiSession failed!");
             System.exit(0);
         }
         return tiSession;

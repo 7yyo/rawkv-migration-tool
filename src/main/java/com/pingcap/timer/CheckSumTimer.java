@@ -8,9 +8,6 @@ import org.slf4j.LoggerFactory;
 import java.util.TimerTask;
 import java.util.concurrent.atomic.AtomicInteger;
 
-/**
- * @author yuyang
- */
 public class CheckSumTimer extends TimerTask {
 
     private static final Logger logger = LoggerFactory.getLogger(Model.LOG);
@@ -27,8 +24,7 @@ public class CheckSumTimer extends TimerTask {
 
     @Override
     public void run() {
-        String logStr = String.format("[%s] [%s/%s], Check sum ratio %s", filePath, totalCheckNum, totalFileNum - 1, CountUtil.getPercentage(totalCheckNum.get(), totalFileNum));
-        logger.info(logStr + "%");
+        logger.info("[{}] [{}/{}], Check sum ratio {}%", filePath, totalCheckNum, totalFileNum - 1, CountUtil.getPercentage(totalCheckNum.get(), totalFileNum));
     }
 
 }
