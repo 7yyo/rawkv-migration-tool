@@ -23,62 +23,55 @@ public class IndexTypeImporter {
 
         long startTime = System.currentTimeMillis();
 
-        String importFilePath = properties.get(Model.IMPORT_FILE_PATH);
-        List<File> fileList = FileUtil.showFileList(importFilePath);
-
-        RawKVClient rawKvClient = tiSession.createRawClient();
-
         FileInputStream fileInputStream;
         BufferedReader bufferedReader;
         BufferedInputStream bufferedInputStream;
 
+        String content;
+        ByteString key, value;
+        int fileLineNum = 0, errorNum = 0;
         HashMap<ByteString, ByteString> kvParis = new HashMap<>();
 
-        String fileLine;
-        ByteString key, value;
-        int lineNum = 0, errorNum = 0;
-        for (File importFile : fileList) {
-
+        RawKVClient rawKvClient = tiSession.createRawClient();
+        List<File> fileList = FileUtil.showFileList(properties.get(Model.IMPORT_FILE_PATH), false);
+        for (File file : fileList) {
             try {
-
-                fileInputStream = new FileInputStream(importFile);
+                fileInputStream = new FileInputStream(file);
                 bufferedInputStream = new BufferedInputStream(fileInputStream);
                 bufferedReader = new BufferedReader(new InputStreamReader(bufferedInputStream, StandardCharsets.UTF_8));
 
-                while ((fileLine = bufferedReader.readLine()) != null) {
-                    lineNum++;
-                    // Blank space.
-                    if (StringUtils.isBlank(fileLine)) {
+                while ((content = bufferedReader.readLine()) != null) {
+                    fileLineNum++;
+                    // Skip spaces.
+                    if (StringUtils.isBlank(content)) {
                         continue;
                     }
                     try {
-                        key = ByteString.copyFromUtf8(fileLine.split(Model.INDEX_TYPE_DELIMITER)[0]);
-                        value = ByteString.copyFromUtf8(fileLine.split(Model.INDEX_TYPE_DELIMITER)[1]);
+                        key = ByteString.copyFromUtf8(content.split(Model.INDEX_TYPE_DELIMITER)[0]);
+                        value = ByteString.copyFromUtf8(content.split(Model.INDEX_TYPE_DELIMITER)[1]);
                         kvParis.put(key, value);
                     } catch (Exception e) {
-                        logger.error("Process failed, file[{}], lineNum[{}], line[{}]", importFile, lineNum, fileLine, e);
+                        logger.error("Parse failed, file={}, line={}, content={}", file, fileLineNum, content, e);
                         errorNum++;
                     }
                 }
-
                 if (!kvParis.isEmpty()) {
                     try {
                         rawKvClient.batchPut(kvParis);
                     } catch (Exception e) {
-                        logger.error("Failed to batch put raw kv, file[{}]", importFile.getAbsolutePath(), e);
+                        logger.error("Batch put failed, file={}", file.getAbsolutePath(), e);
                     }
                 }
-
             } catch (IOException e) {
                 e.printStackTrace();
             }
-
             long duration = System.currentTimeMillis() - startTime;
-            logger.info("[Import Report] File[" + importFile.getAbsolutePath() + "], Total[" + lineNum + "], Imported[" + kvParis.size() + "], Error[" + errorNum + "], Duration[" + duration / 1000 + "]s");
+            logger.info("Import summary: File=" + file.getAbsolutePath() + ", total=" + fileLineNum + ", imported=" + kvParis.size() + ", errNum=" + errorNum + ", duration=" + duration / 1000 + "s");
             kvParis.clear();
-
         }
-    }
 
+        rawKvClient.close();
+
+    }
 
 }

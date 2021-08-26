@@ -20,6 +20,7 @@
             <MaxFileSize>100MB</MaxFileSize>
         </triggeringPolicy>
     </appender>
+
     <appender name="audit" class="ch.qos.logback.core.rolling.RollingFileAppender">
         <encoder>
             <pattern>%d{yyyy-MM-dd HH:mm:ss} [%p][%M][%L]-> %m%n</pattern>
@@ -33,6 +34,7 @@
             <MaxFileSize>100MB</MaxFileSize>
         </triggeringPolicy>
     </appender>
+
     <appender name="checkSum" class="ch.qos.logback.core.rolling.RollingFileAppender">
         <encoder>
             <pattern>%d{yyyy-MM-dd HH:mm:ss} [%p][%M][%L]-> %m%n</pattern>
@@ -46,6 +48,7 @@
             <MaxFileSize>100MB</MaxFileSize>
         </triggeringPolicy>
     </appender>
+
     <appender name="redo" class="ch.qos.logback.core.rolling.RollingFileAppender">
         <encoder>
             <pattern>%d{yyyy-MM-dd HH:mm:ss} [%p][%M][%L]-> %m%n</pattern>
@@ -53,7 +56,21 @@
         </encoder>
         <file>./redo.log</file>
         <rollingPolicy class="ch.qos.logback.core.rolling.FixedWindowRollingPolicy">
-            <fileNamePattern>./toTiKV.log.%i</fileNamePattern>
+            <fileNamePattern>./redo.log.%i</fileNamePattern>
+        </rollingPolicy>
+        <triggeringPolicy class="ch.qos.logback.core.rolling.SizeBasedTriggeringPolicy">
+            <MaxFileSize>100MB</MaxFileSize>
+        </triggeringPolicy>
+    </appender>
+
+    <appender name="csFail" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <encoder>
+            <pattern>%msg%n</pattern>
+            <charset>utf-8</charset>
+        </encoder>
+        <file>./redo.log</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.FixedWindowRollingPolicy">
+            <fileNamePattern>./csFail.log.%i</fileNamePattern>
         </rollingPolicy>
         <triggeringPolicy class="ch.qos.logback.core.rolling.SizeBasedTriggeringPolicy">
             <MaxFileSize>100MB</MaxFileSize>
@@ -74,6 +91,10 @@
 
     <logger name="redoLog" level="INFO" additivity="true">
         <appender-ref ref="redo"/>
+    </logger>
+
+    <logger name="csFailLog" level="INFO" additivity="true">
+        <appender-ref ref="csFail"/>
     </logger>
 
     <root level="ERROR">

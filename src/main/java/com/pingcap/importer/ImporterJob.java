@@ -40,11 +40,13 @@ public class ImporterJob implements Runnable {
 
         long startTime = System.currentTimeMillis();
 
-        HashMap<String, Long> ttlTypeMap = new HashMap<>();
-        List<String> ttlTypeList = new ArrayList<>(Arrays.asList(properties.get(Model.TTL_TYPE).split(",")));
-        if (!ttlTypeList.isEmpty()) {
-            ttlTypeMap = FileUtil.getTtlTypeMap(ttlTypeList);
+        HashMap<String, Long> ttlSkipTypeMap = new HashMap<>();
+        List<String> ttlSkipTypeList = new ArrayList<>(Arrays.asList(properties.get(Model.TTL_SKIP_TYPE).split(",")));
+        if (!ttlSkipTypeList.isEmpty()) {
+            ttlSkipTypeMap = FileUtil.getTtlSkipTypeMap(ttlSkipTypeList);
         }
+
+        List<String> ttlPutList = new ArrayList<>(Arrays.asList(properties.get(Model.TTL_PUT_TYPE).split(",")));
 
         // Start the file sub-thread,
         // import the data of the file through the sub-thread, and divide the data in advance according to the number of sub-threads.
@@ -59,10 +61,23 @@ public class ImporterJob implements Runnable {
         timer.schedule(importTimer, 5000, Long.parseLong(properties.get(Model.TIMER_INTERVAL)));
 
         // Return when all threads are processed.
-        final CountDownLatch countDownLatch = new CountDownLatch(threadPerLineList.size());
+        CountDownLatch countDownLatch = new CountDownLatch(threadPerLineList.size());
 
         for (String fileBlock : threadPerLineList) {
-            BatchPutJob batchPutJob = new BatchPutJob(tiSession, totalImportCount, totalSkipCount, totalParseErrorCount, totalBatchPutFailCount, importFilePath, ttlTypeList, ttlTypeMap, fileBlock, properties, countDownLatch, totalDuplicateCount);
+            BatchPutJob batchPutJob = new BatchPutJob(
+                    tiSession,
+                    totalImportCount,
+                    totalSkipCount,
+                    totalParseErrorCount,
+                    totalBatchPutFailCount,
+                    importFilePath,
+                    ttlSkipTypeList,
+                    ttlSkipTypeMap,
+                    fileBlock,
+                    properties,
+                    countDownLatch,
+                    totalDuplicateCount,
+                    ttlPutList);
             batchPutJob.start();
         }
 
@@ -84,7 +99,7 @@ public class ImporterJob implements Runnable {
                         "Duplicate=" + totalDuplicateCount + ", " +
                         "Duration=" + duration / 1000 + "s, ");
         result.append("Skip type[");
-        for (Map.Entry<String, Long> item : ttlTypeMap.entrySet()) {
+        for (Map.Entry<String, Long> item : ttlSkipTypeMap.entrySet()) {
             result.append("<").append(item.getKey()).append(">").append("[").append(item.getValue()).append("]").append("]");
         }
 

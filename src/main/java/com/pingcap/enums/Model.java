@@ -1,8 +1,5 @@
 package com.pingcap.enums;
 
-/**
- * @author yuyang
- */
 public class Model {
 
     public static final String IMPORT = "import";
@@ -18,6 +15,10 @@ public class Model {
     public static final String M = "m";
     public static final String K = "k";
 
+    public static final String ADD = "add";
+    public static final String UPDATE = "update";
+    public static final String DELETE = "delete";
+
     public static final String GET = "get";
     public static final String TRUNCATE = "truncate";
     public static final String EXPORT = "export";
@@ -26,12 +27,12 @@ public class Model {
     public static final String TEMP_INDEX_INFO = "tempIndexInfo";
     public static final String INDEX_TYPE = "indexType";
     public static final String INDEX_TYPE_DELIMITER = "@";
-    public static final String DELETE = "<<deleteFlag>>";
 
     public static final String LOG = "logger";
     public static final String CHECK_SUM_LOG = "checkSumLog";
     public static final String AUDIT_LOG = "auditLog";
     public static final String REDO_LOG = "redoLog";
+    public static final String CS_FAIL_LOG = "csFailLog";
 
     public static final String TASK = "tikv.task";
     public static final String PD = "importer.tikv.pd";
@@ -40,15 +41,16 @@ public class Model {
     public static final String MAX_POOL_SIZE = "importer.tikv.maxPoolSize";
     public static final String CHECK_SUM_THREAD_NUM = "importer.checkSum.checkSumThreadNum";
     public static final String BATCH_SIZE = "importer.tikv.batchSize";
-    public static final String DELETE_FOR_TEST = "importer.tikv.deleteForTest";
+//    public static final String DELETE_FOR_TEST = "importer.tikv.deleteForTest";
 
     public static final String ENABLE_CHECK_SUM = "importer.checkSum.enabledCheckSum";
     public static final String CHECK_SUM_FILE_PATH = "importer.checkSum.checkSumFilePath";
     public static final String CHECK_SUM_DELIMITER = "importer.checkSum.checkSumDelimiter";
-    public static final String CHECK_SUM_PERCENTAGE = "importer.checkSum.checkSumPercentage";
+    //    public static final String CHECK_SUM_PERCENTAGE = "importer.checkSum.checkSumPercentage";
     public static final String SIMPLE_CHECK_SUM = "importer.checkSum.simpleCheckSum";
     public static final String CHECK_SUM_LIMIT = "importer.checkSum.limit";
-    public static final String CHECK_SUM_FAIL_FILE_PATH = "importer.checkSum.failFilePath";
+    public static final String CHECK_SUM_MOVE_PATH = "importer.checkSum.movePath";
+//    public static final String CHECK_SUM_FAIL_FILE_PATH = "importer.checkSum.failFilePath";
 
     public static final String IMPORT_FILE_PATH = "importer.in.filePath";
     public static final String MODE = "importer.in.mode";
@@ -59,8 +61,9 @@ public class Model {
     public static final String KEY_DELIMITER = "importer.in.keyDelimiter";
     public static final String ENV_ID = "importer.out.envId";
     public static final String APP_ID = "importer.out.appId";
-    public static final String TTL_TYPE = "importer.ttl.type";
-    public static final String TTL_DAY = "importer.ttl.day";
+    public static final String TTL_SKIP_TYPE = "importer.ttl.skip.type";
+    public static final String TTL_PUT_TYPE = "importer.ttl.put.type";
+    public static final String TTL = "importer.in.ttl";
     public static final String TIMER_INTERVAL = "importer.timer.interval";
     public static final String PROMETHEUS_ENABLE = "importer.prometheus.enable";
     public static final String PROMETHEUS_PORT = "importer.prometheus.port";
@@ -71,8 +74,9 @@ public class Model {
 
     public static final String REDO_TYPE = "redo.type";
     public static final String REDO_FILE_PATH = "redo.filePath";
-    public static final String REDO_BATCH_SIZE = "redo.batchSize";
+    //    public static final String REDO_BATCH_SIZE = "redo.batchSize";
     public static final String REDO_MOVE_PATH = "redo.movePath";
+    public static final String REDO_FILE_ORDER = "redo.order";
 
 
 }

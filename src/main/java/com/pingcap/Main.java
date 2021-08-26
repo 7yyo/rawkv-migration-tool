@@ -37,15 +37,19 @@ public class Main {
                 case Model.TRUNCATE:
                     RawKv.truncateRawKv(tiSession);
                     break;
+                case Model.DELETE:
+                    RawKv.deleteByKey(tiSession, System.getProperty(Model.K));
+                    break;
                 default:
                     throw new IllegalStateException(System.getProperty(Model.M));
             }
         } else {
-            // Full import, full export, data verification
+
             String task = properties.get(Model.TASK);
             String prometheusEnable = properties.get(Model.PROMETHEUS_ENABLE);
-            int prometheusPort = Integer.parseInt(properties.get(Model.PROMETHEUS_PORT));
+
             if (Model.ON.equals(prometheusEnable)) {
+                int prometheusPort = Integer.parseInt(properties.get(Model.PROMETHEUS_PORT));
                 Prometheus.initPrometheus(prometheusPort);
             }
             if (!StringUtils.isEmpty(task)) {

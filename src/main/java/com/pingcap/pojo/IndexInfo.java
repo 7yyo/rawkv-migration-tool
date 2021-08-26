@@ -14,6 +14,8 @@ public class IndexInfo {
     private String serviceTag;
     private String targetId;
     private String updateTime;
+    private String opType;
+    private String duration;
 
     public String getId() {
         return id;
@@ -67,6 +69,21 @@ public class IndexInfo {
         return updateTime;
     }
 
+    public String getOpType() {
+        return opType;
+    }
+
+    public void setOpType(String opType) {
+        this.opType = opType;
+    }
+
+    public String getDuration() {
+        return duration;
+    }
+
+    public void setDuration(String duration) {
+        this.duration = duration;
+    }
 
     public void setUpdateTime(String updateTime) {
         this.updateTime = updateTime;

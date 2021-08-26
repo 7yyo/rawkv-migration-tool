@@ -9,8 +9,6 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Future;
 
 public class CountUtil {
 
@@ -50,6 +48,19 @@ public class CountUtil {
 
     public static int compareTime(String d1, String d2) {
         SimpleDateFormat simpleDateFormat = new SimpleDateFormat("yyyy-MM-dd hh:mm:ss");
+        int result = 0;
+        try {
+            Date date1 = simpleDateFormat.parse(d1.replaceAll("T", " ").replaceAll("z", ""));
+            Date date2 = simpleDateFormat.parse(d2.replaceAll("T", " ").replaceAll("z", ""));
+            result = date1.compareTo(date2);
+        } catch (ParseException e) {
+            e.printStackTrace();
+        }
+        return Integer.compare(result, 0);
+    }
+
+    public static int compareDate(String d1, String d2) {
+        SimpleDateFormat simpleDateFormat = new SimpleDateFormat("yyyy-MM-dd");
         int result = 0;
         try {
             Date date1 = simpleDateFormat.parse(d1.replaceAll("T", " ").replaceAll("z", ""));

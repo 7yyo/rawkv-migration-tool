@@ -28,12 +28,15 @@ public class BatchPutJob extends Thread {
     private static final Logger logger = LoggerFactory.getLogger(Model.LOG);
     private static final Logger auditLog = LoggerFactory.getLogger(Model.AUDIT_LOG);
 
+    private static final long TTL_TIME = 259200000;
+
     static final Histogram DURATION = Histogram.build().name("duration").help("Everything duration").labelNames("type").register();
 
     private final String filePath;
     private final TiSession tiSession;
-    private final List<String> ttlTypeList;
-    private final HashMap<String, Long> ttlTypeCountMap;
+    private final List<String> ttlSkipTypeList;
+    private final HashMap<String, Long> ttlSkipTypeMap;
+    private final List<String> ttlPutList;
     private final String fileBlock;
     private final AtomicInteger totalImportCount;
     private final AtomicInteger totalSkipCount;
@@ -44,22 +47,38 @@ public class BatchPutJob extends Thread {
     private final CountDownLatch countDownLatch;
 //    private final int checkSumFilePathNum;
 
-    public BatchPutJob(TiSession tiSession, AtomicInteger totalImportCount, AtomicInteger totalSkipCount, AtomicInteger totalParseErrorCount, AtomicInteger totalBatchPutFailCount, String filePath, List<String> ttlTypeList, HashMap<String, Long> ttlTypeCountMap, String fileBlock, Map<String, String> properties, CountDownLatch countDownLatch, AtomicInteger totalDuplicateCount
+    public BatchPutJob(
+            TiSession tiSession,
+            AtomicInteger totalImportCount,
+            AtomicInteger totalSkipCount,
+            AtomicInteger totalParseErrorCount,
+            AtomicInteger totalBatchPutFailCount,
+            String filePath,
+            List<String> ttlSkipTypeList,
+            HashMap<String, Long> ttlSkipTypeMap,
+            String fileBlock,
+            Map<String, String> properties,
+            CountDownLatch countDownLatch,
+            AtomicInteger totalDuplicateCount,
+            List<String> ttlPutList
 //            , int checkSumFilePathNum
     ) {
+
         this.totalImportCount = totalImportCount;
         this.tiSession = tiSession;
         this.totalSkipCount = totalSkipCount;
         this.totalParseErrorCount = totalParseErrorCount;
         this.totalBatchPutFailCount = totalBatchPutFailCount;
         this.filePath = filePath;
-        this.ttlTypeList = ttlTypeList;
-        this.ttlTypeCountMap = ttlTypeCountMap;
+        this.ttlPutList = ttlPutList;
+        this.ttlSkipTypeList = ttlSkipTypeList;
+        this.ttlSkipTypeMap = ttlSkipTypeMap;
         this.fileBlock = fileBlock;
         this.properties = properties;
         this.countDownLatch = countDownLatch;
         this.totalDuplicateCount = totalDuplicateCount;
 //        this.checkSumFilePathNum = checkSumFilePathNum;
+
     }
 
     @Override
@@ -151,10 +170,9 @@ public class BatchPutJob extends Thread {
                     continue;
                 }
 
-
                 // If import file has blank line, continue.
                 if (StringUtils.isBlank(line)) {
-                    logger.warn("There are blank lines in the file={}, line={}", file.getAbsolutePath(), start + totalCount);
+                    logger.warn("There is blank lines in the file={}, line={}", file.getAbsolutePath(), start + totalCount);
                     continue;
                 }
 
@@ -198,20 +216,26 @@ public class BatchPutJob extends Thread {
                                     k = String.format(IndexInfo.KET_FORMAT, indexInfoCassandra.getEnvId(), indexInfoCassandra.getType(), indexInfoCassandra.getId());
                                 }
 
-                                // If it exists in the ttl type map, skip.
-                                if (ttlTypeList.contains(indexInfoCassandra.getType())) {
-                                    ttlTypeCountMap.put(indexInfoCassandra.getType(), ttlTypeCountMap.get(indexInfoCassandra.getType()) + 1);
-                                    auditLog.warn("Skip key={}, file={}, line={}", k, file.getAbsolutePath(), start + totalCount);
-                                    totalSkipCount.addAndGet(1);
-                                    cycleCount = RawKv.batchPut(totalCount, todo, cycleCount, batchSize, rawKvClient, kvPairs, kvList, file, totalImportCount, totalSkipCount, totalBatchPutFailCount, start + totalCount, properties);
-                                    continue;
-                                }
-
                                 // TiKV indexInfo
                                 IndexInfo.initValueIndexInfoTiKV(indexInfoTiKV, indexInfoCassandra);
 
                                 key = ByteString.copyFromUtf8(k);
                                 value = ByteString.copyFromUtf8(JSONObject.toJSONString(indexInfoTiKV));
+
+                                // If importer.ttl.put.type exists, put with ttl, then continue.
+                                if (ttlPutList.contains(indexInfoCassandra.getType())) {
+                                    rawKvClient.put(key, value, TTL_TIME);
+                                    continue;
+                                }
+
+                                // If it exists in the ttl type map, skip.
+                                if (ttlSkipTypeList.contains(indexInfoCassandra.getType())) {
+                                    ttlSkipTypeMap.put(indexInfoCassandra.getType(), ttlSkipTypeMap.get(indexInfoCassandra.getType()) + 1);
+                                    auditLog.warn("Skip key={}, file={}, line={}", k, file.getAbsolutePath(), start + totalCount);
+                                    totalSkipCount.addAndGet(1);
+                                    cycleCount = RawKv.batchPut(totalCount, todo, cycleCount, batchSize, rawKvClient, kvPairs, kvList, file, totalImportCount, totalSkipCount, totalBatchPutFailCount, start + totalCount, properties);
+                                    continue;
+                                }
 
                                 logger.debug("File={}, key={}, value={}", file.getAbsolutePath(), key.toStringUtf8(), JSONObject.toJSONString(indexInfoTiKV));
 
@@ -277,15 +301,6 @@ public class BatchPutJob extends Thread {
                                 k = String.format(IndexInfo.KET_FORMAT, indexInfoCassandra.getEnvId(), type, id);
                             }
 
-                            // Skip the type that exists in the tty type map.
-                            if (ttlTypeList.contains(type)) {
-                                ttlTypeCountMap.put(type, ttlTypeCountMap.get(type) + 1);
-                                auditLog.warn("[Skip key={} in file={} ,line={}", k, file.getAbsolutePath(), start + totalCount);
-                                totalSkipCount.addAndGet(1);
-                                cycleCount = RawKv.batchPut(totalCount, todo, cycleCount, batchSize, rawKvClient, kvPairs, kvList, file, totalImportCount, totalSkipCount, totalBatchPutFailCount, start + totalCount, properties);
-                                continue;
-                            }
-
                             // CSV has no timestamp, so don't consider.
                             String targetId = line.split(delimiter1)[2].split(delimiter2)[0];
                             indexInfoTiKV.setTargetId(targetId);
@@ -303,6 +318,20 @@ public class BatchPutJob extends Thread {
 
                             key = ByteString.copyFromUtf8(k);
                             value = ByteString.copyFromUtf8(JSONObject.toJSONString(indexInfoTiKV));
+
+                            if (ttlPutList.contains(indexInfoCassandra.getType())) {
+                                rawKvClient.put(key, value, TTL_TIME);
+                                continue;
+                            }
+
+                            // Skip the type that exists in the tty type map.
+                            if (ttlSkipTypeList.contains(type)) {
+                                ttlSkipTypeMap.put(type, ttlSkipTypeMap.get(type) + 1);
+                                auditLog.warn("[Skip key={} in file={} ,line={}", k, file.getAbsolutePath(), start + totalCount);
+                                totalSkipCount.addAndGet(1);
+                                cycleCount = RawKv.batchPut(totalCount, todo, cycleCount, batchSize, rawKvClient, kvPairs, kvList, file, totalImportCount, totalSkipCount, totalBatchPutFailCount, start + totalCount, properties);
+                                continue;
+                            }
 
                         } catch (Exception e) {
                             logger.error("Failed to parse json, file[{}], json[{}], line[{}]", file, line, start + totalCount);

@@ -23,22 +23,18 @@ public class Importer {
 
         long importStartTime = System.currentTimeMillis();
 
-        // IndexInfo / TempIndexInfo / IndexType
-        String scenes = properties.get(Model.SCENES);
-
-        // Import IndexType, key@value
-        if (Model.INDEX_TYPE.equals(scenes)) {
+        if (Model.INDEX_TYPE.equals(properties.get(Model.SCENES))) {
             IndexTypeImporter.run(properties, tiSession);
             return;
         }
 
         // Traverse all the files that need to be written.
         String importFilePath = properties.get(Model.IMPORT_FILE_PATH);
-        List<File> importFileList = FileUtil.showFileList(importFilePath);
+        List<File> importFileList = FileUtil.showFileList(importFilePath, false);
         TOTAL_IMPORT_FILE_COUNT.labels("import").inc(importFileList.size());
 
         // Remove check sum & redo folder
-        FileUtil.deleteFolder(properties.get(Model.CHECK_SUM_FILE_PATH));
+//        FileUtil.deleteFolder(properties.get(Model.CHECK_SUM_FILE_PATH));
         FileUtil.deleteFolder(properties.get(Model.BATCH_PUT_ERR_FILE_PATH));
 
         // Create check sum folder
@@ -71,35 +67,35 @@ public class Importer {
         }
 
         // After importing, start check sum if enable check sum.
-        if (Model.ON.equals(properties.get(Model.ENABLE_CHECK_SUM))) {
-
-            long checkSumStartTime = System.currentTimeMillis();
-            int checkSumThreadNum = Integer.parseInt(properties.get(Model.CHECK_SUM_THREAD_NUM));
-
-            // If turn on simple check sum, check sum file is import file.
-//            String simpleCheckSum = properties.get(Model.SIMPLE_CHECK_SUM);
-
-            List<File> checkSumFileList = FileUtil.showFileList(importFilePath);
-            ThreadPoolExecutor checkSumThreadPoolExecutor = ThreadPoolUtil.startJob(checkSumThreadNum, checkSumThreadNum);
-            TOTAL_CHECK_SUM_FILE_COUNT.labels("check sum").inc(checkSumFileList.size());
-
-            for (File checkSumFile : checkSumFileList) {
-                checkSumThreadPoolExecutor.execute(new CheckSumJsonJob(checkSumFile.getAbsolutePath(), tiSession, properties));
-            }
-
-            checkSumThreadPoolExecutor.shutdown();
-
-            try {
-                if (checkSumThreadPoolExecutor.awaitTermination(Long.MAX_VALUE, TimeUnit.SECONDS)) {
-                    duration = System.currentTimeMillis() - checkSumStartTime;
-                    logger.info("All files check sum is complete. Duration={}s.", (duration / 1000));
-                    System.exit(0);
-                }
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
-
-        }
+//        if (Model.ON.equals(properties.get(Model.ENABLE_CHECK_SUM))) {
+//
+//            long checkSumStartTime = System.currentTimeMillis();
+//            int checkSumThreadNum = Integer.parseInt(properties.get(Model.CHECK_SUM_THREAD_NUM));
+//
+//            // If turn on simple check sum, check sum file is import file.
+////            String simpleCheckSum = properties.get(Model.SIMPLE_CHECK_SUM);
+//
+//            List<File> checkSumFileList = FileUtil.showFileList(importFilePath, false);
+//            ThreadPoolExecutor checkSumThreadPoolExecutor = ThreadPoolUtil.startJob(checkSumThreadNum, checkSumThreadNum);
+//            TOTAL_CHECK_SUM_FILE_COUNT.labels("check sum").inc(checkSumFileList.size());
+//
+//            for (File checkSumFile : checkSumFileList) {
+//                checkSumThreadPoolExecutor.execute(new CheckSumJsonJob(checkSumFile.getAbsolutePath(), tiSession, properties));
+//            }
+//
+//            checkSumThreadPoolExecutor.shutdown();
+//
+//            try {
+//                if (checkSumThreadPoolExecutor.awaitTermination(Long.MAX_VALUE, TimeUnit.SECONDS)) {
+//                    duration = System.currentTimeMillis() - checkSumStartTime;
+//                    logger.info("All files check sum is complete. Duration={}s.", (duration / 1000));
+//                    System.exit(0);
+//                }
+//            } catch (InterruptedException e) {
+//                e.printStackTrace();
+//            }
+//
+//        }
 
     }
 

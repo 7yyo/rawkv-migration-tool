@@ -13,9 +13,9 @@ public class FileUtil {
 
     private static final Logger logger = LoggerFactory.getLogger(Model.LOG);
 
-    public static List<File> showFileList(String filePath) {
+    public static List<File> showFileList(String filePath, boolean sort) {
         List<File> totalFileList = new ArrayList<>();
-        List<File> fileList = loadDirectory(new File(filePath), totalFileList);
+        List<File> fileList = loadDirectory(new File(filePath), totalFileList, sort);
         if (fileList == null) {
             logger.warn("Path={} has no file.", filePath);
             System.exit(0);
@@ -28,13 +28,15 @@ public class FileUtil {
         return fileList;
     }
 
-    public static List<File> loadDirectory(File fileList, List<File> totalFileList) {
+    public static List<File> loadDirectory(File fileList, List<File> totalFileList, boolean sort) {
         File[] files = fileList.listFiles();
         if (files == null) {
             logger.error("There is no file in this path {}", fileList);
             return null;
         }
-        Arrays.sort(files, new ComparerByLastModified());
+        if (sort) {
+            Arrays.sort(files, new ComparerByTime(""));
+        }
         List<File> insideFilesList = new ArrayList<>();
         for (File file : files) {
             if (file.isDirectory()) {
@@ -44,7 +46,7 @@ public class FileUtil {
             }
         }
         for (File file : insideFilesList) {
-            loadDirectory(file, totalFileList);
+            loadDirectory(file, totalFileList, sort);
         }
         return totalFileList;
     }
@@ -68,7 +70,7 @@ public class FileUtil {
         return lines;
     }
 
-    public static HashMap<String, Long> getTtlTypeMap(List<String> list) {
+    public static HashMap<String, Long> getTtlSkipTypeMap(List<String> list) {
         HashMap<String, Long> ttlTypeCountMap = new HashMap<>(16);
         for (String ttlType : list) {
             ttlTypeCountMap.put(ttlType, 0L);
@@ -108,6 +110,9 @@ public class FileUtil {
 
     public static File createFile(String filePath) {
         File file = new File(filePath);
+        if (file.exists()) {
+            return file;
+        }
         try {
             boolean result = file.createNewFile();
             logger.debug("Result=" + result);
@@ -131,16 +136,100 @@ public class FileUtil {
         return lineIterator;
     }
 
+    public static void redoFile(String filePath, List<File> allFileList, Map<String, String> properties) {
+        File file = new File(filePath);
+        File[] files = file.listFiles();
+        if (files != null) {
+            List<File> fileList = new ArrayList<>();
+            for (File value : files) {
+                if (value.isFile()) {
+                    fileList.add(value);
+                } else {
+                    redoFile(value.getAbsolutePath(), allFileList, properties);
+                }
+            }
+            if (!fileList.isEmpty()) {
+                File[] fileCount = new File[fileList.size()];
+                for (int i = 0; i < fileList.size(); i++) {
+                    fileCount[i] = fileList.get(i);
+                }
+                Arrays.sort(fileCount, new ComparerByTime(properties.get(Model.REDO_FILE_ORDER)));
+                Collections.addAll(allFileList, fileCount);
+            }
+        }
+    }
+
+//    public static void main(String[] args) {
+//        List<File> allFileList = new ArrayList<>();
+//        redoFile("/Users/yuyang/redoF", allFileList);
+//        for (File f : allFileList) {
+//            System.out.println(f.getAbsolutePath());
+//        }
+//    }
+
 }
 
-class ComparerByLastModified implements Comparator<File> {
+class ComparerByTime implements Comparator<File> {
+
+    private final String order;
+
+    // If you sort in reverse order, pass in the parameter 'desc'
+    public ComparerByTime(String order) {
+        this.order = order;
+    }
+
     public int compare(File f1, File f2) {
-        long diff = f1.lastModified() - f2.lastModified();
-        if (diff > 0)
-            return 1;
-        else if (diff == 0)
-            return 0;
-        else
-            return -1;
+        /*
+         *  name[0]=name
+         *  name[1]=log
+         *  name[2]=date
+         *  name[3]=num
+         */
+        String[] f1Name;
+        String[] f2Name;
+        int diff = 0;
+        try {
+            f1Name = f1.getName().split("\\.");
+            f2Name = f2.getName().split("\\.");
+            int result = 0;
+            try {
+                result = CountUtil.compareDate(f1Name[2], f2Name[2]);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+            try {
+                if ("".equals(order)) {
+                    if (result > 0) {
+                        diff = 1;
+                    } else if (result == 0) {
+                        if (Integer.parseInt(f1Name[3]) > Integer.parseInt(f2Name[3])) {
+                            diff = 1;
+                        } else if (Integer.parseInt(f1Name[3]) < Integer.parseInt(f2Name[3])) {
+                            diff = -1;
+                        }
+                    } else {
+                        diff = -1;
+                    }
+                } else if ("desc".equals(order)) {
+                    if (result > 0) {
+                        diff = -1;
+                    } else if (result == 0) {
+                        if (Integer.parseInt(f1Name[3]) > Integer.parseInt(f2Name[3])) {
+                            diff = -1;
+                        } else if (Integer.parseInt(f1Name[3]) < Integer.parseInt(f2Name[3])) {
+                            diff = 1;
+                        }
+                    } else {
+                        diff = 1;
+                    }
+                }
+
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return diff;
     }
 }

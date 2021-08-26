@@ -29,11 +29,6 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
-/**
- * @author yuyang
- * <p>
- * Export every limit data until the raw kv data is completely exported.
- */
 public class Exporter {
 
     static final Histogram IMPORT_LATENCY = Histogram.build().name("import_duration").help("Import duration in seconds.").labelNames("import_duration").register();

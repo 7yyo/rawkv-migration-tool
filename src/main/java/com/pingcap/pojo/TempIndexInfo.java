@@ -8,6 +8,8 @@ public class TempIndexInfo {
     private String id;
     private String appId;
     private String targetId;
+    private String opType;
+    private String duration;
 
     public String getAppId() {
         return appId;
@@ -41,6 +43,22 @@ public class TempIndexInfo {
         this.id = id;
     }
 
+    public String getOpType() {
+        return opType;
+    }
+
+    public void setOpType(String opType) {
+        this.opType = opType;
+    }
+
+    public String getDuration() {
+        return duration;
+    }
+
+    public void setDuration(String duration) {
+        this.duration = duration;
+    }
+
     public static void key2TempIndexInfo(TempIndexInfo tempIndexInfo, String key, String keyDelimiter) {
         tempIndexInfo.setEnvId(key.split(keyDelimiter)[1]);
         tempIndexInfo.setId(key.split(keyDelimiter)[2]);
@@ -48,10 +66,10 @@ public class TempIndexInfo {
 
     public boolean equals(TempIndexInfo tempIndexInfo) {
 //        boolean envIdC = this.envId.equals(tmpIndexInfo.getEnvId());
-//        boolean appIdC = this.appId.equals(tmpIndexInfo.getId());
-        boolean idC = this.id.equals(tempIndexInfo.getId());
+//        boolean appIdC = this.appId.equals(tempIndexInfo.getId());
+//        boolean idC = this.id.equals(tempIndexInfo.getId());
         boolean targetIdC = this.targetId.equals(tempIndexInfo.getTargetId());
-        return idC && targetIdC;
+        return targetIdC;
     }
 
     public static void initValueTempIndexInfo(TempIndexInfo tempIndexInfoTiKV, TempIndexInfo tempIndexInfoCassandra) {

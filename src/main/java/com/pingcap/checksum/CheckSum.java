@@ -22,6 +22,7 @@ import java.io.*;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.charset.StandardCharsets;
+import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
@@ -315,7 +316,7 @@ public class CheckSum {
         String delimiter2 = properties.get(Model.DELIMITER_2);
 
         String envId = properties.get(Model.ENV_ID);
-        String ttlType = properties.get(Model.TTL_TYPE);
+        String ttlSkipType = properties.get(Model.TTL_SKIP_TYPE);
 
         JSONObject jsonObject;
         if (originalFileIt != null) {
@@ -339,7 +340,7 @@ public class CheckSum {
                                     // key = indexInfo_:_{envid}_:_{type}_:_{id}
                                     key = String.format(IndexInfo.KET_FORMAT, envId, indexInfoOriginal.getType(), indexInfoOriginal.getId());
 
-                                    if (ttlType.contains(key.split(keyDelimiter)[2])) {
+                                    if (ttlSkipType.contains(key.split(keyDelimiter)[2])) {
                                         continue;
                                     }
 
@@ -411,7 +412,7 @@ public class CheckSum {
                         try {
 
                             IndexInfo.csv2IndexInfo(indexInfoOriginal, originalLine, delimiter1, delimiter2);
-                            if (ttlType.contains(indexInfoOriginal.getType())) {
+                            if (ttlSkipType.contains(indexInfoOriginal.getType())) {
                                 continue;
                             }
 
@@ -459,14 +460,20 @@ public class CheckSum {
         int checkSumThreadNum = Integer.parseInt(properties.get(Model.CHECK_SUM_THREAD_NUM));
         List<File> checkSumFileList;
 
+        AtomicInteger fileNum = new AtomicInteger(0);
+
         if (!Model.ON.equals(simpleCheckSum)) {
-            checkSumFileList = FileUtil.showFileList(checkSumFilePath);
+            checkSumFileList = FileUtil.showFileList(checkSumFilePath, false);
         } else {
-            checkSumFileList = FileUtil.showFileList(properties.get(Model.IMPORT_FILE_PATH));
+            checkSumFileList = FileUtil.showFileList(properties.get(Model.IMPORT_FILE_PATH), false);
         }
         ThreadPoolExecutor checkSumThreadPoolExecutor = ThreadPoolUtil.startJob(checkSumThreadNum, checkSumThreadNum);
+        SimpleDateFormat simpleDateFormat = new SimpleDateFormat("yyyyMMddhhmmss");
+        String now = simpleDateFormat.format(new Date());
+        FileUtil.createFolder(properties.get(Model.CHECK_SUM_MOVE_PATH));
+        FileUtil.createFolder(properties.get(Model.CHECK_SUM_MOVE_PATH) + "/" + now);
         for (File checkSumFile : checkSumFileList) {
-            checkSumThreadPoolExecutor.execute(new CheckSumJsonJob(checkSumFile.getAbsolutePath(), tiSession, properties));
+            checkSumThreadPoolExecutor.execute(new CheckSumJsonJob(checkSumFile.getAbsolutePath(), tiSession, properties, fileNum, now));
         }
 
         checkSumThreadPoolExecutor.shutdown();
