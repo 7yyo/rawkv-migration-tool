@@ -7,6 +7,7 @@ import com.pingcap.pojo.IndexInfo;
 import com.pingcap.pojo.TempIndexInfo;
 import com.pingcap.util.CountUtil;
 import com.pingcap.util.FileUtil;
+import com.pingcap.util.PropertiesUtil;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.LineIterator;
 import org.slf4j.Logger;
@@ -35,11 +36,16 @@ public class Redo {
 
         long startTime = System.currentTimeMillis();
 
+        PropertiesUtil.checkConfig(properties, REDO_FILE_PATH);
         String redoFilePath = properties.get(Model.REDO_FILE_PATH);
+
+        PropertiesUtil.checkConfig(properties, REDO_MOVE_PATH);
         String moveFilePath = properties.get(Model.REDO_MOVE_PATH);
+
+        PropertiesUtil.checkConfig(properties, REDO_TYPE);
         String type = properties.get(Model.REDO_TYPE);
 
-        // MoveFilePath+yyyyMMddhhmmss
+        // MoveFilePath
         SimpleDateFormat simpleDateFormat = new SimpleDateFormat("yyyyMMddhhmmss");
         String now = simpleDateFormat.format(new Date());
         FileUtil.createFolder(moveFilePath);
@@ -73,17 +79,17 @@ public class Redo {
         JSONObject jsonObject;
         LineIterator lineIterator;
         int redoFileLineCount;
-        String redoLine, k, v, envId;
+        String redoLine, k, envId;
         ByteString vv;
         RawKVClient rawKVClient = tiSession.createRawClient();
-//        ByteBuffer byteBuffer;
         IndexInfo indexInfoRedo, indexInfoRedoValue, indexInfoTiKVValue;
         TempIndexInfo tempIndexInfoRedo, tempIndexInfoRedoValue;
-//        long ttl;
 
         if (redoNotExistsFileChannel != null && redoFileFileChannel != null) {
 
             List<File> redoFileList = new ArrayList<>();
+            // Sort redo folder
+            // x.log.yyyyMMdd.n
             FileUtil.redoFile(redoFilePath, redoFileList, properties);
             int n = 0;
             for (File redoFile : redoFileList) {
@@ -139,11 +145,10 @@ public class Redo {
                                 }
                                 k = String.format(IndexInfo.KET_FORMAT, envId, indexInfoRedo.getType(), indexInfoRedo.getId());
                                 vv = rawKVClient.get(ByteString.copyFromUtf8(k));
-                                v = vv.toStringUtf8();
                                 switch (indexInfoRedo.getOpType()) {
                                     case ADD:
                                         if (!vv.isEmpty()) {
-                                            indexInfoTiKVValue = JSON.parseObject(v, IndexInfo.class);
+                                            indexInfoTiKVValue = JSON.parseObject(vv.toStringUtf8(), IndexInfo.class);
                                             if (indexInfoRedo.getUpdateTime() != null && indexInfoTiKVValue.getUpdateTime() != null) {
                                                 // Redo > KV
                                                 if (CountUtil.compareTime(indexInfoRedo.getUpdateTime(), indexInfoTiKVValue.getUpdateTime()) >= 0) {
@@ -167,7 +172,7 @@ public class Redo {
                                         break;
                                     case UPDATE:
                                         if (!vv.isEmpty()) {
-                                            indexInfoTiKVValue = JSON.parseObject(v, IndexInfo.class);
+                                            indexInfoTiKVValue = JSON.parseObject(vv.toStringUtf8(), IndexInfo.class);
                                             if (indexInfoRedo.getUpdateTime() != null && indexInfoTiKVValue.getUpdateTime() != null) {
                                                 if (CountUtil.compareTime(indexInfoRedo.getUpdateTime(), indexInfoTiKVValue.getUpdateTime()) >= 0) {
                                                     indexInfoRedoValue = new IndexInfo();
@@ -191,10 +196,10 @@ public class Redo {
                                         }
                                         break;
                                     case DELETE:
-                                        indexInfoTiKVValue = JSON.parseObject(v, IndexInfo.class);
                                         if (!vv.isEmpty()) {
+                                            indexInfoTiKVValue = JSON.parseObject(vv.toStringUtf8(), IndexInfo.class);
                                             if (indexInfoRedo.getUpdateTime() != null && indexInfoTiKVValue.getUpdateTime() != null) {
-                                                indexInfoTiKVValue = JSON.parseObject(v, IndexInfo.class);
+                                                indexInfoTiKVValue = JSON.parseObject(vv.toStringUtf8(), IndexInfo.class);
                                                 if (CountUtil.compareTime(indexInfoRedo.getUpdateTime(), indexInfoTiKVValue.getUpdateTime()) >= 0) {
                                                     delete(rawKVClient, k, redoSummary, redoLine, totalCount);
                                                 } else {
@@ -278,33 +283,6 @@ public class Redo {
         }
         redoSummary.setRedo(redoSummary.getRedo() + 1);
     }
-
-//    public static int batchPut(int aroundCount, int redoFileLine, int totalCount, RawKVClient rawKVClient, Map<ByteString, ByteString> kvParis, RedoSummary redoSummary, int batchSize, FileChannel fileChannel, String redoLine) {
-//        if (aroundCount == batchSize || redoFileLine == totalCount) {
-//            try {
-//                rawKVClient.batchPut(kvParis);
-//                redoSummary.setRedo(redoSummary.getRedo() + kvParis.size());
-//            } catch (Exception e) {
-//                StringBuilder errMsg = new StringBuilder();
-//                errMsg.append("Batch put failed, keys=\n");
-//                for (Map.Entry<ByteString, ByteString> kv : kvParis.entrySet()) {
-//                    errMsg.append(kv.getKey()).append("\n");
-//                }
-//                redoSummary.setPutErr(redoSummary.getPutErr() + kvParis.size());
-//                redoLog.error(errMsg.toString(), e);
-//                ByteBuffer byteBuffer = StandardCharsets.UTF_8.encode(redoLine + "\n");
-//                try {
-//                    fileChannel.write(byteBuffer);
-//                } catch (IOException ioException) {
-//                    ioException.printStackTrace();
-//                }
-//            } finally {
-//                kvParis.clear();
-//                aroundCount = 0;
-//            }
-//        }
-//        return aroundCount;
-//    }
 
     public static void delete(RawKVClient rawKVClient, String k, RedoSummary redoSummary, String fileLine, int lineNum) {
         try {

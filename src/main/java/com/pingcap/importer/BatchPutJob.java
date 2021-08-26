@@ -7,6 +7,7 @@ import com.pingcap.pojo.IndexInfo;
 import com.pingcap.pojo.ServiceTag;
 import com.pingcap.pojo.TempIndexInfo;
 import com.pingcap.rawkv.RawKv;
+import com.pingcap.util.PropertiesUtil;
 import io.prometheus.client.Histogram;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.LineIterator;
@@ -28,7 +29,7 @@ public class BatchPutJob extends Thread {
     private static final Logger logger = LoggerFactory.getLogger(Model.LOG);
     private static final Logger auditLog = LoggerFactory.getLogger(Model.AUDIT_LOG);
 
-    private static final long TTL_TIME = 259200000;
+    private static final long TTL_TIME = 604800000;
 
     static final Histogram DURATION = Histogram.build().name("duration").help("Everything duration").labelNames("type").register();
 
@@ -45,7 +46,6 @@ public class BatchPutJob extends Thread {
     private final AtomicInteger totalDuplicateCount;
     private final Map<String, String> properties;
     private final CountDownLatch countDownLatch;
-//    private final int checkSumFilePathNum;
 
     public BatchPutJob(
             TiSession tiSession,
@@ -60,10 +60,7 @@ public class BatchPutJob extends Thread {
             Map<String, String> properties,
             CountDownLatch countDownLatch,
             AtomicInteger totalDuplicateCount,
-            List<String> ttlPutList
-//            , int checkSumFilePathNum
-    ) {
-
+            List<String> ttlPutList) {
         this.totalImportCount = totalImportCount;
         this.tiSession = tiSession;
         this.totalSkipCount = totalSkipCount;
@@ -77,21 +74,24 @@ public class BatchPutJob extends Thread {
         this.properties = properties;
         this.countDownLatch = countDownLatch;
         this.totalDuplicateCount = totalDuplicateCount;
-//        this.checkSumFilePathNum = checkSumFilePathNum;
 
     }
 
     @Override
     public void run() {
 
+        PropertiesUtil.checkConfig(properties, Model.SCENES);
         String scenes = properties.get(Model.SCENES);
+        PropertiesUtil.checkConfig(properties, Model.MODE);
         String importMode = properties.get(Model.MODE);
 
+        PropertiesUtil.checkConfig(properties, Model.ENV_ID);
         String envId = properties.get(Model.ENV_ID);
+        PropertiesUtil.checkConfig(properties, Model.APP_ID);
         String appId = properties.get(Model.APP_ID);
 
+        PropertiesUtil.checkConfig(properties, Model.BATCH_SIZE);
         int batchSize = Integer.parseInt(properties.get(Model.BATCH_SIZE));
-//        int checkSumPercentage = Integer.parseInt(properties.get(Model.CHECK_SUM_PERCENTAGE));
 
         File file = new File(filePath);
 
@@ -99,19 +99,9 @@ public class BatchPutJob extends Thread {
         int start = Integer.parseInt(fileBlock.split(",")[0]);
         int todo = Integer.parseInt(fileBlock.split(",")[1]);// todoImportFileLine  = How many rows the child thread has to process
 
-        // If turn off simpleCheckSum & enable check sum, write check sum log.
-//        String simpleCheckSum = properties.get(Model.SIMPLE_CHECK_SUM);
-//        String enableCheckSum = properties.get(Model.ENABLE_CHECK_SUM);
-//        boolean writeCheckSumFile = Model.ON.equals(enableCheckSum) && !Model.ON.equals(simpleCheckSum);
-//
-//        FileChannel checkSumFileChannel = null;
-//        if (writeCheckSumFile) {
-//            checkSumFileChannel = CheckSum.initCheckSumLog(properties, file, checkSumFilePathNum);
-//        }
 
-        // Raw kv client.
         RawKVClient rawKvClient = tiSession.createRawClient();
-        // Batch put kv map.
+
         HashMap<ByteString, ByteString> kvPairs = new HashMap<>(16);
         // Batch get kv list.
         List<String> kvList = new ArrayList<>();
@@ -126,33 +116,20 @@ public class BatchPutJob extends Thread {
             }
             fileBlockTimer.observeDuration();
 
-            // Cassandra is from original data file.
-            // TiKV is will be put raw kv.
+            // Cassandra is from original data file, TiKV is will be put raw kv.
             IndexInfo indexInfoCassandra;
             IndexInfo indexInfoTiKV = new IndexInfo();
 
             TempIndexInfo tempIndexInfoCassandra;
             TempIndexInfo tempIndexInfoTiKV = new TempIndexInfo();
 
-            // Exists is already in raw kv.
-//            IndexInfo existsIndexInfo;
-//            TempIndexInfo existsTempIndexInfo;
-
             // For CSV format, There may be have two delimiter, if CSV has only one delimiter, delimiter2 is invalid.
             String delimiter1 = properties.get(Model.DELIMITER_1);
             String delimiter2 = properties.get(Model.DELIMITER_2);
-            // Check sum delimiter, default @#@#@ ======== key@#@#@fileLine.
-//            String checkSumDelimiter = properties.get(Model.CHECK_SUM_DELIMITER);
-            // For TempIndexInfo, CSV has no updateTime col, so we should add this col, this format is yyyy-MM-dd hh:mm:ss
-//            SimpleDateFormat simpleDateFormat = new SimpleDateFormat("yyyy-MM-dd hh:mm:ss");
-            // For check sum, judge whether to write the row of data to check sum by the percentage of random number.
-//            Random random = new Random();
-
             // The string type of the key.
             String k;
             // The kv pair to be inserted into the raw kv.
             ByteString key = ByteString.EMPTY, value = ByteString.EMPTY;
-//                    , existsValue;
             String line, id, type; // Import file line. Import line col: id, type.
             JSONObject jsonObject; // For import file format is json.
 
@@ -162,7 +139,6 @@ public class BatchPutJob extends Thread {
 
                 cycleCount++;
                 totalCount++;
-//                logger.info(cycleCount + "===" + totalCount);
 
                 try {
                     line = lineIterator.nextLine();
@@ -170,9 +146,10 @@ public class BatchPutJob extends Thread {
                     continue;
                 }
 
-                // If import file has blank line, continue.
+                // If import file has blank line, continue, recode skip+1.
                 if (StringUtils.isBlank(line)) {
                     logger.warn("There is blank lines in the file={}, line={}", file.getAbsolutePath(), start + totalCount);
+                    totalSkipCount.addAndGet(1);
                     continue;
                 }
 
@@ -184,7 +161,6 @@ public class BatchPutJob extends Thread {
 
                     case Model.JSON_FORMAT:
                         try {
-                            // Regardless of tempIndexInfo or indexInfo, the conversion of JSONObject is the same logic.
                             jsonObject = JSONObject.parseObject(line);
                             parseJsonTimer.observeDuration();
                         } catch (Exception e) {
@@ -225,6 +201,7 @@ public class BatchPutJob extends Thread {
                                 // If importer.ttl.put.type exists, put with ttl, then continue.
                                 if (ttlPutList.contains(indexInfoCassandra.getType())) {
                                     rawKvClient.put(key, value, TTL_TIME);
+                                    cycleCount = RawKv.batchPut(totalCount, todo, cycleCount, batchSize, rawKvClient, kvPairs, kvList, file, totalImportCount, totalSkipCount, totalBatchPutFailCount, start + totalCount, properties);
                                     continue;
                                 }
 
@@ -244,32 +221,12 @@ public class BatchPutJob extends Thread {
                             case Model.TEMP_INDEX_INFO:
 
                                 tempIndexInfoCassandra = JSON.toJavaObject(jsonObject, TempIndexInfo.class);
-                                // TempIndexInfo has no timestamp, so we should add current timestamp for data.
-//                                tempIndexInfoCassandra.setUpdateTime(simpleDateFormat.format(new Date()));
-                                toObjTimer.observeDuration();
 
                                 if (envId != null) {
                                     k = String.format(TempIndexInfo.KEY_FORMAT, envId, tempIndexInfoCassandra.getId());
                                 } else {
                                     k = String.format(TempIndexInfo.KEY_FORMAT, tempIndexInfoCassandra.getEnvId(), tempIndexInfoCassandra.getId());
                                 }
-
-                                // Compare this kv tso with kvPairs
-//                                existsValue = kvPairs.get(ByteString.copyFromUtf8(k));
-//                                if (existsValue != null && !existsValue.isEmpty()) {
-//                                    JSONObject existsJSONObject = JSONObject.parseObject(existsValue.toStringUtf8());
-//                                    existsTempIndexInfo = JSON.toJavaObject(existsJSONObject, TempIndexInfo.class);
-//                                    // exist time > update time
-//                                    if (CountUtil.compareTime(existsTempIndexInfo.getUpdateTime(), tempIndexInfoCassandra.getUpdateTime()) < 0) {
-//                                        auditLog.warn("Skip key[{}] in kvPairs, kvPairs tso[{}], curr tso[{}], file[{}], line[{}]", k, existsTempIndexInfo.getUpdateTime(), tempIndexInfoCassandra.getUpdateTime(), file.getAbsolutePath(), start + totalCount);
-//                                        totalSkipCount.addAndGet(1);
-//                                        cycleCount = RawKv.batchPut(totalCount, todo, cycleCount, batchSize, rawKvClient, kvPairs, kvList, file, totalImportCount, totalSkipCount, totalBatchPutFailCount, start + totalCount, properties);
-//                                        continue;
-//                                    } else if ((CountUtil.compareTime(existsTempIndexInfo.getUpdateTime(), tempIndexInfoCassandra.getUpdateTime()) > 0)) {
-//                                        totalSkipCount.addAndGet(1);
-//                                        auditLog.warn("Cover key[{}] in kvPairs, kvPairs tso[{}], curr tso[{}], file[{}], line[{}]", k, existsTempIndexInfo.getUpdateTime(), tempIndexInfoCassandra.getUpdateTime(), file.getAbsolutePath(), start + totalCount);
-//                                    }
-//                                }
 
                                 // TiKV tempIndexInfo
                                 TempIndexInfo.initValueTempIndexInfo(tempIndexInfoTiKV, tempIndexInfoCassandra);
@@ -348,17 +305,6 @@ public class BatchPutJob extends Thread {
                         return;
                 }
 
-                // Sampling data is written into the check sum file
-//                if (writeCheckSumFile) {
-//                    int ratio = random.nextInt(100 / checkSumPercentage) + 1;
-//                    if (ratio == 1) {
-//                        Histogram.Timer writeCheckSumTimer = DURATION.labels("check sum").startTimer();
-//                        if (checkSumFileChannel != null)
-//                            checkSumFileChannel.write(StandardCharsets.UTF_8.encode(k + checkSumDelimiter + (start + totalCount) + "\n"));
-//                        writeCheckSumTimer.observeDuration();
-//                    }
-//                }
-
                 ByteString du = kvPairs.put(key, value);
                 if (du != null) {
                     totalDuplicateCount.addAndGet(1);
@@ -369,9 +315,6 @@ public class BatchPutJob extends Thread {
             }
 
             try {
-//                if (writeCheckSumFile) {
-//                    if (checkSumFileChannel != null) checkSumFileChannel.close();
-//                }
                 lineIterator.close();
                 rawKvClient.close();
             } catch (Exception e) {
@@ -380,13 +323,10 @@ public class BatchPutJob extends Thread {
 
             countDownLatch.countDown();
 
-
         } catch (IOException e) {
             e.printStackTrace();
         }
 
-
     }
-
 
 }

@@ -11,6 +11,7 @@ import com.pingcap.pojo.TempIndexInfo;
 import com.pingcap.timer.CheckSumTimer;
 import com.pingcap.util.CountUtil;
 import com.pingcap.util.FileUtil;
+import com.pingcap.util.PropertiesUtil;
 import io.prometheus.client.Histogram;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.LineIterator;
@@ -51,21 +52,9 @@ public class CheckSumJsonJob implements Runnable {
     @Override
     public void run() {
 
-//        String simpleCheckSum = properties.get(SIMPLE_CHECK_SUM);
-//        if (!ON.equals(simpleCheckSum)) {
-//            CheckSum.checkSum(checkSumFilePath, tiSession, properties);
-//        } else {
-//            CheckSum.doRedo(checkSumFilePath, tiSession, properties);
-//        }
-
-//        String simpleCheckSum = properties.get(SIMPLE_CHECK_SUM);
-//
-//        if (ON.equals(simpleCheckSum)) {
-//            CheckSum.doRedo(checkSumFilePath, tiSession, properties);
-//        } else {
-
         logger.info("Start check sum file={}", checkSumFilePath);
 
+        PropertiesUtil.checkConfig(properties, TTL_SKIP_TYPE);
         List<String> ttlSkipTypeList = new ArrayList<>(Arrays.asList(properties.get(TTL_SKIP_TYPE).split(",")));
 
         int parseErr = 0;
@@ -79,6 +68,7 @@ public class CheckSumJsonJob implements Runnable {
 
         Timer timer = new Timer();
         CheckSumTimer checkSumTimer = new CheckSumTimer(checkSumFilePath, totalLine, FileUtil.getFileLines(checkSumFile));
+        PropertiesUtil.checkConfig(properties, TIMER_INTERVAL);
         timer.schedule(checkSumTimer, 5000, Long.parseLong(properties.get(TIMER_INTERVAL)));
 
         IndexInfo indexInfoRawKv, indexInfoOriginal, rawKvIndexInfoValue;
@@ -90,9 +80,17 @@ public class CheckSumJsonJob implements Runnable {
         JSONObject jsonObject;
         String key, value, envId, checkSumFileLine;
         int limit = 0, totalCount = 0;
+
+        PropertiesUtil.checkConfig(properties, CHECK_SUM_LIMIT);
         int limitSize = Integer.parseInt(properties.get(CHECK_SUM_LIMIT));
+
+        if (properties.get(MODE).equals(CSV_FORMAT)) {
+            PropertiesUtil.checkConfig(properties, DELIMITER_1);
+            PropertiesUtil.checkConfig(properties, DELIMITER_2);
+        }
         String delimiter1 = properties.get(DELIMITER_1);
         String delimiter2 = properties.get(DELIMITER_2);
+
         int lineCount = FileUtil.getFileLines(checkSumFile);
 
         LineIterator originalLineIterator = FileUtil.createLineIterator(checkSumFile);
@@ -236,12 +234,13 @@ public class CheckSumJsonJob implements Runnable {
                     csTimer.observeDuration();
                 }
             }
+            try {
+                originalLineIterator.close();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
         }
-        try {
-            originalLineIterator.close();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
+
         timer.cancel();
         logger.info("Check sum file={} complete. Total={}, notExists={}, skipParseErr={}, checkSumFail={}", checkSumFile.getAbsolutePath(), totalLine, notInsert, parseErr, checkSumFail);
 
@@ -255,5 +254,3 @@ public class CheckSumJsonJob implements Runnable {
 
     }
 }
-
-//}

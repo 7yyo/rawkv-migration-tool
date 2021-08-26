@@ -159,14 +159,6 @@ public class FileUtil {
         }
     }
 
-//    public static void main(String[] args) {
-//        List<File> allFileList = new ArrayList<>();
-//        redoFile("/Users/yuyang/redoF", allFileList);
-//        for (File f : allFileList) {
-//            System.out.println(f.getAbsolutePath());
-//        }
-//    }
-
 }
 
 class ComparerByTime implements Comparator<File> {

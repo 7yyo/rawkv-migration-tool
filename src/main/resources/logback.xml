@@ -68,7 +68,7 @@
             <pattern>%msg%n</pattern>
             <charset>utf-8</charset>
         </encoder>
-        <file>./redo.log</file>
+        <file>./csFail.log</file>
         <rollingPolicy class="ch.qos.logback.core.rolling.FixedWindowRollingPolicy">
             <fileNamePattern>./csFail.log.%i</fileNamePattern>
         </rollingPolicy>

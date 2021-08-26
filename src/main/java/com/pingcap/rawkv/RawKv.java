@@ -13,7 +13,6 @@ import org.tikv.raw.RawKVClient;
 import org.tikv.shade.com.google.protobuf.ByteString;
 
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.channels.FileChannel;
@@ -42,13 +41,6 @@ public class RawKv {
 
                     // For batch get to check exists kv
                     List<ByteString> kvList = new ArrayList<>(kvPairs.keySet());
-//                    // Just for test
-//                    if (Model.ON.equals(properties.get(Model.DELETE_FOR_TEST))) {
-//                        REQUEST_COUNTER.labels("batch delete").inc();
-//                        Histogram.Timer batchDeleteTimer = REQUEST_LATENCY.labels("batch delete").startTimer();
-//                        rawKvClient.batchDelete(kvList);
-//                        batchDeleteTimer.observeDuration();
-//                    }
 
                     Histogram.Timer batchGetTimer = REQUEST_LATENCY.labels("batch get").startTimer();
                     List<Kvrpcpb.KvPair> kvHaveList;
@@ -72,7 +64,7 @@ public class RawKv {
                     batchGetTimer.observeDuration();
                     for (Kvrpcpb.KvPair kv : kvHaveList) {
                         kvPairs.remove(kv.getKey());
-                        auditLog.warn("Skip exists key[{}], file[{}], almost line[{}]", kv.getKey().toStringUtf8(), file.getAbsolutePath(), totalLine);
+                        auditLog.warn("Skip exists key={}, file={}, almost line={}", kv.getKey().toStringUtf8(), file.getAbsolutePath(), totalLine);
                     }
                     totalSkipCount.addAndGet(kvHaveList.size());
 

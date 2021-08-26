@@ -68,8 +68,7 @@ public class TempIndexInfo {
 //        boolean envIdC = this.envId.equals(tmpIndexInfo.getEnvId());
 //        boolean appIdC = this.appId.equals(tempIndexInfo.getId());
 //        boolean idC = this.id.equals(tempIndexInfo.getId());
-        boolean targetIdC = this.targetId.equals(tempIndexInfo.getTargetId());
-        return targetIdC;
+        return this.targetId.equals(tempIndexInfo.getTargetId());
     }
 
     public static void initValueTempIndexInfo(TempIndexInfo tempIndexInfoTiKV, TempIndexInfo tempIndexInfoCassandra) {

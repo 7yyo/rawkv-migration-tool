@@ -96,7 +96,6 @@ public class IndexInfo {
             serviceTagC = this.serviceTag.equals(indexInfo.getServiceTag());
         }
         boolean targetIdC = this.targetId.equals(indexInfo.getTargetId());
-//        boolean typeC = this.type.equals(indexInfo.getType());
         return appIdC && serviceTagC && targetIdC;
     }
 
@@ -132,12 +131,6 @@ public class IndexInfo {
 
     }
 
-    /**
-     * Value = appId, serviceTag, targetId, updateTime
-     *
-     * @param indexInfoTiKV      To tikv.
-     * @param indexInfoCassandra From cassandra.
-     */
     public static void initValueIndexInfoTiKV(IndexInfo indexInfoTiKV, IndexInfo indexInfoCassandra) {
         // appId
         indexInfoTiKV.setAppId(indexInfoCassandra.getAppId());

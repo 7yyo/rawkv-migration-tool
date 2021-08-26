@@ -41,16 +41,9 @@ public class Model {
     public static final String MAX_POOL_SIZE = "importer.tikv.maxPoolSize";
     public static final String CHECK_SUM_THREAD_NUM = "importer.checkSum.checkSumThreadNum";
     public static final String BATCH_SIZE = "importer.tikv.batchSize";
-//    public static final String DELETE_FOR_TEST = "importer.tikv.deleteForTest";
 
-    public static final String ENABLE_CHECK_SUM = "importer.checkSum.enabledCheckSum";
-    public static final String CHECK_SUM_FILE_PATH = "importer.checkSum.checkSumFilePath";
-    public static final String CHECK_SUM_DELIMITER = "importer.checkSum.checkSumDelimiter";
-    //    public static final String CHECK_SUM_PERCENTAGE = "importer.checkSum.checkSumPercentage";
-    public static final String SIMPLE_CHECK_SUM = "importer.checkSum.simpleCheckSum";
     public static final String CHECK_SUM_LIMIT = "importer.checkSum.limit";
     public static final String CHECK_SUM_MOVE_PATH = "importer.checkSum.movePath";
-//    public static final String CHECK_SUM_FAIL_FILE_PATH = "importer.checkSum.failFilePath";
 
     public static final String IMPORT_FILE_PATH = "importer.in.filePath";
     public static final String MODE = "importer.in.mode";
@@ -74,7 +67,6 @@ public class Model {
 
     public static final String REDO_TYPE = "redo.type";
     public static final String REDO_FILE_PATH = "redo.filePath";
-    //    public static final String REDO_BATCH_SIZE = "redo.batchSize";
     public static final String REDO_MOVE_PATH = "redo.movePath";
     public static final String REDO_FILE_ORDER = "redo.order";
 

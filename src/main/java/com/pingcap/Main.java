@@ -46,12 +46,13 @@ public class Main {
         } else {
 
             String task = properties.get(Model.TASK);
-            String prometheusEnable = properties.get(Model.PROMETHEUS_ENABLE);
 
-            if (Model.ON.equals(prometheusEnable)) {
-                int prometheusPort = Integer.parseInt(properties.get(Model.PROMETHEUS_PORT));
-                Prometheus.initPrometheus(prometheusPort);
+            if (properties.get(Model.PROMETHEUS_ENABLE) != null) {
+                if (Model.ON.equals(properties.get(Model.PROMETHEUS_ENABLE))) {
+                    Prometheus.initPrometheus(Integer.parseInt(properties.get(Model.PROMETHEUS_PORT)));
+                }
             }
+
             if (!StringUtils.isEmpty(task)) {
                 switch (task) {
                     case Model.IMPORT:

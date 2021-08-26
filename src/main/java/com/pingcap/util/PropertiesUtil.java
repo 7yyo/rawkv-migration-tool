@@ -31,4 +31,11 @@ public class PropertiesUtil {
         return propertiesMap;
     }
 
+    public static void checkConfig(Map<String, String> properties, String configName) {
+        if (properties.get(configName) == null) {
+            logger.error("Configuration item must be added={}", configName);
+            System.exit(0);
+        }
+    }
+
 }
