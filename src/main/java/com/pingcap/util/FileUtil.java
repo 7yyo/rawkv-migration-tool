@@ -70,8 +70,8 @@ public class FileUtil {
         return lines;
     }
 
-    public static HashMap<String, Long> getTtlSkipTypeMap(List<String> list) {
-        HashMap<String, Long> ttlTypeCountMap = new HashMap<>(16);
+    public static LinkedHashMap<String, Long> getTtlSkipTypeMap(List<String> list) {
+        LinkedHashMap<String, Long> ttlTypeCountMap = new LinkedHashMap<>(16);
         for (String ttlType : list) {
             ttlTypeCountMap.put(ttlType, 0L);
         }
@@ -81,6 +81,7 @@ public class FileUtil {
     public static synchronized void createFolder(String folderPath) {
         File checkSumFolder = new File(folderPath);
         if (checkSumFolder.exists()) {
+            logger.warn("Folder={} has been created, skip.", folderPath);
             return;
         }
         if (!checkSumFolder.mkdir()) {
@@ -153,6 +154,7 @@ public class FileUtil {
                 for (int i = 0; i < fileList.size(); i++) {
                     fileCount[i] = fileList.get(i);
                 }
+                // Whether to sort
                 Arrays.sort(fileCount, new ComparerByTime(properties.get(Model.REDO_FILE_ORDER)));
                 Collections.addAll(allFileList, fileCount);
             }

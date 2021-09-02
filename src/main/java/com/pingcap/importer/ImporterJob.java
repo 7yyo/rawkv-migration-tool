@@ -39,9 +39,10 @@ public class ImporterJob implements Runnable {
 
         long startTime = System.currentTimeMillis();
 
-        HashMap<String, Long> ttlSkipTypeMap = new HashMap<>();
         PropertiesUtil.checkConfig(properties, Model.TTL_SKIP_TYPE);
         List<String> ttlSkipTypeList = new ArrayList<>(Arrays.asList(properties.get(Model.TTL_SKIP_TYPE).split(",")));
+        // Used to count the number of skipped entries for each ttl type.
+        LinkedHashMap<String, Long> ttlSkipTypeMap = new LinkedHashMap<>();
         if (!ttlSkipTypeList.isEmpty()) {
             ttlSkipTypeMap = FileUtil.getTtlSkipTypeMap(ttlSkipTypeList);
         }

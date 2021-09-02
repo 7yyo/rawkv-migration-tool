@@ -28,7 +28,6 @@ public class Main {
         Map<String, String> properties = PropertiesUtil.getProperties(propertiesPath);
         TiSession tiSession = TiSessionUtil.getTiSession(properties);
 
-        // Some API.
         if (!StringUtils.isEmpty(System.getProperty(Model.M))) {
             switch (System.getProperty(Model.M)) {
                 case Model.GET:
@@ -39,6 +38,9 @@ public class Main {
                     break;
                 case Model.DELETE:
                     RawKv.deleteByKey(tiSession, System.getProperty(Model.K));
+                    break;
+                case Model.DELETE_BY_PREFIX:
+                    RawKv.deleteByPrefix(tiSession, System.getProperty(Model.K));
                     break;
                 default:
                     throw new IllegalStateException(System.getProperty(Model.M));

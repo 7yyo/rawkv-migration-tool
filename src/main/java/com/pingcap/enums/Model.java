@@ -5,6 +5,7 @@ public class Model {
     public static final String IMPORT = "import";
     public static final String CHECK_SUM = "checkSum";
     public static final String REDO = "redo";
+    public static final String EXPORT = "export";
 
     public static final String JSON_FORMAT = "json";
     public static final String CSV_FORMAT = "csv";
@@ -14,14 +15,12 @@ public class Model {
     public static final String P = "p";
     public static final String M = "m";
     public static final String K = "k";
-
+    public static final String GET = "get";
+    public static final String TRUNCATE = "truncate";
+    public static final String DELETE_BY_PREFIX = "deleteByPrefix";
     public static final String ADD = "add";
     public static final String UPDATE = "update";
     public static final String DELETE = "delete";
-
-    public static final String GET = "get";
-    public static final String TRUNCATE = "truncate";
-    public static final String EXPORT = "export";
 
     public static final String INDEX_INFO = "indexInfo";
     public static final String TEMP_INDEX_INFO = "tempIndexInfo";
@@ -32,26 +31,28 @@ public class Model {
     public static final String CHECK_SUM_LOG = "checkSumLog";
     public static final String AUDIT_LOG = "auditLog";
     public static final String REDO_LOG = "redoLog";
-    public static final String CS_FAIL_LOG = "csFailLog";
+    public static final String CS_FAIL_LOG = "checkSumFailLog";
+    public static final String BP_FAIL_LOG = "batchPutFailLog";
 
     public static final String TASK = "tikv.task";
     public static final String PD = "importer.tikv.pd";
-    public static final String INTERNAL_THREAD_NUM = "importer.tikv.internalThreadNum";
-    public static final String CORE_POOL_SIZE = "importer.tikv.corePoolSize";
-    public static final String MAX_POOL_SIZE = "importer.tikv.maxPoolSize";
-    public static final String CHECK_SUM_THREAD_NUM = "importer.checkSum.checkSumThreadNum";
-    public static final String BATCH_SIZE = "importer.tikv.batchSize";
 
+    public static final String CHECK_SUM_THREAD_NUM = "importer.checkSum.checkSumThreadNum";
     public static final String CHECK_SUM_LIMIT = "importer.checkSum.limit";
     public static final String CHECK_SUM_MOVE_PATH = "importer.checkSum.movePath";
 
     public static final String IMPORT_FILE_PATH = "importer.in.filePath";
     public static final String MODE = "importer.in.mode";
     public static final String SCENES = "importer.in.scenes";
-    public static final String BATCH_PUT_ERR_FILE_PATH = "importer.in.batchPutErrFilePath";
+    public static final String INTERNAL_THREAD_NUM = "importer.tikv.internalThreadNum";
+    public static final String CORE_POOL_SIZE = "importer.tikv.corePoolSize";
+    public static final String MAX_POOL_SIZE = "importer.tikv.maxPoolSize";
+    public static final String BATCH_SIZE = "importer.tikv.batchSize";
+//    public static final String BATCH_PUT_ERR_FILE_PATH = "importer.in.batchPutErrFilePath";
     public static final String DELIMITER_1 = "importer.in.delimiter_1";
     public static final String DELIMITER_2 = "importer.in.delimiter_2";
     public static final String KEY_DELIMITER = "importer.in.keyDelimiter";
+    public static final String CHECK_EXISTS_KEY = "importer.in.checkExistsKey";
     public static final String ENV_ID = "importer.out.envId";
     public static final String APP_ID = "importer.out.appId";
     public static final String TTL_SKIP_TYPE = "importer.ttl.skip.type";

@@ -45,11 +45,6 @@
             <artifactId>fastjson</artifactId>
             <version>1.2.75</version>
         </dependency>
-<!--        <dependency>
-            <groupId>org.tikv</groupId>
-            <artifactId>tikv-client-java</artifactId>
-            <version>3.1.0</version>
-        </dependency>-->
         <dependency>
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-api</artifactId>
@@ -58,7 +53,7 @@
         <dependency>
             <groupId>ch.qos.logback</groupId>
             <artifactId>logback-classic</artifactId>
-            <version>1.2.3</version>
+            <version>1.2.4</version>
         </dependency>
         <dependency>
             <groupId>commons-io</groupId>

@@ -17,7 +17,7 @@
             <fileNamePattern>./toTiKV.log.%i</fileNamePattern>
         </rollingPolicy>
         <triggeringPolicy class="ch.qos.logback.core.rolling.SizeBasedTriggeringPolicy">
-            <MaxFileSize>100MB</MaxFileSize>
+            <MaxFileSize>300MB</MaxFileSize>
         </triggeringPolicy>
     </appender>
 
@@ -31,7 +31,7 @@
             <fileNamePattern>./audit.log.%i</fileNamePattern>
         </rollingPolicy>
         <triggeringPolicy class="ch.qos.logback.core.rolling.SizeBasedTriggeringPolicy">
-            <MaxFileSize>100MB</MaxFileSize>
+            <MaxFileSize>300MB</MaxFileSize>
         </triggeringPolicy>
     </appender>
 
@@ -45,7 +45,7 @@
             <fileNamePattern>./checkSum.log.%i</fileNamePattern>
         </rollingPolicy>
         <triggeringPolicy class="ch.qos.logback.core.rolling.SizeBasedTriggeringPolicy">
-            <MaxFileSize>100MB</MaxFileSize>
+            <MaxFileSize>300MB</MaxFileSize>
         </triggeringPolicy>
     </appender>
 
@@ -59,21 +59,35 @@
             <fileNamePattern>./redo.log.%i</fileNamePattern>
         </rollingPolicy>
         <triggeringPolicy class="ch.qos.logback.core.rolling.SizeBasedTriggeringPolicy">
-            <MaxFileSize>100MB</MaxFileSize>
+            <MaxFileSize>300MB</MaxFileSize>
         </triggeringPolicy>
     </appender>
 
-    <appender name="csFail" class="ch.qos.logback.core.rolling.RollingFileAppender">
+    <appender name="checkSumFail" class="ch.qos.logback.core.rolling.RollingFileAppender">
         <encoder>
             <pattern>%msg%n</pattern>
             <charset>utf-8</charset>
         </encoder>
-        <file>./csFail.log</file>
+        <file>./checkSumFail/checkSumFail.json</file>
         <rollingPolicy class="ch.qos.logback.core.rolling.FixedWindowRollingPolicy">
-            <fileNamePattern>./csFail.log.%i</fileNamePattern>
+            <fileNamePattern>./checkSumFail.json.%i</fileNamePattern>
         </rollingPolicy>
         <triggeringPolicy class="ch.qos.logback.core.rolling.SizeBasedTriggeringPolicy">
-            <MaxFileSize>100MB</MaxFileSize>
+            <MaxFileSize>300MB</MaxFileSize>
+        </triggeringPolicy>
+    </appender>
+
+    <appender name="batchPutFail" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <encoder>
+            <pattern>%msg%n</pattern>
+            <charset>utf-8</charset>
+        </encoder>
+        <file>./batchPutFail/batchPutFail.json</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.FixedWindowRollingPolicy">
+            <fileNamePattern>./batchPutFail.json.%i</fileNamePattern>
+        </rollingPolicy>
+        <triggeringPolicy class="ch.qos.logback.core.rolling.SizeBasedTriggeringPolicy">
+            <MaxFileSize>300MB</MaxFileSize>
         </triggeringPolicy>
     </appender>
 
@@ -93,8 +107,12 @@
         <appender-ref ref="redo"/>
     </logger>
 
-    <logger name="csFailLog" level="INFO" additivity="true">
-        <appender-ref ref="csFail"/>
+    <logger name="checkSumFailLog" level="INFO" additivity="true">
+        <appender-ref ref="checkSumFail"/>
+    </logger>
+
+    <logger name="batchPutFailLog" level="INFO" additivity="true">
+        <appender-ref ref="batchPutFail"/>
     </logger>
 
     <root level="ERROR">

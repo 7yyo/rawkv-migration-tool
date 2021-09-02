@@ -36,18 +36,22 @@ public class Redo {
 
         long startTime = System.currentTimeMillis();
 
+        // Redo file
         PropertiesUtil.checkConfig(properties, REDO_FILE_PATH);
         String redoFilePath = properties.get(Model.REDO_FILE_PATH);
 
+        // Redo.log move path
         PropertiesUtil.checkConfig(properties, REDO_MOVE_PATH);
         String moveFilePath = properties.get(Model.REDO_MOVE_PATH);
 
+        // Redo data type, indexInfo or tempIndexInfo
         PropertiesUtil.checkConfig(properties, REDO_TYPE);
         String type = properties.get(Model.REDO_TYPE);
 
-        // MoveFilePath
         SimpleDateFormat simpleDateFormat = new SimpleDateFormat("yyyyMMddhhmmss");
         String now = simpleDateFormat.format(new Date());
+
+        // MoveFilePath
         FileUtil.createFolder(moveFilePath);
         FileUtil.createFolder(moveFilePath + "/" + now);
 
@@ -64,16 +68,16 @@ public class Redo {
         }
 
         // Manual confirmation log
-        String redoNotExistsPath = moveFilePath + "/" + now + "/" + "manual_confirmation.txt";
-        File redoNotExistsFile = FileUtil.createFile(redoNotExistsPath);
-        FileOutputStream fileOutputStream1;
-        FileChannel redoNotExistsFileChannel = null;
-        try {
-            fileOutputStream1 = new FileOutputStream(redoNotExistsFile);
-            redoNotExistsFileChannel = fileOutputStream1.getChannel();
-        } catch (FileNotFoundException e) {
-            e.printStackTrace();
-        }
+//        String redoNotExistsPath = moveFilePath + "/" + now + "/" + "manual_confirmation.txt";
+//        File redoNotExistsFile = FileUtil.createFile(redoNotExistsPath);
+//        FileOutputStream fileOutputStream1;
+//        FileChannel redoNotExistsFileChannel = null;
+//        try {
+//            fileOutputStream1 = new FileOutputStream(redoNotExistsFile);
+//            redoNotExistsFileChannel = fileOutputStream1.getChannel();
+//        } catch (FileNotFoundException e) {
+//            e.printStackTrace();
+//        }
 
         RedoSummary redoSummary;
         JSONObject jsonObject;
@@ -85,11 +89,9 @@ public class Redo {
         IndexInfo indexInfoRedo, indexInfoRedoValue, indexInfoTiKVValue;
         TempIndexInfo tempIndexInfoRedo, tempIndexInfoRedoValue;
 
-        if (redoNotExistsFileChannel != null && redoFileFileChannel != null) {
+        if (redoFileFileChannel != null) {
 
             List<File> redoFileList = new ArrayList<>();
-            // Sort redo folder
-            // x.log.yyyyMMdd.n
             FileUtil.redoFile(redoFilePath, redoFileList, properties);
             int n = 0;
             for (File redoFile : redoFileList) {
@@ -108,7 +110,7 @@ public class Redo {
                      *          a. redo
                      *      v != null
                      *          a. Raw KV > redo, not redo.
-                     *          b. Raw KV < redo, Manual confirmation.
+                     *          b. Raw KV < redo, do  redo.
                      *   2) update:
                      *      v == null
                      *          a. redo
@@ -138,58 +140,38 @@ public class Redo {
                         switch (type) {
                             case Model.INDEX_INFO:
                                 indexInfoRedo = JSON.toJavaObject(jsonObject, IndexInfo.class);
+                                // If envId exists, overwrite
                                 if (properties.get(ENV_ID) != null) {
                                     envId = properties.get(ENV_ID);
                                 } else {
                                     envId = indexInfoRedo.getEnvId();
                                 }
+                                // key
                                 k = String.format(IndexInfo.KET_FORMAT, envId, indexInfoRedo.getType(), indexInfoRedo.getId());
                                 vv = rawKVClient.get(ByteString.copyFromUtf8(k));
                                 switch (indexInfoRedo.getOpType()) {
                                     case ADD:
-                                        if (!vv.isEmpty()) {
-                                            indexInfoTiKVValue = JSON.parseObject(vv.toStringUtf8(), IndexInfo.class);
-                                            if (indexInfoRedo.getUpdateTime() != null && indexInfoTiKVValue.getUpdateTime() != null) {
-                                                // Redo > KV
-                                                if (CountUtil.compareTime(indexInfoRedo.getUpdateTime(), indexInfoTiKVValue.getUpdateTime()) >= 0) {
-                                                    write(redoLine, redoNotExistsFileChannel, redoSummary);
-                                                } else {
-                                                    redoLog.info("Key={}, redoTso={} <= rawkvTso={}, so skip.", k, indexInfoRedo.getUpdateTime(), indexInfoTiKVValue.getUpdateTime());
-                                                    redoSummary.setSkip(redoSummary.getSkip() + 1);
-                                                }
-                                            } else {
-                                                // If raw kv is empty, put.
-                                                indexInfoRedoValue = new IndexInfo();
-                                                IndexInfo.initValueIndexInfoTiKV(indexInfoRedoValue, indexInfoRedo);
-                                                put(rawKVClient, k, JSON.toJSONString(indexInfoRedoValue), redoSummary, Long.parseLong(indexInfoRedo.getDuration()), redoLine, totalCount);
-                                            }
-                                        } else {
-                                            // If raw kv is empty, put.
-                                            indexInfoRedoValue = new IndexInfo();
-                                            IndexInfo.initValueIndexInfoTiKV(indexInfoRedoValue, indexInfoRedo);
-                                            put(rawKVClient, k, JSON.toJSONString(indexInfoRedoValue), redoSummary, Long.parseLong(indexInfoRedo.getDuration()), redoLine, totalCount);
-                                        }
-                                        break;
                                     case UPDATE:
                                         if (!vv.isEmpty()) {
                                             indexInfoTiKVValue = JSON.parseObject(vv.toStringUtf8(), IndexInfo.class);
                                             if (indexInfoRedo.getUpdateTime() != null && indexInfoTiKVValue.getUpdateTime() != null) {
+                                                // Redo > RawKV
                                                 if (CountUtil.compareTime(indexInfoRedo.getUpdateTime(), indexInfoTiKVValue.getUpdateTime()) >= 0) {
                                                     indexInfoRedoValue = new IndexInfo();
                                                     IndexInfo.initValueIndexInfoTiKV(indexInfoRedoValue, indexInfoRedo);
                                                     put(rawKVClient, k, JSON.toJSONString(indexInfoRedoValue), redoSummary, Long.parseLong(indexInfoRedo.getDuration()), redoLine, totalCount);
                                                 } else {
-                                                    redoLog.info("Key={}, redoTso={} <= rawkvTso={}, so skip.", k, indexInfoRedo.getUpdateTime(), indexInfoTiKVValue.getUpdateTime());
+                                                    redoLog.info("Key={}, redoTso={} < rawkvTso={}, so skip.", k, indexInfoRedo.getUpdateTime(), indexInfoTiKVValue.getUpdateTime());
                                                     redoSummary.setSkip(redoSummary.getSkip() + 1);
                                                 }
                                             } else {
-                                                // If raw kv is empty, put.
+                                                // If timeStamp is null, put
                                                 indexInfoRedoValue = new IndexInfo();
                                                 IndexInfo.initValueIndexInfoTiKV(indexInfoRedoValue, indexInfoRedo);
                                                 put(rawKVClient, k, JSON.toJSONString(indexInfoRedoValue), redoSummary, Long.parseLong(indexInfoRedo.getDuration()), redoLine, totalCount);
                                             }
                                         } else {
-                                            // If raw kv is empty, put.
+                                            // If raw kv is not exists, put.
                                             indexInfoRedoValue = new IndexInfo();
                                             IndexInfo.initValueIndexInfoTiKV(indexInfoRedoValue, indexInfoRedo);
                                             put(rawKVClient, k, JSON.toJSONString(indexInfoRedoValue), redoSummary, Long.parseLong(indexInfoRedo.getDuration()), redoLine, totalCount);
@@ -199,16 +181,18 @@ public class Redo {
                                         if (!vv.isEmpty()) {
                                             indexInfoTiKVValue = JSON.parseObject(vv.toStringUtf8(), IndexInfo.class);
                                             if (indexInfoRedo.getUpdateTime() != null && indexInfoTiKVValue.getUpdateTime() != null) {
-                                                indexInfoTiKVValue = JSON.parseObject(vv.toStringUtf8(), IndexInfo.class);
                                                 if (CountUtil.compareTime(indexInfoRedo.getUpdateTime(), indexInfoTiKVValue.getUpdateTime()) >= 0) {
                                                     delete(rawKVClient, k, redoSummary, redoLine, totalCount);
                                                 } else {
-                                                    redoLog.info("Key={}, redoTso={} <= rawkvTso={}, so skip.", k, indexInfoRedo.getUpdateTime(), indexInfoTiKVValue.getUpdateTime());
+                                                    redoLog.info("Key={}, redoTso={} < rawkvTso={}, so skip.", k, indexInfoRedo.getUpdateTime(), indexInfoTiKVValue.getUpdateTime());
                                                     redoSummary.setSkip(redoSummary.getSkip() + 1);
                                                 }
                                             } else {
                                                 delete(rawKVClient, k, redoSummary, redoLine, totalCount);
                                             }
+                                        } else {
+                                            redoLog.info("Key={}, raw KV not exists, so skip.", k);
+                                            redoSummary.setSkip(redoSummary.getSkip() + 1);
                                         }
                                         break;
                                     default:
@@ -223,7 +207,7 @@ public class Redo {
                                     case ADD:
                                     case UPDATE:
                                         TempIndexInfo.initValueTempIndexInfo(tempIndexInfoRedoValue, tempIndexInfoRedo);
-                                        put(rawKVClient, k, JSON.toJSONString(tempIndexInfoRedoValue), redoSummary, Long.parseLong(tempIndexInfoRedo.getDuration()), redoLine, totalCount);
+                                        put(rawKVClient, k, JSON.toJSONString(tempIndexInfoRedoValue), redoSummary, 604800000L, redoLine, totalCount);
                                         break;
                                     case DELETE:
                                         delete(rawKVClient, k, redoSummary, redoLine, totalCount);
@@ -233,7 +217,7 @@ public class Redo {
                                 }
                                 break;
                             default:
-                                redoLog.error("error type={}", type);
+                                redoLog.error("Redo error type={}", type);
                                 System.exit(0);
                         }
 

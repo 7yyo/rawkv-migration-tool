@@ -95,9 +95,10 @@ public class BatchPutJob extends Thread {
 
         File file = new File(filePath);
 
-        // start = Where does the child thread start processing
+        // start_ = Where does the child thread start processing
         int start = Integer.parseInt(fileBlock.split(",")[0]);
-        int todo = Integer.parseInt(fileBlock.split(",")[1]);// todoImportFileLine  = How many rows the child thread has to process
+        // todo_ ImportFileLine  = How many rows the child thread has to process
+        int todo = Integer.parseInt(fileBlock.split(",")[1]);
 
 
         RawKVClient rawKvClient = tiSession.createRawClient();
@@ -143,11 +144,13 @@ public class BatchPutJob extends Thread {
                 try {
                     line = lineIterator.nextLine();
                 } catch (NoSuchElementException e) {
-                    continue;
+                    logger.error("LineIterator error, file = {}", file.getAbsolutePath(), e);
+                    totalParseErrorCount.addAndGet(1);
+                    break;
                 }
 
-                // If import file has blank line, continue, recode skip+1.
-                if (StringUtils.isBlank(line)) {
+                // If import file has blank line, continue, recode skip + 1.
+                if (StringUtils.isBlank(line) || "".equals(line.trim())) {
                     logger.warn("There is blank lines in the file={}, line={}", file.getAbsolutePath(), start + totalCount);
                     totalSkipCount.addAndGet(1);
                     continue;
@@ -175,7 +178,6 @@ public class BatchPutJob extends Thread {
                         switch (scenes) {
 
                             case Model.INDEX_INFO:
-
                                 // Cassandra IndexInfo
                                 indexInfoCassandra = JSON.toJavaObject(jsonObject, IndexInfo.class);
                                 if (indexInfoCassandra.getUpdateTime() != null) {
@@ -201,6 +203,7 @@ public class BatchPutJob extends Thread {
                                 // If importer.ttl.put.type exists, put with ttl, then continue.
                                 if (ttlPutList.contains(indexInfoCassandra.getType())) {
                                     rawKvClient.put(key, value, TTL_TIME);
+                                    totalImportCount.addAndGet(1);
                                     cycleCount = RawKv.batchPut(totalCount, todo, cycleCount, batchSize, rawKvClient, kvPairs, kvList, file, totalImportCount, totalSkipCount, totalBatchPutFailCount, start + totalCount, properties);
                                     continue;
                                 }
@@ -208,7 +211,7 @@ public class BatchPutJob extends Thread {
                                 // If it exists in the ttl type map, skip.
                                 if (ttlSkipTypeList.contains(indexInfoCassandra.getType())) {
                                     ttlSkipTypeMap.put(indexInfoCassandra.getType(), ttlSkipTypeMap.get(indexInfoCassandra.getType()) + 1);
-                                    auditLog.warn("Skip key={}, file={}, line={}", k, file.getAbsolutePath(), start + totalCount);
+                                    auditLog.info("Skip key={}, file={}, line={}", k, file.getAbsolutePath(), start + totalCount);
                                     totalSkipCount.addAndGet(1);
                                     cycleCount = RawKv.batchPut(totalCount, todo, cycleCount, batchSize, rawKvClient, kvPairs, kvList, file, totalImportCount, totalSkipCount, totalBatchPutFailCount, start + totalCount, properties);
                                     continue;
@@ -240,6 +243,7 @@ public class BatchPutJob extends Thread {
 
                             default:
                                 logger.error("Illegal format={}", Model.MODE);
+                                System.exit(0);
 
                         }
                         break;
@@ -291,7 +295,7 @@ public class BatchPutJob extends Thread {
                             }
 
                         } catch (Exception e) {
-                            logger.error("Failed to parse json, file[{}], json[{}], line[{}]", file, line, start + totalCount);
+                            logger.error("Failed to parse csv, file[{}], json[{}], line[{}]", file, line, start + totalCount);
                             totalParseErrorCount.addAndGet(1);
                             // if _todo_ == totalCount in json failed, batch put.
                             cycleCount = RawKv.batchPut(totalCount, todo, cycleCount, batchSize, rawKvClient, kvPairs, kvList, file, totalImportCount, totalSkipCount, totalBatchPutFailCount, start + totalCount, properties);
@@ -302,7 +306,7 @@ public class BatchPutJob extends Thread {
 
                     default:
                         logger.error("Illegal format={}", importMode);
-                        return;
+                        System.exit(0);
                 }
 
                 ByteString du = kvPairs.put(key, value);

@@ -26,7 +26,6 @@ import java.nio.channels.FileChannel;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class Exporter {
@@ -154,7 +153,6 @@ class ExportJob implements Runnable {
             }
             String key = kvPairList.get(i).getKey().toStringUtf8();
             String value = kvPairList.get(i).getValue().toStringUtf8();
-            System.out.println(key + "===" + value);
             String json;
             if (key.startsWith(INDEX_INFO_PREFIX)) {
                 jsonObject = JSONObject.parseObject(value);

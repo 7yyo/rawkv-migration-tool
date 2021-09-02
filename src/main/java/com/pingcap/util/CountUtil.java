@@ -33,13 +33,6 @@ public class CountUtil {
         return list;
     }
 
-    /**
-     * Returns the percentage of two numbers
-     *
-     * @param n1: Molecular
-     * @param n2: Denominator
-     * @return percentage
-     */
     public static String getPercentage(int n1, int n2) {
         java.text.NumberFormat numerator = java.text.NumberFormat.getInstance();
         numerator.setMaximumFractionDigits(2);

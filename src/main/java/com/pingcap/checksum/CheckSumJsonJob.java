@@ -54,6 +54,9 @@ public class CheckSumJsonJob implements Runnable {
 
         logger.info("Start check sum file={}", checkSumFilePath);
 
+        PropertiesUtil.checkConfig(properties, MODE);
+        PropertiesUtil.checkConfig(properties, SCENES);
+
         PropertiesUtil.checkConfig(properties, TTL_SKIP_TYPE);
         List<String> ttlSkipTypeList = new ArrayList<>(Arrays.asList(properties.get(TTL_SKIP_TYPE).split(",")));
 
@@ -84,12 +87,15 @@ public class CheckSumJsonJob implements Runnable {
         PropertiesUtil.checkConfig(properties, CHECK_SUM_LIMIT);
         int limitSize = Integer.parseInt(properties.get(CHECK_SUM_LIMIT));
 
+        String delimiter1 = "";
+        String delimiter2 = "";
         if (properties.get(MODE).equals(CSV_FORMAT)) {
             PropertiesUtil.checkConfig(properties, DELIMITER_1);
             PropertiesUtil.checkConfig(properties, DELIMITER_2);
+            delimiter1 = properties.get(DELIMITER_1);
+            delimiter2 = properties.get(DELIMITER_2);
         }
-        String delimiter1 = properties.get(DELIMITER_1);
-        String delimiter2 = properties.get(DELIMITER_2);
+
 
         int lineCount = FileUtil.getFileLines(checkSumFile);
 
