@@ -5,7 +5,8 @@ import org.apache.commons.lang.StringUtils;
 
 public class IndexInfo {
 
-    public static final String KET_FORMAT = "indexInfo_:_%s_:_%s_:_%s";
+    // indexInfo_:_{envid}_:_{type}_:_{id}
+    public static final String KET_FORMAT = "indexInfo%s%s%s%s%s%s";
 
     private String envId;
     private String type;

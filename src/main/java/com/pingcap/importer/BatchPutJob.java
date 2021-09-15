@@ -29,6 +29,7 @@ public class BatchPutJob extends Thread {
     private static final Logger logger = LoggerFactory.getLogger(Model.LOG);
     private static final Logger auditLog = LoggerFactory.getLogger(Model.AUDIT_LOG);
 
+    // Ttl put default 7 days.
     private static final long TTL_TIME = 604800000;
 
     static final Histogram DURATION = Histogram.build().name("duration").help("Everything duration").labelNames("type").register();
@@ -124,6 +125,8 @@ public class BatchPutJob extends Thread {
             TempIndexInfo tempIndexInfoCassandra;
             TempIndexInfo tempIndexInfoTiKV = new TempIndexInfo();
 
+            PropertiesUtil.checkConfig(properties, Model.KEY_DELIMITER);
+            String keyDelimiter = properties.get(Model.KEY_DELIMITER);
             // For CSV format, There may be have two delimiter, if CSV has only one delimiter, delimiter2 is invalid.
             String delimiter1 = properties.get(Model.DELIMITER_1);
             String delimiter2 = properties.get(Model.DELIMITER_2);
@@ -146,7 +149,7 @@ public class BatchPutJob extends Thread {
                 } catch (NoSuchElementException e) {
                     logger.error("LineIterator error, file = {}", file.getAbsolutePath(), e);
                     totalParseErrorCount.addAndGet(1);
-                    break;
+                    continue;
                 }
 
                 // If import file has blank line, continue, recode skip + 1.
@@ -189,9 +192,9 @@ public class BatchPutJob extends Thread {
 
                                 // If the configuration file is configured with envId, we need to overwrite the corresponding value in the json file
                                 if (envId != null) {
-                                    k = String.format(IndexInfo.KET_FORMAT, envId, indexInfoCassandra.getType(), indexInfoCassandra.getId());
+                                    k = String.format(IndexInfo.KET_FORMAT, keyDelimiter, envId, keyDelimiter, indexInfoCassandra.getType(), keyDelimiter, indexInfoCassandra.getId());
                                 } else {
-                                    k = String.format(IndexInfo.KET_FORMAT, indexInfoCassandra.getEnvId(), indexInfoCassandra.getType(), indexInfoCassandra.getId());
+                                    k = String.format(IndexInfo.KET_FORMAT, keyDelimiter, indexInfoCassandra.getEnvId(), keyDelimiter, indexInfoCassandra.getType(), keyDelimiter, indexInfoCassandra.getId());
                                 }
 
                                 // TiKV indexInfo
@@ -203,6 +206,7 @@ public class BatchPutJob extends Thread {
                                 // If importer.ttl.put.type exists, put with ttl, then continue.
                                 if (ttlPutList.contains(indexInfoCassandra.getType())) {
                                     rawKvClient.put(key, value, TTL_TIME);
+                                    // Single put, so +1
                                     totalImportCount.addAndGet(1);
                                     cycleCount = RawKv.batchPut(totalCount, todo, cycleCount, batchSize, rawKvClient, kvPairs, kvList, file, totalImportCount, totalSkipCount, totalBatchPutFailCount, start + totalCount, properties);
                                     continue;
@@ -226,9 +230,9 @@ public class BatchPutJob extends Thread {
                                 tempIndexInfoCassandra = JSON.toJavaObject(jsonObject, TempIndexInfo.class);
 
                                 if (envId != null) {
-                                    k = String.format(TempIndexInfo.KEY_FORMAT, envId, tempIndexInfoCassandra.getId());
+                                    k = String.format(TempIndexInfo.KEY_FORMAT, keyDelimiter, envId, keyDelimiter, tempIndexInfoCassandra.getId());
                                 } else {
-                                    k = String.format(TempIndexInfo.KEY_FORMAT, tempIndexInfoCassandra.getEnvId(), tempIndexInfoCassandra.getId());
+                                    k = String.format(TempIndexInfo.KEY_FORMAT, keyDelimiter, tempIndexInfoCassandra.getEnvId(), keyDelimiter, tempIndexInfoCassandra.getId());
                                 }
 
                                 // TiKV tempIndexInfo
@@ -257,9 +261,9 @@ public class BatchPutJob extends Thread {
                             indexInfoCassandra = new IndexInfo();
 
                             if (envId != null) {
-                                k = String.format(IndexInfo.KET_FORMAT, envId, type, id);
+                                k = String.format(IndexInfo.KET_FORMAT, keyDelimiter, envId, keyDelimiter, type, keyDelimiter, id);
                             } else {
-                                k = String.format(IndexInfo.KET_FORMAT, indexInfoCassandra.getEnvId(), type, id);
+                                k = String.format(IndexInfo.KET_FORMAT, keyDelimiter, indexInfoCassandra.getEnvId(), keyDelimiter, type, keyDelimiter, id);
                             }
 
                             // CSV has no timestamp, so don't consider.
@@ -309,6 +313,7 @@ public class BatchPutJob extends Thread {
                         System.exit(0);
                 }
 
+                // for duplicate
                 ByteString du = kvPairs.put(key, value);
                 if (du != null) {
                     totalDuplicateCount.addAndGet(1);

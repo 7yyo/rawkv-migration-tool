@@ -2,7 +2,8 @@ package com.pingcap.pojo;
 
 public class TempIndexInfo {
 
-    public static final String KEY_FORMAT = "tempIndex_:_%s_:_%s";
+    // tempIndex_:_{envid}_:_{id}
+    public static final String KEY_FORMAT = "tempIndex%s%s%s%s";
 
     private String envId;
     private String id;

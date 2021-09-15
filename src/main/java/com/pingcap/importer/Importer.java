@@ -28,9 +28,6 @@ public class Importer {
         PropertiesUtil.checkConfig(properties, Model.IMPORT_FILE_PATH);
         List<File> importFileList = FileUtil.showFileList(properties.get(Model.IMPORT_FILE_PATH), false);
 
-//        PropertiesUtil.checkConfig(properties, Model.BATCH_PUT_ERR_FILE_PATH);
-//        FileUtil.deleteFolder(properties.get(Model.BATCH_PUT_ERR_FILE_PATH));
-
         PropertiesUtil.checkConfig(properties, Model.CORE_POOL_SIZE);
         PropertiesUtil.checkConfig(properties, Model.MAX_POOL_SIZE);
         // Start the Main thread for each file.showFileList.

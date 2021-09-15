@@ -55,6 +55,9 @@ public class Redo {
         FileUtil.createFolder(moveFilePath);
         FileUtil.createFolder(moveFilePath + "/" + now);
 
+        PropertiesUtil.checkConfig(properties, KEY_DELIMITER);
+        String keyDelimiter = properties.get(KEY_DELIMITER);
+
         // Redo failed log
         String redoFailPath = moveFilePath + "/" + now + "/" + "redoFail.txt";
         File redoFailFile = FileUtil.createFile(redoFailPath);
@@ -147,7 +150,7 @@ public class Redo {
                                     envId = indexInfoRedo.getEnvId();
                                 }
                                 // key
-                                k = String.format(IndexInfo.KET_FORMAT, envId, indexInfoRedo.getType(), indexInfoRedo.getId());
+                                k = String.format(IndexInfo.KET_FORMAT, keyDelimiter, envId, keyDelimiter, indexInfoRedo.getType(), keyDelimiter, indexInfoRedo.getId());
                                 vv = rawKVClient.get(ByteString.copyFromUtf8(k));
                                 switch (indexInfoRedo.getOpType()) {
                                     case ADD:
@@ -202,7 +205,7 @@ public class Redo {
                             case Model.TEMP_INDEX_INFO:
                                 tempIndexInfoRedo = JSON.toJavaObject(jsonObject, TempIndexInfo.class);
                                 tempIndexInfoRedoValue = new TempIndexInfo();
-                                k = String.format(TempIndexInfo.KEY_FORMAT, tempIndexInfoRedo.getEnvId(), tempIndexInfoRedo.getId());
+                                k = String.format(TempIndexInfo.KEY_FORMAT, keyDelimiter, tempIndexInfoRedo.getEnvId(), keyDelimiter, tempIndexInfoRedo.getId());
                                 switch (tempIndexInfoRedo.getOpType()) {
                                     case ADD:
                                     case UPDATE:
@@ -272,7 +275,7 @@ public class Redo {
         try {
             rawKVClient.delete(ByteString.copyFromUtf8(k));
         } catch (Exception e) {
-            redoLog.error("Redo put failed. key={}, line={}, lineNum={}", k, fileLine, lineNum, e);
+            redoLog.error("Redo delete failed. key={}, line={}, lineNum={}", k, fileLine, lineNum, e);
             redoSummary.setDeleteErr(redoSummary.getDeleteErr() + 1);
             return;
         }

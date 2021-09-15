@@ -60,7 +60,7 @@ public class CountUtil {
             Date date2 = simpleDateFormat.parse(d2.replaceAll("T", " ").replaceAll("z", ""));
             result = date1.compareTo(date2);
         } catch (ParseException e) {
-            e.printStackTrace();
+            return -1;
         }
         return Integer.compare(result, 0);
     }

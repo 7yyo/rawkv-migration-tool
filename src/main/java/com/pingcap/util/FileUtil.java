@@ -59,10 +59,10 @@ public class FileUtil {
             LineNumberReader lineNumberReader = new LineNumberReader(fileReader);
             long characters = lineNumberReader.skip(Long.MAX_VALUE);
             logger.debug("Skip characters={}, file={}", characters, file);
-            lines = lineNumberReader.getLineNumber();
-            if (!isLinux()) {
-                lines++;
-            }
+            lines = lineNumberReader.getLineNumber() + 1;
+//            if (!isLinux()) {
+//                lines++;
+//            }
             lineNumberReader.close();
         } catch (IOException e) {
             e.printStackTrace();
@@ -161,6 +161,16 @@ public class FileUtil {
         }
     }
 
+    public static void main(String[] args) {
+        String propertiesPath = System.getProperty(Model.P) == null ? "/Users/yuyang/IdeaProjects/tikv_importer/src/main/resources/rawkv.properties" : System.getProperty(Model.P);
+        Map<String, String> properties = PropertiesUtil.getProperties(propertiesPath);
+        List<File> files = new ArrayList<>();
+        redoFile("/Users/yuyang/redo", files, properties);
+        for (File file : files) {
+            System.out.println(file);
+        }
+    }
+
 }
 
 class ComparerByTime implements Comparator<File> {
@@ -186,43 +196,36 @@ class ComparerByTime implements Comparator<File> {
             f1Name = f1.getName().split("\\.");
             f2Name = f2.getName().split("\\.");
             int result = 0;
-            try {
-                result = CountUtil.compareDate(f1Name[2], f2Name[2]);
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-            try {
-                if ("".equals(order)) {
-                    if (result > 0) {
-                        diff = 1;
-                    } else if (result == 0) {
-                        if (Integer.parseInt(f1Name[3]) > Integer.parseInt(f2Name[3])) {
-                            diff = 1;
-                        } else if (Integer.parseInt(f1Name[3]) < Integer.parseInt(f2Name[3])) {
-                            diff = -1;
-                        }
-                    } else {
-                        diff = -1;
-                    }
-                } else if ("desc".equals(order)) {
-                    if (result > 0) {
-                        diff = -1;
-                    } else if (result == 0) {
-                        if (Integer.parseInt(f1Name[3]) > Integer.parseInt(f2Name[3])) {
-                            diff = -1;
-                        } else if (Integer.parseInt(f1Name[3]) < Integer.parseInt(f2Name[3])) {
-                            diff = 1;
-                        }
-                    } else {
-                        diff = 1;
-                    }
-                }
+            result = CountUtil.compareDate(f1Name[2], f2Name[2]);
 
-            } catch (Exception e) {
-                e.printStackTrace();
+            if ("".equals(order)) {
+                if (result > 0) {
+                    diff = 1;
+                } else if (result == 0) {
+                    if (Integer.parseInt(f1Name[3]) > Integer.parseInt(f2Name[3])) {
+                        diff = 1;
+                    } else if (Integer.parseInt(f1Name[3]) < Integer.parseInt(f2Name[3])) {
+                        diff = -1;
+                    }
+                } else {
+                    diff = -1;
+                }
+            } else if ("desc".equals(order)) {
+                if (result > 0) {
+                    diff = -1;
+                } else if (result == 0) {
+                    if (Integer.parseInt(f1Name[3]) > Integer.parseInt(f2Name[3])) {
+                        diff = -1;
+                    } else if (Integer.parseInt(f1Name[3]) < Integer.parseInt(f2Name[3])) {
+                        diff = 1;
+                    }
+                } else {
+                    diff = 1;
+                }
             }
+
         } catch (Exception e) {
-            e.printStackTrace();
+            return 0;
         }
         return diff;
     }

@@ -60,7 +60,7 @@ public class CheckSumJsonJob implements Runnable {
         PropertiesUtil.checkConfig(properties, TTL_SKIP_TYPE);
         List<String> ttlSkipTypeList = new ArrayList<>(Arrays.asList(properties.get(TTL_SKIP_TYPE).split(",")));
 
-        int parseErr = 0;
+        int skip = 0;
         int notInsert = 0;
         int checkSumFail = 0;
         AtomicInteger totalLine = new AtomicInteger(0);
@@ -87,6 +87,9 @@ public class CheckSumJsonJob implements Runnable {
         PropertiesUtil.checkConfig(properties, CHECK_SUM_LIMIT);
         int limitSize = Integer.parseInt(properties.get(CHECK_SUM_LIMIT));
 
+        PropertiesUtil.checkConfig(properties, KEY_DELIMITER);
+        String keyDelimiter = properties.get(KEY_DELIMITER);
+
         String delimiter1 = "";
         String delimiter2 = "";
         if (properties.get(MODE).equals(CSV_FORMAT)) {
@@ -112,7 +115,7 @@ public class CheckSumJsonJob implements Runnable {
                         try {
                             jsonObject = JSONObject.parseObject(checkSumFileLine);
                         } catch (Exception e) {
-                            parseErr++;
+                            skip++;
                             continue;
                         }
                         switch (properties.get(SCENES)) {
@@ -120,6 +123,7 @@ public class CheckSumJsonJob implements Runnable {
 
                                 indexInfoOriginal = JSON.toJavaObject(jsonObject, IndexInfo.class);
                                 if (ttlSkipTypeList.contains(indexInfoOriginal.getType())) {
+                                    skip++;
                                     continue;
                                 }
 
@@ -129,15 +133,14 @@ public class CheckSumJsonJob implements Runnable {
                                     envId = indexInfoOriginal.getEnvId();
                                 }
 
-                                key = String.format(IndexInfo.KET_FORMAT, envId, indexInfoOriginal.getType(), indexInfoOriginal.getId());
+                                key = String.format(IndexInfo.KET_FORMAT, keyDelimiter, envId, keyDelimiter, indexInfoOriginal.getType(), keyDelimiter, indexInfoOriginal.getId());
 
-                                // TODO
                                 if (DELETE.equals(indexInfoOriginal.getOpType())) {
                                     value = rawKvClient.get(ByteString.copyFromUtf8(key)).toStringUtf8();
                                     if (!value.isEmpty()) {
                                         indexInfoRawKv = JSONObject.parseObject(value, IndexInfo.class);
                                         if (CountUtil.compareTime(indexInfoRawKv.getUpdateTime(), indexInfoOriginal.getUpdateTime()) <= 0) {
-                                            logger.error("Check sum key={} delete fail, rawkv tso={} > delete tso={}", key, indexInfoRawKv.getUpdateTime(), indexInfoOriginal.getUpdateTime());
+                                            logger.error("Check sum key={} delete fail, rawkv tso={} < delete tso={}", key, indexInfoRawKv.getUpdateTime(), indexInfoOriginal.getUpdateTime());
                                             checkSumFail++;
                                         }
                                     }
@@ -153,7 +156,7 @@ public class CheckSumJsonJob implements Runnable {
                                 } else {
                                     envId = tempIndexInfoOriginal.getEnvId();
                                 }
-                                key = String.format(TempIndexInfo.KEY_FORMAT, envId, tempIndexInfoOriginal.getId());
+                                key = String.format(TempIndexInfo.KEY_FORMAT, keyDelimiter, envId, keyDelimiter, tempIndexInfoOriginal.getId());
                                 if (DELETE.equals(tempIndexInfoOriginal.getOpType())) {
                                     value = rawKvClient.get(ByteString.copyFromUtf8(key)).toStringUtf8();
                                     if (!value.isEmpty()) {
@@ -171,7 +174,7 @@ public class CheckSumJsonJob implements Runnable {
                     case CSV_FORMAT:
                         indexInfoOriginal = new IndexInfo();
                         IndexInfo.csv2IndexInfo(indexInfoOriginal, checkSumFileLine, delimiter1, delimiter2);
-                        key = String.format(IndexInfo.KET_FORMAT, indexInfoOriginal.getEnvId(), indexInfoOriginal.getType(), indexInfoOriginal.getId());
+                        key = String.format(IndexInfo.KET_FORMAT, keyDelimiter, indexInfoOriginal.getEnvId(), keyDelimiter, indexInfoOriginal.getType(), keyDelimiter, indexInfoOriginal.getId());
                         originalIndexInfoMap.put(key, indexInfoOriginal);
                         break;
                     default:
@@ -185,6 +188,9 @@ public class CheckSumJsonJob implements Runnable {
                         batchGetTimer.observeDuration();
                     } catch (Exception e) {
                         logger.error("Batch get failed. file={}, line={}", checkSumFile.getAbsolutePath(), totalCount);
+                        for (int i = 0; i < kvList.size(); i++) {
+                            csFailLog.info(keyList.get(i).toStringUtf8());
+                        }
                     }
                     Histogram.Timer csTimer = CHECK_SUM_DURATION.labels("check_sum").startTimer();
                     switch (properties.get(SCENES)) {
@@ -248,7 +254,7 @@ public class CheckSumJsonJob implements Runnable {
         }
 
         timer.cancel();
-        logger.info("Check sum file={} complete. Total={}, notExists={}, skipParseErr={}, checkSumFail={}", checkSumFile.getAbsolutePath(), totalLine, notInsert, parseErr, checkSumFail);
+        logger.info("Check sum file={} complete. Total={}, notExists={}, skip={}, checkSumFail={}", checkSumFile.getAbsolutePath(), totalLine, notInsert, skip, checkSumFail);
 
         String moveFilePath = properties.get(CHECK_SUM_MOVE_PATH);
         File moveFile = new File(moveFilePath + "/" + now + "/" + checkSumFile.getName() + "." + fileNum.addAndGet(1));
