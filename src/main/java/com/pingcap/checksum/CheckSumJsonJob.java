@@ -9,12 +9,12 @@ import com.pingcap.enums.Model;
 import com.pingcap.pojo.IndexInfo;
 import com.pingcap.pojo.TempIndexInfo;
 import com.pingcap.timer.CheckSumTimer;
-import com.pingcap.util.CountUtil;
 import com.pingcap.util.FileUtil;
 import com.pingcap.util.PropertiesUtil;
 import io.prometheus.client.Histogram;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.LineIterator;
+import org.apache.commons.lang.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.tikv.common.TiSession;
@@ -57,29 +57,39 @@ public class CheckSumJsonJob implements Runnable {
         PropertiesUtil.checkConfig(properties, MODE);
         PropertiesUtil.checkConfig(properties, SCENES);
 
+        // Skip ttl type when check sum.
         PropertiesUtil.checkConfig(properties, TTL_SKIP_TYPE);
         List<String> ttlSkipTypeList = new ArrayList<>(Arrays.asList(properties.get(TTL_SKIP_TYPE).split(",")));
 
-        int skip = 0;
-        int notInsert = 0;
-        int checkSumFail = 0;
-        AtomicInteger totalLine = new AtomicInteger(0);
+        // Skip ttl put when check sum.
+        PropertiesUtil.checkConfig(properties, Model.TTL_PUT_TYPE);
+        List<String> ttlPutList = new ArrayList<>(Arrays.asList(properties.get(Model.TTL_PUT_TYPE).split(",")));
+
+        // Total skip num
+        AtomicInteger skip = new AtomicInteger(0);
+        // Total parse err num
+        AtomicInteger parseErr = new AtomicInteger(0);
+        // Total not in rawKv num
+        AtomicInteger notInsert = new AtomicInteger(0);
+        // Total check sum fail num
+        AtomicInteger checkSumFail = new AtomicInteger(0);
+        // Total check sum num = Total - total skip
+        AtomicInteger totalCheck = new AtomicInteger(0);
 
         RawKVClient rawKvClient = tiSession.createRawClient();
 
         File checkSumFile = new File(checkSumFilePath);
 
         Timer timer = new Timer();
-        CheckSumTimer checkSumTimer = new CheckSumTimer(checkSumFilePath, totalLine, FileUtil.getFileLines(checkSumFile));
+        CheckSumTimer checkSumTimer = new CheckSumTimer(checkSumFilePath, totalCheck, FileUtil.getFileLines(checkSumFile));
         PropertiesUtil.checkConfig(properties, TIMER_INTERVAL);
         timer.schedule(checkSumTimer, 5000, Long.parseLong(properties.get(TIMER_INTERVAL)));
 
-        IndexInfo indexInfoRawKv, indexInfoOriginal, rawKvIndexInfoValue;
-        TempIndexInfo tempIndexInfoRawKv, tempIndexInfoOriginal, rawKvTempIndexInfoValue;
+        IndexInfo indexInfoOriginal;
+        TempIndexInfo tempIndexInfoOriginal;
         Map<String, IndexInfo> originalIndexInfoMap = new HashMap<>(), rawKvIndexInfoMap = new HashMap<>();
         Map<String, TempIndexInfo> originalTempIndexInfoMap = new HashMap<>(), rawKvTempIndexInfoMap = new HashMap<>();
         List<ByteString> keyList = new ArrayList<>();
-        List<Kvrpcpb.KvPair> kvList = new ArrayList<>();
         JSONObject jsonObject;
         String key, value, envId, checkSumFileLine;
         int limit = 0, totalCount = 0;
@@ -90,44 +100,47 @@ public class CheckSumJsonJob implements Runnable {
         PropertiesUtil.checkConfig(properties, KEY_DELIMITER);
         String keyDelimiter = properties.get(KEY_DELIMITER);
 
-        String delimiter1 = "";
-        String delimiter2 = "";
-        if (properties.get(MODE).equals(CSV_FORMAT)) {
-            PropertiesUtil.checkConfig(properties, DELIMITER_1);
-            PropertiesUtil.checkConfig(properties, DELIMITER_2);
-            delimiter1 = properties.get(DELIMITER_1);
-            delimiter2 = properties.get(DELIMITER_2);
-        }
+        PropertiesUtil.checkConfig(properties, DELIMITER_1);
+        PropertiesUtil.checkConfig(properties, DELIMITER_2);
+        String delimiter1 = properties.get(DELIMITER_1);
+        String delimiter2 = properties.get(DELIMITER_2);
 
-
+        // Check sum file line num
         int lineCount = FileUtil.getFileLines(checkSumFile);
 
         LineIterator originalLineIterator = FileUtil.createLineIterator(checkSumFile);
         if (originalLineIterator != null) {
-            while (originalLineIterator.hasNext()) {
+//            while (originalLineIterator.hasNext()) {
+            for (int n = 0; n < lineCount; n++) {
                 Histogram.Timer parseTimer = CHECK_SUM_DURATION.labels("parse").startTimer();
                 limit++;
+                // How many lines we check sum.
                 totalCount++;
-                totalLine.addAndGet(1);
-                checkSumFileLine = originalLineIterator.nextLine();
+                try {
+                    checkSumFileLine = originalLineIterator.nextLine();
+                } catch (Exception e) {
+//                    logger.error("LineIterator error, file = {}", checkSumFile.getAbsolutePath(), e);
+//                    skip.addAndGet(1);
+                    limit = checkSum(limit, limitSize, totalCount, lineCount, rawKvClient, keyList, properties, checkSumFile, originalIndexInfoMap, rawKvIndexInfoMap, checkSumFail, notInsert, rawKvTempIndexInfoMap, originalTempIndexInfoMap, totalCheck);
+                    continue;
+                }
+
                 switch (properties.get(MODE)) {
                     case JSON_FORMAT:
                         try {
                             jsonObject = JSONObject.parseObject(checkSumFileLine);
                         } catch (Exception e) {
-                            skip++;
+                            parseErr.addAndGet(1);
+                            logger.error("Failed to parse file={}, data={}, line={}", checkSumFile, checkSumFileLine, totalCount);
+                            limit = checkSum(limit, limitSize, totalCount, lineCount, rawKvClient, keyList, properties, checkSumFile, originalIndexInfoMap, rawKvIndexInfoMap, checkSumFail, notInsert, rawKvTempIndexInfoMap, originalTempIndexInfoMap, totalCheck);
                             continue;
                         }
                         switch (properties.get(SCENES)) {
                             case INDEX_INFO:
 
                                 indexInfoOriginal = JSON.toJavaObject(jsonObject, IndexInfo.class);
-                                if (ttlSkipTypeList.contains(indexInfoOriginal.getType())) {
-                                    skip++;
-                                    continue;
-                                }
 
-                                if (properties.get(ENV_ID) != null) {
+                                if (!StringUtils.isEmpty(properties.get(ENV_ID))) {
                                     envId = properties.get(ENV_ID);
                                 } else {
                                     envId = indexInfoOriginal.getEnvId();
@@ -138,20 +151,44 @@ public class CheckSumJsonJob implements Runnable {
                                 if (DELETE.equals(indexInfoOriginal.getOpType())) {
                                     value = rawKvClient.get(ByteString.copyFromUtf8(key)).toStringUtf8();
                                     if (!value.isEmpty()) {
-                                        indexInfoRawKv = JSONObject.parseObject(value, IndexInfo.class);
-                                        if (CountUtil.compareTime(indexInfoRawKv.getUpdateTime(), indexInfoOriginal.getUpdateTime()) <= 0) {
-                                            logger.error("Check sum key={} delete fail, rawkv tso={} < delete tso={}", key, indexInfoRawKv.getUpdateTime(), indexInfoOriginal.getUpdateTime());
-                                            checkSumFail++;
-                                        }
+//                                        indexInfoRawKv = JSONObject.parseObject(value, IndexInfo.class);
+//                                        if (indexInfoRawKv.getUpdateTime() != null && indexInfoOriginal.getUpdateTime() != null) {
+//                                            if (CountUtil.compareTime(indexInfoRawKv.getUpdateTime().replaceAll("T", " ").replaceAll("Z", ""), indexInfoOriginal.getUpdateTime().replaceAll("T", " ").replaceAll("Z", "")) <= 0) {
+//                                                logger.error("Check sum key={} delete fail, rawkv tso={} <= delete tso={}", key, indexInfoRawKv.getUpdateTime(), indexInfoOriginal.getUpdateTime());
+//                                                checkSumFail.addAndGet(1);
+//                                            }
+//                                        }
+                                        checkSumLog.error("Check sum delete fail, it still exists, key={}, file={}, line={}", key, checkSumFile.getAbsolutePath(), totalCount);
+                                        csFailLog.info(JSON.toJSONString(indexInfoOriginal));
+                                        checkSumFail.addAndGet(1);
                                     }
+                                    totalCheck.addAndGet(1);
+                                    limit = checkSum(limit, limitSize, totalCount, lineCount, rawKvClient, keyList, properties, checkSumFile, originalIndexInfoMap, rawKvIndexInfoMap, checkSumFail, notInsert, rawKvTempIndexInfoMap, originalTempIndexInfoMap, totalCheck);
                                     continue;
                                 }
+
+                                // TTL first
+                                if (ttlPutList.contains(indexInfoOriginal.getType())) {
+                                    skip.addAndGet(1);
+                                    logger.error("Skip ttl key={}, file={}, line={}", key, checkSumFile.getAbsolutePath(), totalCount);
+                                    limit = checkSum(limit, limitSize, totalCount, lineCount, rawKvClient, keyList, properties, checkSumFile, originalIndexInfoMap, rawKvIndexInfoMap, checkSumFail, notInsert, rawKvTempIndexInfoMap, originalTempIndexInfoMap, totalCheck);
+                                    continue;
+                                }
+
+                                // Skip second
+                                if (ttlSkipTypeList.contains(indexInfoOriginal.getType())) {
+                                    skip.addAndGet(1);
+                                    logger.error("Skip ttl put key={}, file={}, line={}", key, checkSumFile.getAbsolutePath(), totalCount);
+                                    limit = checkSum(limit, limitSize, totalCount, lineCount, rawKvClient, keyList, properties, checkSumFile, originalIndexInfoMap, rawKvIndexInfoMap, checkSumFail, notInsert, rawKvTempIndexInfoMap, originalTempIndexInfoMap, totalCheck);
+                                    continue;
+                                }
+
                                 originalIndexInfoMap.put(key, indexInfoOriginal);
                                 keyList.add(ByteString.copyFromUtf8(key));
                                 break;
                             case TEMP_INDEX_INFO:
                                 tempIndexInfoOriginal = JSON.toJavaObject(jsonObject, TempIndexInfo.class);
-                                if (properties.get(ENV_ID) != null) {
+                                if (!StringUtils.isEmpty(properties.get(ENV_ID))) {
                                     envId = properties.get(ENV_ID);
                                 } else {
                                     envId = tempIndexInfoOriginal.getEnvId();
@@ -160,9 +197,12 @@ public class CheckSumJsonJob implements Runnable {
                                 if (DELETE.equals(tempIndexInfoOriginal.getOpType())) {
                                     value = rawKvClient.get(ByteString.copyFromUtf8(key)).toStringUtf8();
                                     if (!value.isEmpty()) {
-                                        logger.error("Check sum key={} delete fail.", key);
-                                        checkSumFail++;
+                                        checkSumLog.error("Check sum delete fail, it still exists, key={}, file={}, line={}", key, checkSumFile.getAbsolutePath(), totalCount);
+                                        csFailLog.info(JSON.toJSONString(tempIndexInfoOriginal));
+                                        checkSumFail.addAndGet(1);
                                     }
+                                    totalCheck.addAndGet(1);
+                                    limit = checkSum(limit, limitSize, totalCount, lineCount, rawKvClient, keyList, properties, checkSumFile, originalIndexInfoMap, rawKvIndexInfoMap, checkSumFail, notInsert, rawKvTempIndexInfoMap, originalTempIndexInfoMap, totalCheck);
                                     continue;
                                 }
                                 originalTempIndexInfoMap.put(key, tempIndexInfoOriginal);
@@ -174,77 +214,19 @@ public class CheckSumJsonJob implements Runnable {
                     case CSV_FORMAT:
                         indexInfoOriginal = new IndexInfo();
                         IndexInfo.csv2IndexInfo(indexInfoOriginal, checkSumFileLine, delimiter1, delimiter2);
-                        key = String.format(IndexInfo.KET_FORMAT, keyDelimiter, indexInfoOriginal.getEnvId(), keyDelimiter, indexInfoOriginal.getType(), keyDelimiter, indexInfoOriginal.getId());
+                        if (StringUtils.isEmpty(properties.get(ENV_ID))) {
+                            logger.error("Must be set [importer.out.envId] for csv check sum.");
+                            System.exit(0);
+                        }
+                        key = String.format(IndexInfo.KET_FORMAT, keyDelimiter, properties.get(ENV_ID), keyDelimiter, indexInfoOriginal.getType(), keyDelimiter, indexInfoOriginal.getId());
                         originalIndexInfoMap.put(key, indexInfoOriginal);
                         break;
                     default:
                 }
                 parseTimer.observeDuration();
 
-                if (limit == limitSize || totalCount == lineCount) {
-                    try {
-                        Histogram.Timer batchGetTimer = CHECK_SUM_DURATION.labels("batch_get").startTimer();
-                        kvList = rawKvClient.batchGet(keyList);
-                        batchGetTimer.observeDuration();
-                    } catch (Exception e) {
-                        logger.error("Batch get failed. file={}, line={}", checkSumFile.getAbsolutePath(), totalCount);
-                        for (int i = 0; i < kvList.size(); i++) {
-                            csFailLog.info(keyList.get(i).toStringUtf8());
-                        }
-                    }
-                    Histogram.Timer csTimer = CHECK_SUM_DURATION.labels("check_sum").startTimer();
-                    switch (properties.get(SCENES)) {
-                        case INDEX_INFO:
-                            for (Kvrpcpb.KvPair kvPair : kvList) {
-                                indexInfoRawKv = JSONObject.parseObject(kvPair.getValue().toStringUtf8(), IndexInfo.class);
-                                rawKvIndexInfoMap.put(kvPair.getKey().toStringUtf8(), indexInfoRawKv);
-                            }
-                            for (Map.Entry<String, IndexInfo> originalIndexInfoKv : originalIndexInfoMap.entrySet()) {
-                                rawKvIndexInfoValue = rawKvIndexInfoMap.get(originalIndexInfoKv.getKey());
-                                if (rawKvIndexInfoValue != null) {
-                                    if (!rawKvIndexInfoValue.equals(originalIndexInfoKv.getValue())) {
-                                        checkSumLog.error("Check sum failed! Key={}", originalIndexInfoKv.getKey());
-                                        csFailLog.info(JSON.toJSONString(originalIndexInfoKv.getValue()));
-                                        checkSumFail++;
-                                    }
-                                } else {
-                                    checkSumLog.error("Key={} is not exists.", originalIndexInfoKv.getKey());
-                                    csFailLog.info(JSON.toJSONString(originalIndexInfoKv.getValue()));
-                                    notInsert++;
-                                }
-                            }
-                            break;
-                        case TEMP_INDEX_INFO:
-                            for (Kvrpcpb.KvPair kvPair : kvList) {
-                                tempIndexInfoRawKv = JSONObject.parseObject(kvPair.getValue().toStringUtf8(), TempIndexInfo.class);
-                                rawKvTempIndexInfoMap.put(kvPair.getKey().toStringUtf8(), tempIndexInfoRawKv);
-                            }
-                            for (Map.Entry<String, TempIndexInfo> originalKv : originalTempIndexInfoMap.entrySet()) {
-                                rawKvTempIndexInfoValue = rawKvTempIndexInfoMap.get(originalKv.getKey());
-                                if (rawKvTempIndexInfoValue != null) {
-                                    if (!rawKvTempIndexInfoValue.equals(originalKv.getValue())) {
-                                        checkSumLog.error("Check sum failed. Key={}", originalKv.getKey());
-                                        csFailLog.info(JSON.toJSONString(originalKv.getValue()));
-                                        checkSumFail++;
-                                    }
-                                } else {
-                                    checkSumLog.error("Key={} is not exists.", originalKv.getKey());
-                                    csFailLog.info(JSON.toJSONString(originalKv.getValue()));
-                                    notInsert++;
-                                }
-                            }
-                            break;
-                        default:
-                    }
-                    limit = 0;
-                    kvList.clear();
-                    keyList.clear();
-                    originalIndexInfoMap.clear();
-                    rawKvIndexInfoMap.clear();
-                    originalTempIndexInfoMap.clear();
-                    rawKvTempIndexInfoMap.clear();
-                    csTimer.observeDuration();
-                }
+                limit = checkSum(limit, limitSize, totalCount, lineCount, rawKvClient, keyList, properties, checkSumFile, originalIndexInfoMap, rawKvIndexInfoMap, checkSumFail, notInsert, rawKvTempIndexInfoMap, originalTempIndexInfoMap, totalCheck);
+
             }
             try {
                 originalLineIterator.close();
@@ -254,7 +236,7 @@ public class CheckSumJsonJob implements Runnable {
         }
 
         timer.cancel();
-        logger.info("Check sum file={} complete. Total={}, notExists={}, skip={}, checkSumFail={}", checkSumFile.getAbsolutePath(), totalLine, notInsert, skip, checkSumFail);
+        logger.info("Check sum file={} complete. Total={}, totalCheck={}, notExists={}, skip={}, parseErr={}, checkSumFail={}", checkSumFile.getAbsolutePath(), totalCount, totalCheck, notInsert, skip, parseErr, checkSumFail);
 
         String moveFilePath = properties.get(CHECK_SUM_MOVE_PATH);
         File moveFile = new File(moveFilePath + "/" + now + "/" + checkSumFile.getName() + "." + fileNum.addAndGet(1));
@@ -265,4 +247,119 @@ public class CheckSumJsonJob implements Runnable {
         }
 
     }
+
+    public static int checkSum(
+            Integer limit,
+            Integer limitSize,
+            Integer totalCount,
+            Integer lineCount,
+            RawKVClient rawKvClient,
+            List<ByteString> keyList,
+            Map<String, String> properties,
+            File checkSumFile,
+            Map<String, IndexInfo> originalIndexInfoMap,
+            Map<String, IndexInfo> rawKvIndexInfoMap,
+            AtomicInteger checkSumFail,
+            AtomicInteger notInsert,
+            Map<String, TempIndexInfo> rawKvTempIndexInfoMap,
+            Map<String, TempIndexInfo> originalTempIndexInfoMap,
+            AtomicInteger totalCheck
+
+    ) {
+        if (Objects.equals(limit, limitSize) || Objects.equals(totalCount, lineCount)) {
+
+            List<Kvrpcpb.KvPair> kvList;
+            try {
+                Histogram.Timer batchGetTimer = CHECK_SUM_DURATION.labels("batch_get").startTimer();
+                // Batch get keys which to check sum
+                kvList = rawKvClient.batchGet(keyList);
+                batchGetTimer.observeDuration();
+            } catch (Exception e) {
+                for (ByteString k : keyList) {
+                    if (properties.get(SCENES).equals(INDEX_INFO)) {
+                        logger.error("Batch get failed.Key={}, file={}, almost line={}", JSON.toJSONString(originalIndexInfoMap.get(k.toStringUtf8())), checkSumFile.getAbsolutePath(), totalCount);
+                        csFailLog.info(JSON.toJSONString(originalIndexInfoMap.get(k.toStringUtf8())));
+                    } else if (properties.get(SCENES).equals(TEMP_INDEX_INFO)) {
+                        logger.error("Batch get failed.Key={}, file={}, almost line={}", JSON.toJSONString(originalTempIndexInfoMap.get(k.toStringUtf8())), checkSumFile.getAbsolutePath(), totalCount);
+                        csFailLog.info(JSON.toJSONString(originalTempIndexInfoMap.get(k.toStringUtf8())));
+                    } else {
+                        logger.error("Scenes error:" + properties.get(SCENES));
+                        System.exit(0);
+                    }
+                }
+                checkSumFail.addAndGet(keyList.size());
+                keyList.clear();
+                originalIndexInfoMap.clear();
+                rawKvIndexInfoMap.clear();
+                originalTempIndexInfoMap.clear();
+                rawKvTempIndexInfoMap.clear();
+                limit = 0;
+                return limit;
+            }
+            Histogram.Timer csTimer = CHECK_SUM_DURATION.labels("check_sum").startTimer();
+            switch (properties.get(SCENES)) {
+                case INDEX_INFO:
+                    // Put all will check sum key to map.
+                    IndexInfo indexInfoRawKv;
+                    for (Kvrpcpb.KvPair kvPair : kvList) {
+                        indexInfoRawKv = JSONObject.parseObject(kvPair.getValue().toStringUtf8(), IndexInfo.class);
+                        rawKvIndexInfoMap.put(kvPair.getKey().toStringUtf8(), indexInfoRawKv);
+                    }
+                    // Check Sum
+                    IndexInfo rawKvIndexInfoValue;
+                    for (Map.Entry<String, IndexInfo> originalIndexInfoKv : originalIndexInfoMap.entrySet()) {
+                        rawKvIndexInfoValue = rawKvIndexInfoMap.get(originalIndexInfoKv.getKey());
+                        if (rawKvIndexInfoValue != null) {
+                            if (!rawKvIndexInfoValue.equals(originalIndexInfoKv.getValue())) {
+                                checkSumLog.error("Check sum failed! Key={}", JSON.toJSONString(originalIndexInfoKv.getKey()));
+                                csFailLog.info(JSON.toJSONString(originalIndexInfoKv.getValue()));
+                                checkSumFail.addAndGet(1);
+                            }
+                        } else {
+                            checkSumLog.error("Key={} is not exists.", JSON.toJSONString(originalIndexInfoKv.getKey()));
+                            csFailLog.info(JSON.toJSONString(originalIndexInfoKv.getValue()));
+                            notInsert.addAndGet(1);
+                        }
+                    }
+                    totalCheck.addAndGet(keyList.size());
+                    break;
+                case TEMP_INDEX_INFO:
+                    TempIndexInfo tempIndexInfoRawKv;
+                    for (Kvrpcpb.KvPair kvPair : kvList) {
+                        tempIndexInfoRawKv = JSONObject.parseObject(kvPair.getValue().toStringUtf8(), TempIndexInfo.class);
+                        rawKvTempIndexInfoMap.put(kvPair.getKey().toStringUtf8(), tempIndexInfoRawKv);
+                    }
+                    TempIndexInfo rawKvTempIndexInfoValue;
+                    for (Map.Entry<String, TempIndexInfo> originalKv : originalTempIndexInfoMap.entrySet()) {
+                        rawKvTempIndexInfoValue = rawKvTempIndexInfoMap.get(originalKv.getKey());
+                        if (rawKvTempIndexInfoValue != null) {
+                            if (!rawKvTempIndexInfoValue.equals(originalKv.getValue())) {
+                                checkSumLog.error("Check sum failed. Key={}", JSON.toJSONString(originalKv.getValue()));
+                                csFailLog.info(JSON.toJSONString(originalKv.getValue()));
+                                checkSumFail.addAndGet(1);
+                            }
+                        } else {
+                            checkSumLog.error("Key={} is not exists.", JSON.toJSONString(originalKv.getValue()));
+                            csFailLog.info(JSON.toJSONString(originalKv.getValue()));
+                            notInsert.addAndGet(1);
+                        }
+                    }
+                    totalCheck.addAndGet(keyList.size());
+                    break;
+                default:
+            }
+            kvList.clear();
+            keyList.clear();
+            originalIndexInfoMap.clear();
+            rawKvIndexInfoMap.clear();
+            originalTempIndexInfoMap.clear();
+            rawKvTempIndexInfoMap.clear();
+            csTimer.observeDuration();
+            limit = 0;
+            return limit;
+        }
+        return limit;
+    }
+
+
 }

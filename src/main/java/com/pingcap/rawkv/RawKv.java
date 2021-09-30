@@ -156,7 +156,7 @@ public class RawKv {
     }
 
     public static void truncateRawKv(TiSession tiSession) {
-        logger.info("Start to truncate raw kv...");
+        logger.info("Start to truncate Raw KV...");
         RawKVClient rawKvClient = tiSession.createRawClient();
         long startTime = System.currentTimeMillis();
         rawKvClient.deleteRange(ByteString.EMPTY, ByteString.EMPTY);

@@ -77,5 +77,11 @@ public class TempIndexInfo {
         tempIndexInfoTiKV.setAppId(tempIndexInfoCassandra.getAppId());
         // target id
         tempIndexInfoTiKV.setTargetId(tempIndexInfoCassandra.getTargetId());
+        if (tempIndexInfoCassandra.getOpType() != null) {
+            tempIndexInfoTiKV.setOpType(tempIndexInfoCassandra.getOpType());
+        }
+        if (tempIndexInfoCassandra.getDuration() != null) {
+            tempIndexInfoTiKV.setDuration(tempIndexInfoCassandra.getDuration());
+        }
     }
 }

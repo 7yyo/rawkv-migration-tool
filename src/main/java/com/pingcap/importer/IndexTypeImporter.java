@@ -75,7 +75,7 @@ public class IndexTypeImporter {
             }
 
             long duration = System.currentTimeMillis() - importStartTime;
-            logger.info("Import summary: File=" + file.getAbsolutePath() + ", total=" + fileLineNum + ", imported=" + kvParis.size() + ",blankNum=" + blankNum + "errNum = " + errorNum + ", duration = " + duration / 1000 + "s");
+            logger.info("Import summary: File=" + file.getAbsolutePath() + ", total=" + fileLineNum + ", imported=" + kvParis.size() + ", blankNum=" + blankNum + ", errNum = " + errorNum + ", duration = " + duration / 1000 + "s");
 
             kvParis.clear();
 

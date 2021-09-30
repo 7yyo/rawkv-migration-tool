@@ -24,7 +24,7 @@ public class CheckSumTimer extends TimerTask {
 
     @Override
     public void run() {
-        logger.info("[{}] [{}/{}], Check sum ratio {}%", filePath, totalCheckNum, totalFileNum - 1, CountUtil.getPercentage(totalCheckNum.get(), totalFileNum));
+        logger.info("[{}] [{}/{}], Check sum ratio {}%", filePath, totalCheckNum, totalFileNum, CountUtil.getPercentage(totalCheckNum.get(), totalFileNum));
     }
 
 }

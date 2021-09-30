@@ -34,6 +34,7 @@ public class Importer {
         ThreadPoolExecutor threadPoolExecutor = ThreadPoolUtil.startJob(Integer.parseInt(properties.get(Model.CORE_POOL_SIZE)), Integer.parseInt(properties.get(Model.MAX_POOL_SIZE)));
 
         for (File importFile : importFileList) {
+            FileUtil.getFileLines(importFile);
             threadPoolExecutor.execute(new ImporterJob(importFile.getAbsolutePath(), tiSession, properties));
         }
         threadPoolExecutor.shutdown();

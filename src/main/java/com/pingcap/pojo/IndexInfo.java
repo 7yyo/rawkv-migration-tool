@@ -91,13 +91,12 @@ public class IndexInfo {
     }
 
     public boolean equals(IndexInfo indexInfo) {
-        boolean appIdC = this.appId.equals(indexInfo.getAppId());
         boolean serviceTagC = true;
         if (!StringUtils.isEmpty(this.serviceTag) && !StringUtils.isEmpty(indexInfo.getServiceTag())) {
             serviceTagC = this.serviceTag.equals(indexInfo.getServiceTag());
         }
         boolean targetIdC = this.targetId.equals(indexInfo.getTargetId());
-        return appIdC && serviceTagC && targetIdC;
+        return serviceTagC && targetIdC;
     }
 
     public static void key2IndexInfo(IndexInfo indexInfo, String key, String keyDelimiter) {
@@ -119,17 +118,17 @@ public class IndexInfo {
         indexInfo.setTargetId(targetId);
         // Means 1|2|3##4##5##6##7##8
         String v = originalLine.split(delimiter1)[2];
-        ServiceTag serviceTag = new ServiceTag();
-        serviceTag.setBLKMDL_ID(v.split(delimiter2)[0]);
-        serviceTag.setPD_SALE_FTA_CD(v.split(delimiter2)[1]);
-        serviceTag.setACCT_DTL_TYPE(v.split(delimiter2)[2]);
-        serviceTag.setCORPPRVT_FLAG(v.split(delimiter2)[3]);
-        serviceTag.setCMTRST_CST_ACCNO(v.split(delimiter2)[4]);
-        serviceTag.setAR_ID(v.split(delimiter2)[5]);
-        serviceTag.setQCRCRD_IND(v.split(delimiter2)[6]);
-        indexInfo.setServiceTag(JSON.toJSONString(serviceTag));
-
-
+        if (v.split(delimiter2).length > 1) {
+            ServiceTag serviceTag = new ServiceTag();
+            serviceTag.setBLKMDL_ID(v.split(delimiter2)[0]);
+            serviceTag.setPD_SALE_FTA_CD(v.split(delimiter2)[1]);
+            serviceTag.setACCT_DTL_TYPE(v.split(delimiter2)[2]);
+            serviceTag.setCORPPRVT_FLAG(v.split(delimiter2)[3]);
+            serviceTag.setCMTRST_CST_ACCNO(v.split(delimiter2)[4]);
+            serviceTag.setAR_ID(v.split(delimiter2)[5]);
+            serviceTag.setQCRCRD_IND(v.split(delimiter2)[6]);
+            indexInfo.setServiceTag(JSON.toJSONString(serviceTag));
+        }
     }
 
     public static void initValueIndexInfoTiKV(IndexInfo indexInfoTiKV, IndexInfo indexInfoCassandra) {
@@ -145,6 +144,12 @@ public class IndexInfo {
         indexInfoTiKV.setTargetId(indexInfoCassandra.getTargetId());
         // update time
         indexInfoTiKV.setUpdateTime(indexInfoCassandra.getUpdateTime());
+        if (indexInfoCassandra.getOpType() != null) {
+            indexInfoTiKV.setOpType(indexInfoCassandra.getOpType());
+        }
+        if (indexInfoCassandra.getDuration() != null) {
+            indexInfoTiKV.setDuration(indexInfoCassandra.getDuration());
+        }
     }
 
 }

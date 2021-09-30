@@ -41,7 +41,8 @@ public class FileUtil {
         for (File file : files) {
             if (file.isDirectory()) {
                 insideFilesList.add(file);
-            } else {
+                // For *.crc
+            } else if (!file.isHidden()) {
                 totalFileList.add(file);
             }
         }
@@ -52,22 +53,18 @@ public class FileUtil {
     }
 
     public static int getFileLines(File file) {
-        FileReader fileReader;
-        int lines = 0;
+        int line = 0;
         try {
-            fileReader = new FileReader(file);
-            LineNumberReader lineNumberReader = new LineNumberReader(fileReader);
-            long characters = lineNumberReader.skip(Long.MAX_VALUE);
-            logger.debug("Skip characters={}, file={}", characters, file);
-            lines = lineNumberReader.getLineNumber() + 1;
-//            if (!isLinux()) {
-//                lines++;
-//            }
-            lineNumberReader.close();
+            LineIterator iterator = FileUtil.createLineIterator(file);
+            while (iterator.hasNext()) {
+                iterator.nextLine();
+                line++;
+            }
+            iterator.close();
         } catch (IOException e) {
             e.printStackTrace();
         }
-        return lines;
+        return line;
     }
 
     public static LinkedHashMap<String, Long> getTtlSkipTypeMap(List<String> list) {

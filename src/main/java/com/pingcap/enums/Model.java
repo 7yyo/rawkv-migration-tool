@@ -33,6 +33,7 @@ public class Model {
     public static final String REDO_LOG = "redoLog";
     public static final String CS_FAIL_LOG = "checkSumFailLog";
     public static final String BP_FAIL_LOG = "batchPutFailLog";
+    public static final String REDO_FAIL_LOG = "redoFailLog";
 
     public static final String TASK = "tikv.task";
     public static final String PD = "importer.tikv.pd";

@@ -91,6 +91,20 @@
         </triggeringPolicy>
     </appender>
 
+    <appender name="redoFail" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <encoder>
+            <pattern>%msg%n</pattern>
+            <charset>utf-8</charset>
+        </encoder>
+        <file>./redoFail/redoFail.json</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.FixedWindowRollingPolicy">
+            <fileNamePattern>./redoFail.json.%i</fileNamePattern>
+        </rollingPolicy>
+        <triggeringPolicy class="ch.qos.logback.core.rolling.SizeBasedTriggeringPolicy">
+            <MaxFileSize>300MB</MaxFileSize>
+        </triggeringPolicy>
+    </appender>
+
     <logger name="logger" level="INFO" additivity="true">
         <appender-ref ref="log"/>
     </logger>
@@ -113,6 +127,10 @@
 
     <logger name="batchPutFailLog" level="INFO" additivity="true">
         <appender-ref ref="batchPutFail"/>
+    </logger>
+
+    <logger name="redoFailLog" level="INFO" additivity="true">
+        <appender-ref ref="redoFail"/>
     </logger>
 
     <root level="ERROR">

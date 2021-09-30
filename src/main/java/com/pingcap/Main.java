@@ -22,7 +22,7 @@ public class Main {
 
     public static void main(String[] args) throws Exception {
 
-        logger.info("Welcome to Raw KV Migration tool!");
+        logger.info("Welcome to TiKV Migration tool!");
 
         String propertiesPath = System.getProperty(Model.P) == null ? PERSONAL_PROPERTIES_PATH : System.getProperty(Model.P);
         Map<String, String> properties = PropertiesUtil.getProperties(propertiesPath);
@@ -51,6 +51,7 @@ public class Main {
 
             if (properties.get(Model.PROMETHEUS_ENABLE) != null) {
                 if (Model.ON.equals(properties.get(Model.PROMETHEUS_ENABLE))) {
+                    PropertiesUtil.checkConfig(properties, Model.PROMETHEUS_PORT);
                     Prometheus.initPrometheus(Integer.parseInt(properties.get(Model.PROMETHEUS_PORT)));
                 }
             }
