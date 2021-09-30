@@ -114,21 +114,50 @@ public class IndexInfo {
      */
     public static void csv2IndexInfo(IndexInfo indexInfo, String originalLine, String delimiter1, String delimiter2) {
 
+//        String targetId = originalLine.split(delimiter1)[2].split(delimiter2)[0];
+//        indexInfo.setTargetId(targetId);
+//        // Means 1|2|3##4##5##6##7##8
+//        String v = originalLine.split(delimiter1)[2];
+//        if (v.split(delimiter2).length > 1) {
+//            ServiceTag serviceTag = new ServiceTag();
+//            serviceTag.setBLKMDL_ID(v.split(delimiter2)[0]);
+//            serviceTag.setPD_SALE_FTA_CD(v.split(delimiter2)[1]);
+//            serviceTag.setACCT_DTL_TYPE(v.split(delimiter2)[2]);
+//            serviceTag.setCORPPRVT_FLAG(v.split(delimiter2)[3]);
+//            serviceTag.setCMTRST_CST_ACCNO(v.split(delimiter2)[4]);
+//            serviceTag.setAR_ID(v.split(delimiter2)[5]);
+//            serviceTag.setQCRCRD_IND(v.split(delimiter2)[6]);
+//            indexInfo.setServiceTag(JSON.toJSONString(serviceTag));
+//        }
+
+        String id = originalLine.split(delimiter1)[0];
+        String type = originalLine.split(delimiter1)[1];
+        indexInfo.setId(id);
+        indexInfo.setType(type);
         String targetId = originalLine.split(delimiter1)[2].split(delimiter2)[0];
         indexInfo.setTargetId(targetId);
-        // Means 1|2|3##4##5##6##7##8
         String v = originalLine.split(delimiter1)[2];
+
+        // except <id|type|targetId>
         if (v.split(delimiter2).length > 1) {
             ServiceTag serviceTag = new ServiceTag();
-            serviceTag.setBLKMDL_ID(v.split(delimiter2)[0]);
-            serviceTag.setPD_SALE_FTA_CD(v.split(delimiter2)[1]);
-            serviceTag.setACCT_DTL_TYPE(v.split(delimiter2)[2]);
-            serviceTag.setCORPPRVT_FLAG(v.split(delimiter2)[3]);
-            serviceTag.setCMTRST_CST_ACCNO(v.split(delimiter2)[4]);
-            serviceTag.setAR_ID(v.split(delimiter2)[5]);
-            serviceTag.setQCRCRD_IND(v.split(delimiter2)[6]);
+            String[] vs = v.split(delimiter2);
+            if (vs.length == 2) {
+                // id|type|targetId##BLKMDL_ID
+                serviceTag.setBLKMDL_ID(vs[1]);
+            } else {
+                // id|type|targetId##BLKMDL_ID##PD_SALE_FTA_CD##ACCT_DTL_TYPE##CORPPRVT_FLAG##CMTRST_CST_ACCNO##AR_ID##QCRCRD_IND
+                serviceTag.setBLKMDL_ID(v.split(delimiter2)[1]);
+                serviceTag.setPD_SALE_FTA_CD(v.split(delimiter2)[2]);
+                serviceTag.setACCT_DTL_TYPE(v.split(delimiter2)[3]);
+                serviceTag.setCORPPRVT_FLAG(v.split(delimiter2)[4]);
+                serviceTag.setCMTRST_CST_ACCNO(v.split(delimiter2)[5]);
+                serviceTag.setAR_ID(v.split(delimiter2)[6]);
+                serviceTag.setQCRCRD_IND(v.split(delimiter2)[7]);
+            }
             indexInfo.setServiceTag(JSON.toJSONString(serviceTag));
         }
+
     }
 
     public static void initValueIndexInfoTiKV(IndexInfo indexInfoTiKV, IndexInfo indexInfoCassandra) {

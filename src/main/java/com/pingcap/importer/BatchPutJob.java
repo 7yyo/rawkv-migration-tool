@@ -152,8 +152,8 @@ public class BatchPutJob extends Thread {
                 try {
                     line = lineIterator.nextLine();
                 } catch (NoSuchElementException e) {
-//                    logger.error("LineIterator error, file = {}", file.getAbsolutePath(), e);
-//                    totalParseErrorCount.addAndGet(1);
+                    logger.error("LineIterator error, file = {}", file.getAbsolutePath(), e);
+                    totalParseErrorCount.addAndGet(1);
                     cycleCount = RawKv.batchPut(totalCount, todo, cycleCount, batchSize, rawKvClient, kvPairs, kvList, file, totalImportCount, totalSkipCount, totalBatchPutFailCount, start + totalCount, properties);
                     continue;
                 }
