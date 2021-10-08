@@ -39,7 +39,7 @@ public class FileUtil {
         }
         List<File> insideFilesList = new ArrayList<>();
         for (File file : files) {
-            if (file.isDirectory()) {
+            if (file.isDirectory() && !file.isHidden()) {
                 insideFilesList.add(file);
                 // For *.crc
             } else if (!file.isHidden()) {
