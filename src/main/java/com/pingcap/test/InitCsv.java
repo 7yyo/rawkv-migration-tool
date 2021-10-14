@@ -9,7 +9,7 @@ import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.charset.StandardCharsets;
 
-public class initCsv {
+public class InitCsv {
 
     static String csv1 = "%s|type|targetId";
     static String csv2 = "%s|type|targetId##BLKMDL_ID";

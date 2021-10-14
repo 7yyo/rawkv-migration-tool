@@ -9,7 +9,7 @@ import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.charset.StandardCharsets;
 
-public class initJson {
+public class InitJson_IndexInfo {
 
     static String json = "{\"id\":\"%s\",\"type\":\"type\",\"envid\":\"envid\",\"appid\":\"appid\",\"createtime\":\"2021-11-11 00:00:00\",\"servicetag\":\"{\\\"ACCT_DTL_TYPE\\\":\\\"ACCT_DTL_TYPE\\\",\\\"PD_SALE_FTA_CD\\\":\\\"PD_SALE_FTA_CD\\\",\\\"AR_ID\\\":\\\"AR_  ID\\\",\\\"CMTRST_CST_ACCNO\\\":\\\"CMTRST_CST_ACCNO\\\",\\\"QCRCRD_IND\\\":\\\" QCRC RD_IND \\\",\\\"BLKMDL_ID\\\":\\\"BLKMDL_ID\\\",\\\"CORPPRVT_FLAG\\\":\\\"CORPPRVT_FLAG\\\"}\",\"targetid\":\"targetid\",\"updatetime\":\"2021-12-12T00:00:00Z\"}";
 
