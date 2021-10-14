@@ -140,7 +140,7 @@ public class BatchPutJob extends Thread {
             String line, id, type; // Import file line. Import line col: id, type.
             JSONObject jsonObject; // For import file format is json.
 
-            SimpleDateFormat simpleDateFormat = new SimpleDateFormat("yyyy-MM-dd hh:mm:ss");
+            SimpleDateFormat simpleDateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
 
             int cycleCount = 0, totalCount = 0;
 

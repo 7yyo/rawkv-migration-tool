@@ -31,7 +31,7 @@ public class CheckSum {
 
         ThreadPoolExecutor checkSumThreadPoolExecutor = ThreadPoolUtil.startJob(checkSumThreadNum, checkSumThreadNum);
 
-        SimpleDateFormat simpleDateFormat = new SimpleDateFormat("yyyyMMddhhmmss");
+        SimpleDateFormat simpleDateFormat = new SimpleDateFormat("yyyyMMddHHmmss");
         String now = simpleDateFormat.format(new Date());
 
         PropertiesUtil.checkConfig(properties, Model.CHECK_SUM_MOVE_PATH);

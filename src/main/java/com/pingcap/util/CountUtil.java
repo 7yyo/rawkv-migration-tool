@@ -40,7 +40,7 @@ public class CountUtil {
     }
 
     public static int compareTime(String d1, String d2) {
-        SimpleDateFormat simpleDateFormat = new SimpleDateFormat("yyyy-MM-dd hh:mm:ss");
+        SimpleDateFormat simpleDateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
         int result = 0;
         try {
             Date date1 = simpleDateFormat.parse(d1.replaceAll("T", " ").replaceAll("z", ""));

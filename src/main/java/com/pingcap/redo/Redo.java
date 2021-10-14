@@ -48,7 +48,7 @@ public class Redo {
         PropertiesUtil.checkConfig(properties, REDO_TYPE);
         String type = properties.get(Model.REDO_TYPE);
 
-        SimpleDateFormat simpleDateFormat = new SimpleDateFormat("yyyyMMddhhmmss");
+        SimpleDateFormat simpleDateFormat = new SimpleDateFormat("yyyyMMddHHmmss");
         String now = simpleDateFormat.format(new Date());
 
         // MoveFilePath
