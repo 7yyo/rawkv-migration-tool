@@ -342,12 +342,12 @@ public class CheckSumJsonJob implements Runnable {
                         rawKvTempIndexInfoValue = rawKvTempIndexInfoMap.get(originalKv.getKey());
                         if (rawKvTempIndexInfoValue != null) {
                             if (!rawKvTempIndexInfoValue.equals(originalKv.getValue())) {
-                                checkSumLog.error("Check sum failed. Key={}", JSON.toJSONString(originalKv.getValue()));
+                                checkSumLog.error("Check sum failed. Key={}", JSON.toJSONString(originalKv.getKey()));
                                 csFailLog.info(JSON.toJSONString(originalKv.getValue()));
                                 checkSumFail.addAndGet(1);
                             }
                         } else {
-                            checkSumLog.error("Key={} is not exists.", JSON.toJSONString(originalKv.getValue()));
+                            checkSumLog.error("Key={} is not exists.", JSON.toJSONString(originalKv.getKey()));
                             csFailLog.info(JSON.toJSONString(originalKv.getValue()));
                             notInsert.addAndGet(1);
                         }
