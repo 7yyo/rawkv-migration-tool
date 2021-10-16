@@ -89,6 +89,8 @@ public class BatchPutJob extends Thread {
         String envId = properties.get(Model.ENV_ID);
         PropertiesUtil.checkConfig(properties, Model.APP_ID);
         String appId = properties.get(Model.APP_ID);
+        PropertiesUtil.checkConfig(properties, Model.UPDATE_TIME);
+        String updateTime = properties.get(Model.UPDATE_TIME);
 
         PropertiesUtil.checkConfig(properties, Model.BATCH_SIZE);
         int batchSize = Integer.parseInt(properties.get(Model.BATCH_SIZE));
@@ -139,8 +141,6 @@ public class BatchPutJob extends Thread {
             ByteString key = ByteString.EMPTY, value = ByteString.EMPTY;
             String line, id, type; // Import file line. Import line col: id, type.
             JSONObject jsonObject; // For import file format is json.
-
-            SimpleDateFormat simpleDateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
 
             int cycleCount = 0, totalCount = 0;
 
@@ -194,7 +194,7 @@ public class BatchPutJob extends Thread {
                                     indexInfoCassandra.setUpdateTime(indexInfoCassandra.getUpdateTime().replaceAll("T", " ").replaceAll("Z", ""));
                                 } else {
                                     // If updateTime = null, set current time.
-                                    indexInfoCassandra.setUpdateTime(simpleDateFormat.format(new Date()));
+                                    indexInfoCassandra.setUpdateTime(updateTime);
                                 }
                                 toObjTimer.observeDuration();
 
@@ -321,7 +321,7 @@ public class BatchPutJob extends Thread {
                                 indexInfoTiKV.setServiceTag(JSON.toJSONString(serviceTag));
                             }
 
-                            indexInfoTiKV.setUpdateTime(simpleDateFormat.format(new Date()));
+                            indexInfoTiKV.setUpdateTime(updateTime);
 
                             key = ByteString.copyFromUtf8(k);
                             value = ByteString.copyFromUtf8(JSONObject.toJSONString(indexInfoTiKV));
