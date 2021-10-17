@@ -91,11 +91,25 @@ public class IndexInfo {
     }
 
     public boolean equals(IndexInfo indexInfo) {
-        boolean serviceTagC = true;
-        if (!StringUtils.isEmpty(this.serviceTag) && !StringUtils.isEmpty(indexInfo.getServiceTag())) {
+        boolean serviceTagC;
+        boolean targetIdC;
+        // "" != null
+        if (("".equals(this.serviceTag) && "".equals(indexInfo.getServiceTag())) || (this.serviceTag == null && indexInfo.getServiceTag() == null)) {
+            return true;
+        } else if (!StringUtils.isEmpty(this.serviceTag) && !StringUtils.isEmpty(indexInfo.getServiceTag())) {
             serviceTagC = this.serviceTag.equals(indexInfo.getServiceTag());
+        } else {
+            // This means that one is empty and the other is not empty, return false
+            return false;
         }
-        boolean targetIdC = this.targetId.equals(indexInfo.getTargetId());
+        if (("".equals(this.targetId) && "".equals(indexInfo.getTargetId())) || (this.targetId == null && indexInfo.getTargetId() == null)) {
+            return true;
+        } else if (!StringUtils.isEmpty(this.targetId) && !StringUtils.isEmpty(indexInfo.getTargetId())) {
+            targetIdC = this.targetId.equals(indexInfo.getTargetId());
+        } else {
+            // This means that one is empty and the other is not empty, return false
+            return false;
+        }
         return serviceTagC && targetIdC;
     }
 
