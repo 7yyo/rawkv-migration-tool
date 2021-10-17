@@ -220,7 +220,13 @@ public class CheckSumJsonJob implements Runnable {
                         break;
                     case CSV_FORMAT:
                         indexInfoOriginal = new IndexInfo();
-                        IndexInfo.csv2IndexInfo(indexInfoOriginal, checkSumFileLine, delimiter1, delimiter2);
+                        try {
+                            IndexInfo.csv2IndexInfo(indexInfoOriginal, checkSumFileLine, delimiter1, delimiter2);
+                        } catch (Exception e) {
+                            logger.error("Failed to parse csv, file={}, csv={}, line={}", checkSumFile, checkSumFileLine, totalCount);
+                            parseErr.addAndGet(1);
+                            continue;
+                        }
                         if (StringUtils.isEmpty(properties.get(ENV_ID))) {
                             logger.error("Must be set [importer.out.envId] for csv check sum.");
                             System.exit(0);
