@@ -33,7 +33,7 @@ public class IndexTypeImporter {
         for (File file : fileList) {
 
             long importStartTime = System.currentTimeMillis();
-            int fileLineNum = 0, blankNum = 0, errorNum = 0;
+            int fileLineNum = 0, blankNum = 0, parseErrNum = 0, putErr = 0;
 
             try {
 
@@ -46,23 +46,29 @@ public class IndexTypeImporter {
                     // Skip spaces.
                     if (StringUtils.isBlank(content)) {
                         blankNum++;
+                        logger.warn("There is blank, file={}, line={}", file, fileLineNum);
                         continue;
                     }
                     try {
                         // Key@Value
                         key = ByteString.copyFromUtf8(content.split(Model.INDEX_TYPE_DELIMITER)[0]);
+                        if (StringUtils.isEmpty(key.toStringUtf8())) {
+                            throw new Exception("IndexType key is empty");
+                        }
                         value = ByteString.copyFromUtf8(content.split(Model.INDEX_TYPE_DELIMITER)[1]);
                         kvParis.put(key, value);
                     } catch (Exception e) {
-                        logger.error("Parse failed, file={}, line={}, content={}", file, fileLineNum, content, e);
-                        errorNum++;
+                        logger.error("Parse failed, file={}, data={}, line={},", file, content, fileLineNum, e);
+                        parseErrNum++;
                     }
                 }
                 if (!kvParis.isEmpty()) {
                     try {
                         rawKvClient.batchPut(kvParis);
                     } catch (Exception e) {
+                        putErr += kvParis.size();
                         logger.error("Batch put failed, file={}", file.getAbsolutePath(), e);
+                        kvParis.clear();
                     }
                 }
 
@@ -75,12 +81,13 @@ public class IndexTypeImporter {
             }
 
             long duration = System.currentTimeMillis() - importStartTime;
-            logger.info("Import summary: File=" + file.getAbsolutePath() + ", total=" + fileLineNum + ", imported=" + kvParis.size() + ", blankNum=" + blankNum + ", errNum = " + errorNum + ", duration = " + duration / 1000 + "s");
+            logger.info("Import summary: File=" + file.getAbsolutePath() + ", total=" + fileLineNum + ", imported=" + kvParis.size() + ", blankNum=" + blankNum + ", putErrNum = " + putErr + ", parseErrNum = " + parseErrNum + ", duration = " + duration / 1000 + "s");
 
             kvParis.clear();
 
         }
 
+        logger.info("All indexType file import finish.");
         rawKvClient.close();
 
     }
