@@ -134,7 +134,7 @@ public class Redo {
                         // Parse
                         jsonObject = JSONObject.parseObject(redoLine);
                     } catch (Exception e) {
-                        redoLog.error("Parse failed, file={}, data={}, line={}", redoFile, totalCount, totalCount);
+                        redoLog.error("Parse failed, file={}, data={}, line={}", redoFile, redoLine, totalCount);
                         redoSummary.setParseErr(redoSummary.getParseErr() + 1);
                         continue;
                     }
@@ -174,7 +174,7 @@ public class Redo {
                                                 // if duration == 0, D
                                                 put(rawKVClient, k, JSON.toJSONString(indexInfoRedoValue), redoSummary, Long.parseLong(indexInfoRedo.getDuration()), redoLine, totalCount);
                                             } else {
-                                                redoLog.info("Key={}, redoTso={} < rawkvTso={}, line = {}, so skip.", k, indexInfoRedo.getUpdateTime(), indexInfoTiKVValue.getUpdateTime(), totalCount);
+                                                redoLog.info("Key={}, redoTso={} < rawkvTso={}, line = {}, so skip. OpType={}.", k, indexInfoRedo.getUpdateTime(), indexInfoTiKVValue.getUpdateTime(), totalCount, indexInfoRedo.getOpType());
                                                 redoSummary.setSkip(redoSummary.getSkip() + 1);
                                             }
                                         } else {
@@ -197,7 +197,7 @@ public class Redo {
                                             if (CountUtil.compareTime(indexInfoRedo.getUpdateTime(), indexInfoTiKVValue.getUpdateTime()) >= 0) {
                                                 delete(rawKVClient, k, redoSummary, redoLine, totalCount);
                                             } else {
-                                                redoLog.info("Key={}, redoTso={} < rawkvTso={}, line = {}, so skip.", k, indexInfoRedo.getUpdateTime(), indexInfoTiKVValue.getUpdateTime(), totalCount);
+                                                redoLog.info("Key={}, redoTso={} < rawkvTso={}, line = {}, so skip. OpType={}", k, indexInfoRedo.getUpdateTime(), indexInfoTiKVValue.getUpdateTime(), totalCount, indexInfoRedo.getOpType());
                                                 redoSummary.setSkip(redoSummary.getSkip() + 1);
                                             }
                                         } else {
@@ -246,7 +246,7 @@ public class Redo {
                                 "redoDelete={}, " +
                                 "redoPutErr={}, " +
                                 "redoDeleteErr={}, " +
-                                "getErr={}," +
+                                "getErr={}, " +
                                 "parseErr={}, " +
                                 "skip={}, " +
                                 "notSure={}",
