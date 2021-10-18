@@ -98,6 +98,9 @@ public class RawKv {
                     fileLineList.clear();
                     count = 0;
                 }
+            } else {
+                // If kvParis is null,  reset count = 0;
+                count = 0;
             }
         }
         return count;
