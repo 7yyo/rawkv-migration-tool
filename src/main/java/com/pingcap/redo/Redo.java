@@ -142,11 +142,11 @@ public class Redo {
                         case Model.INDEX_INFO:
                             indexInfoRedo = JSON.toJavaObject(jsonObject, IndexInfo.class);
                             // If envId exists, overwrite
-                            if (!StringUtils.isEmpty(properties.get(ENV_ID))) {
-                                envId = properties.get(ENV_ID);
-                            } else {
-                                envId = indexInfoRedo.getEnvId();
-                            }
+//                            if (!StringUtils.isEmpty(properties.get(ENV_ID))) {
+//                                envId = properties.get(ENV_ID);
+//                            } else {
+                            envId = indexInfoRedo.getEnvId();
+//                            }
                             // key
                             k = String.format(IndexInfo.KET_FORMAT, keyDelimiter, envId, keyDelimiter, indexInfoRedo.getType(), keyDelimiter, indexInfoRedo.getId());
                             try {
