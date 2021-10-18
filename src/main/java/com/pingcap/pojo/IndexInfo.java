@@ -95,7 +95,7 @@ public class IndexInfo {
         boolean targetIdC;
         // "" != null
         if (("".equals(this.serviceTag) && "".equals(indexInfo.getServiceTag())) || (this.serviceTag == null && indexInfo.getServiceTag() == null)) {
-            return true;
+            serviceTagC = true;
         } else if (!StringUtils.isEmpty(this.serviceTag) && !StringUtils.isEmpty(indexInfo.getServiceTag())) {
             serviceTagC = this.serviceTag.equals(indexInfo.getServiceTag());
         } else {
@@ -103,7 +103,7 @@ public class IndexInfo {
             return false;
         }
         if (("".equals(this.targetId) && "".equals(indexInfo.getTargetId())) || (this.targetId == null && indexInfo.getTargetId() == null)) {
-            return true;
+            targetIdC = true;
         } else if (!StringUtils.isEmpty(this.targetId) && !StringUtils.isEmpty(indexInfo.getTargetId())) {
             targetIdC = this.targetId.equals(indexInfo.getTargetId());
         } else {
