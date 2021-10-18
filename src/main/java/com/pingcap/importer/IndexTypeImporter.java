@@ -58,7 +58,7 @@ public class IndexTypeImporter {
                         value = ByteString.copyFromUtf8(content.split(Model.INDEX_TYPE_DELIMITER)[1]);
                         kvParis.put(key, value);
                     } catch (Exception e) {
-                        logger.error("Parse failed, file={}, data={}, line={},", file, content, fileLineNum, e);
+                        logger.error("Parse failed, file={}, data={}, line={}", file, content, fileLineNum);
                         parseErrNum++;
                     }
                 }
