@@ -177,7 +177,7 @@ public class CheckSumJsonJob implements Runnable {
                                 // TTL first
                                 if (ttlPutList.contains(indexInfoOriginal.getType())) {
                                     skip.addAndGet(1);
-                                    logger.error("Skip ttl put key={}, file={}, line={}", key, checkSumFile.getAbsolutePath(), totalCount);
+                                    logger.warn("Skip ttl put key={}, file={}, line={}", key, checkSumFile.getAbsolutePath(), totalCount);
                                     limit = checkSum(limit, limitSize, totalCount, lineCount, rawKvClient, keyList, properties, checkSumFile, originalIndexInfoMap, rawKvIndexInfoMap, checkSumFail, notInsert, rawKvTempIndexInfoMap, originalTempIndexInfoMap, totalCheck);
                                     continue;
                                 }
@@ -185,7 +185,7 @@ public class CheckSumJsonJob implements Runnable {
                                 // Skip second
                                 if (ttlSkipTypeList.contains(indexInfoOriginal.getType())) {
                                     skip.addAndGet(1);
-                                    logger.error("Skip ttl type key={}, file={}, line={}", key, checkSumFile.getAbsolutePath(), totalCount);
+                                    logger.warn("Skip ttl type key={}, file={}, line={}", key, checkSumFile.getAbsolutePath(), totalCount);
                                     limit = checkSum(limit, limitSize, totalCount, lineCount, rawKvClient, keyList, properties, checkSumFile, originalIndexInfoMap, rawKvIndexInfoMap, checkSumFail, notInsert, rawKvTempIndexInfoMap, originalTempIndexInfoMap, totalCheck);
                                     continue;
                                 }
