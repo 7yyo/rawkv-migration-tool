@@ -1,12 +1,14 @@
 package com.pingcap.pojo;
 
 import com.alibaba.fastjson.JSON;
+import com.alibaba.fastjson.serializer.PascalNameFilter;
 import org.apache.commons.lang.StringUtils;
 
 public class IndexInfo {
 
     // indexInfo_:_{envid}_:_{type}_:_{id}
     public static final String KET_FORMAT = "indexInfo%s%s%s%s%s%s";
+    private static final PascalNameFilter nameFilter = new PascalNameFilter();
 
     private String envId;
     private String type;
@@ -169,7 +171,7 @@ public class IndexInfo {
                 serviceTag.setAR_ID(v.split(delimiter2)[6]);
                 serviceTag.setQCRCRD_IND(v.split(delimiter2)[7]);
             }
-            indexInfo.setServiceTag(JSON.toJSONString(serviceTag));
+            indexInfo.setServiceTag(JSON.toJSONString(serviceTag, nameFilter));
         }
 
     }

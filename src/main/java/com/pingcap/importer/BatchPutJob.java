@@ -2,6 +2,7 @@ package com.pingcap.importer;
 
 import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONObject;
+import com.alibaba.fastjson.serializer.PascalNameFilter;
 import com.pingcap.enums.Model;
 import com.pingcap.pojo.IndexInfo;
 import com.pingcap.pojo.ServiceTag;
@@ -102,6 +103,7 @@ public class BatchPutJob extends Thread {
         // todo_ ImportFileLine  = How many rows the child thread has to process
         int todo = Integer.parseInt(fileBlock.split(",")[1]);
 
+        PascalNameFilter nameFilter = new PascalNameFilter();
 
         RawKVClient rawKvClient = tiSession.createRawClient();
 
@@ -318,7 +320,7 @@ public class BatchPutJob extends Thread {
                                     serviceTag.setAR_ID(v.split(delimiter2)[6]);
                                     serviceTag.setQCRCRD_IND(v.split(delimiter2)[7]);
                                 }
-                                indexInfoTiKV.setServiceTag(JSON.toJSONString(serviceTag));
+                                indexInfoTiKV.setServiceTag(JSON.toJSONString(serviceTag, nameFilter));
                             }
 
                             indexInfoTiKV.setUpdateTime(updateTime);
