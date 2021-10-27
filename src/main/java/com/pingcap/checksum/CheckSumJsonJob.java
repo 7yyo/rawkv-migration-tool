@@ -7,7 +7,9 @@ import static com.pingcap.enums.Model.*;
 
 import com.pingcap.enums.Model;
 import com.pingcap.pojo.IndexInfo;
+import com.pingcap.pojo.IndexInfoLower;
 import com.pingcap.pojo.TempIndexInfo;
+import com.pingcap.pojo.TempIndexInfoLower;
 import com.pingcap.timer.CheckSumTimer;
 import com.pingcap.util.FileUtil;
 import com.pingcap.util.PropertiesUtil;
@@ -80,14 +82,21 @@ public class CheckSumJsonJob implements Runnable {
 
         File checkSumFile = new File(checkSumFilePath);
 
+        // Check sum file line num
+        int lineCount = FileUtil.getFileLines(checkSumFile);
+
         Timer timer = new Timer();
-        CheckSumTimer checkSumTimer = new CheckSumTimer(checkSumFilePath, totalCheck, FileUtil.getFileLines(checkSumFile));
+        CheckSumTimer checkSumTimer = new CheckSumTimer(checkSumFilePath, totalCheck, lineCount);
         PropertiesUtil.checkConfig(properties, TIMER_INTERVAL);
         timer.schedule(checkSumTimer, 5000, Long.parseLong(properties.get(TIMER_INTERVAL)));
 
         IndexInfo indexInfoOriginal;
+        IndexInfoLower indexInfoOriginalL;
         TempIndexInfo tempIndexInfoOriginal;
+        TempIndexInfoLower tempIndexInfoOriginalL;
         Map<String, IndexInfo> originalIndexInfoMap = new HashMap<>(), rawKvIndexInfoMap = new HashMap<>();
+        Map<String, IndexInfoLower> originalIndexInfoMapL = new HashMap<>();
+        Map<String, TempIndexInfoLower> originalTempIndexInfoMapL = new HashMap<>();
         Map<String, TempIndexInfo> originalTempIndexInfoMap = new HashMap<>(), rawKvTempIndexInfoMap = new HashMap<>();
         List<ByteString> keyList = new ArrayList<>();
         JSONObject jsonObject;
@@ -105,9 +114,6 @@ public class CheckSumJsonJob implements Runnable {
         String delimiter1 = properties.get(DELIMITER_1);
         String delimiter2 = properties.get(DELIMITER_2);
 
-        // Check sum file line num
-        int lineCount = FileUtil.getFileLines(checkSumFile);
-
         LineIterator originalLineIterator = FileUtil.createLineIterator(checkSumFile);
         if (originalLineIterator != null) {
 //            while (originalLineIterator.hasNext()) {
@@ -121,14 +127,14 @@ public class CheckSumJsonJob implements Runnable {
                 } catch (Exception e) {
 //                    logger.error("LineIterator error, file = {}", checkSumFile.getAbsolutePath(), e);
 //                    skip.addAndGet(1);
-                    limit = checkSum(limit, limitSize, totalCount, lineCount, rawKvClient, keyList, properties, checkSumFile, originalIndexInfoMap, rawKvIndexInfoMap, checkSumFail, notInsert, rawKvTempIndexInfoMap, originalTempIndexInfoMap, totalCheck);
+                    limit = checkSum(limit, limitSize, totalCount, lineCount, rawKvClient, keyList, properties, checkSumFile, originalIndexInfoMap, rawKvIndexInfoMap, checkSumFail, notInsert, rawKvTempIndexInfoMap, originalTempIndexInfoMap, totalCheck, originalIndexInfoMapL, originalTempIndexInfoMapL);
                     continue;
                 }
 
                 if (StringUtils.isBlank(checkSumFileLine) || "".equals(checkSumFileLine.trim())) {
                     logger.warn("There is blank lines in the file={}, line={}", checkSumFile.getAbsolutePath(), totalCount);
                     skip.addAndGet(1);
-                    limit = checkSum(limit, limitSize, totalCount, lineCount, rawKvClient, keyList, properties, checkSumFile, originalIndexInfoMap, rawKvIndexInfoMap, checkSumFail, notInsert, rawKvTempIndexInfoMap, originalTempIndexInfoMap, totalCheck);
+                    limit = checkSum(limit, limitSize, totalCount, lineCount, rawKvClient, keyList, properties, checkSumFile, originalIndexInfoMap, rawKvIndexInfoMap, checkSumFail, notInsert, rawKvTempIndexInfoMap, originalTempIndexInfoMap, totalCheck, originalIndexInfoMapL, originalTempIndexInfoMapL);
                     continue;
                 }
 
@@ -139,13 +145,14 @@ public class CheckSumJsonJob implements Runnable {
                         } catch (Exception e) {
                             parseErr.addAndGet(1);
                             logger.error("Failed to parse file={}, data={}, line={}", checkSumFile, checkSumFileLine, totalCount);
-                            limit = checkSum(limit, limitSize, totalCount, lineCount, rawKvClient, keyList, properties, checkSumFile, originalIndexInfoMap, rawKvIndexInfoMap, checkSumFail, notInsert, rawKvTempIndexInfoMap, originalTempIndexInfoMap, totalCheck);
+                            limit = checkSum(limit, limitSize, totalCount, lineCount, rawKvClient, keyList, properties, checkSumFile, originalIndexInfoMap, rawKvIndexInfoMap, checkSumFail, notInsert, rawKvTempIndexInfoMap, originalTempIndexInfoMap, totalCheck, originalIndexInfoMapL, originalTempIndexInfoMapL);
                             continue;
                         }
                         switch (properties.get(SCENES)) {
                             case INDEX_INFO:
 
                                 indexInfoOriginal = JSON.toJavaObject(jsonObject, IndexInfo.class);
+                                indexInfoOriginalL = JSON.toJavaObject(jsonObject, IndexInfoLower.class);
 
                                 if (!StringUtils.isEmpty(properties.get(ENV_ID))) {
                                     envId = properties.get(ENV_ID);
@@ -170,7 +177,7 @@ public class CheckSumJsonJob implements Runnable {
                                         checkSumFail.addAndGet(1);
                                     }
                                     totalCheck.addAndGet(1);
-                                    limit = checkSum(limit, limitSize, totalCount, lineCount, rawKvClient, keyList, properties, checkSumFile, originalIndexInfoMap, rawKvIndexInfoMap, checkSumFail, notInsert, rawKvTempIndexInfoMap, originalTempIndexInfoMap, totalCheck);
+                                    limit = checkSum(limit, limitSize, totalCount, lineCount, rawKvClient, keyList, properties, checkSumFile, originalIndexInfoMap, rawKvIndexInfoMap, checkSumFail, notInsert, rawKvTempIndexInfoMap, originalTempIndexInfoMap, totalCheck, originalIndexInfoMapL, originalTempIndexInfoMapL);
                                     continue;
                                 }
 
@@ -178,7 +185,7 @@ public class CheckSumJsonJob implements Runnable {
                                 if (ttlPutList.contains(indexInfoOriginal.getType())) {
                                     skip.addAndGet(1);
                                     logger.warn("Skip ttl put key={}, file={}, line={}", key, checkSumFile.getAbsolutePath(), totalCount);
-                                    limit = checkSum(limit, limitSize, totalCount, lineCount, rawKvClient, keyList, properties, checkSumFile, originalIndexInfoMap, rawKvIndexInfoMap, checkSumFail, notInsert, rawKvTempIndexInfoMap, originalTempIndexInfoMap, totalCheck);
+                                    limit = checkSum(limit, limitSize, totalCount, lineCount, rawKvClient, keyList, properties, checkSumFile, originalIndexInfoMap, rawKvIndexInfoMap, checkSumFail, notInsert, rawKvTempIndexInfoMap, originalTempIndexInfoMap, totalCheck, originalIndexInfoMapL, originalTempIndexInfoMapL);
                                     continue;
                                 }
 
@@ -186,15 +193,17 @@ public class CheckSumJsonJob implements Runnable {
                                 if (ttlSkipTypeList.contains(indexInfoOriginal.getType())) {
                                     skip.addAndGet(1);
                                     logger.warn("Skip ttl type key={}, file={}, line={}", key, checkSumFile.getAbsolutePath(), totalCount);
-                                    limit = checkSum(limit, limitSize, totalCount, lineCount, rawKvClient, keyList, properties, checkSumFile, originalIndexInfoMap, rawKvIndexInfoMap, checkSumFail, notInsert, rawKvTempIndexInfoMap, originalTempIndexInfoMap, totalCheck);
+                                    limit = checkSum(limit, limitSize, totalCount, lineCount, rawKvClient, keyList, properties, checkSumFile, originalIndexInfoMap, rawKvIndexInfoMap, checkSumFail, notInsert, rawKvTempIndexInfoMap, originalTempIndexInfoMap, totalCheck, originalIndexInfoMapL, originalTempIndexInfoMapL);
                                     continue;
                                 }
 
                                 originalIndexInfoMap.put(key, indexInfoOriginal);
+                                originalIndexInfoMapL.put(key, indexInfoOriginalL);
                                 keyList.add(ByteString.copyFromUtf8(key));
                                 break;
                             case TEMP_INDEX_INFO:
                                 tempIndexInfoOriginal = JSON.toJavaObject(jsonObject, TempIndexInfo.class);
+                                tempIndexInfoOriginalL = JSON.toJavaObject(jsonObject, TempIndexInfoLower.class);
                                 if (!StringUtils.isEmpty(properties.get(ENV_ID))) {
                                     envId = properties.get(ENV_ID);
                                 } else {
@@ -209,10 +218,11 @@ public class CheckSumJsonJob implements Runnable {
                                         checkSumFail.addAndGet(1);
                                     }
                                     totalCheck.addAndGet(1);
-                                    limit = checkSum(limit, limitSize, totalCount, lineCount, rawKvClient, keyList, properties, checkSumFile, originalIndexInfoMap, rawKvIndexInfoMap, checkSumFail, notInsert, rawKvTempIndexInfoMap, originalTempIndexInfoMap, totalCheck);
+                                    limit = checkSum(limit, limitSize, totalCount, lineCount, rawKvClient, keyList, properties, checkSumFile, originalIndexInfoMap, rawKvIndexInfoMap, checkSumFail, notInsert, rawKvTempIndexInfoMap, originalTempIndexInfoMap, totalCheck, originalIndexInfoMapL, originalTempIndexInfoMapL);
                                     continue;
                                 }
                                 originalTempIndexInfoMap.put(key, tempIndexInfoOriginal);
+                                originalTempIndexInfoMapL.put(key, tempIndexInfoOriginalL);
                                 keyList.add(ByteString.copyFromUtf8(key));
                                 break;
                             default:
@@ -239,7 +249,7 @@ public class CheckSumJsonJob implements Runnable {
                 }
                 parseTimer.observeDuration();
 
-                limit = checkSum(limit, limitSize, totalCount, lineCount, rawKvClient, keyList, properties, checkSumFile, originalIndexInfoMap, rawKvIndexInfoMap, checkSumFail, notInsert, rawKvTempIndexInfoMap, originalTempIndexInfoMap, totalCheck);
+                limit = checkSum(limit, limitSize, totalCount, lineCount, rawKvClient, keyList, properties, checkSumFile, originalIndexInfoMap, rawKvIndexInfoMap, checkSumFail, notInsert, rawKvTempIndexInfoMap, originalTempIndexInfoMap, totalCheck, originalIndexInfoMapL, originalTempIndexInfoMapL);
 
             }
             try {
@@ -277,7 +287,9 @@ public class CheckSumJsonJob implements Runnable {
             AtomicInteger notInsert,
             Map<String, TempIndexInfo> rawKvTempIndexInfoMap,
             Map<String, TempIndexInfo> originalTempIndexInfoMap,
-            AtomicInteger totalCheck
+            AtomicInteger totalCheck,
+            Map<String, IndexInfoLower> originalIndexInfoMapL,
+            Map<String, TempIndexInfoLower> originalTempIndexInfoMapL
 
     ) {
         if (Objects.equals(limit, limitSize) || Objects.equals(totalCount, lineCount)) {
@@ -326,12 +338,12 @@ public class CheckSumJsonJob implements Runnable {
                         if (rawKvIndexInfoValue != null) {
                             if (!rawKvIndexInfoValue.equals(originalIndexInfoKv.getValue())) {
                                 checkSumLog.error("Check sum failed! Key={}", JSON.toJSONString(originalIndexInfoKv.getKey()));
-                                csFailLog.info(JSON.toJSONString(originalIndexInfoKv.getValue()));
+                                csFailLog.info(JSON.toJSONString(originalIndexInfoMapL.get(originalIndexInfoKv.getKey())));
                                 checkSumFail.addAndGet(1);
                             }
                         } else {
                             checkSumLog.error("Key={} is not exists.", JSON.toJSONString(originalIndexInfoKv.getKey()));
-                            csFailLog.info(JSON.toJSONString(originalIndexInfoKv.getValue()));
+                            csFailLog.info(JSON.toJSONString(originalIndexInfoMapL.get(originalIndexInfoKv.getKey())));
                             notInsert.addAndGet(1);
                         }
                     }
@@ -349,12 +361,14 @@ public class CheckSumJsonJob implements Runnable {
                         if (rawKvTempIndexInfoValue != null) {
                             if (!rawKvTempIndexInfoValue.equals(originalKv.getValue())) {
                                 checkSumLog.error("Check sum failed. Key={}", JSON.toJSONString(originalKv.getKey()));
-                                csFailLog.info(JSON.toJSONString(originalKv.getValue()));
+//                                csFailLog.info(JSON.toJSONString(originalKv.getValue()));
+                                csFailLog.info(JSON.toJSONString(originalTempIndexInfoMapL.get(originalKv.getKey())));
                                 checkSumFail.addAndGet(1);
                             }
                         } else {
                             checkSumLog.error("Key={} is not exists.", JSON.toJSONString(originalKv.getKey()));
-                            csFailLog.info(JSON.toJSONString(originalKv.getValue()));
+//                            csFailLog.info(JSON.toJSONString(originalKv.getValue()));
+                            csFailLog.info(JSON.toJSONString(originalTempIndexInfoMapL.get(originalKv.getKey())));
                             notInsert.addAndGet(1);
                         }
                     }
@@ -368,6 +382,8 @@ public class CheckSumJsonJob implements Runnable {
             rawKvIndexInfoMap.clear();
             originalTempIndexInfoMap.clear();
             rawKvTempIndexInfoMap.clear();
+            originalIndexInfoMapL.clear();
+            originalTempIndexInfoMapL.clear();
             csTimer.observeDuration();
             limit = 0;
             return limit;
