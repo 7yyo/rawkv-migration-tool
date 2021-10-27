@@ -29,6 +29,7 @@ import static com.pingcap.enums.Model.*;
 
 public class Redo {
 
+    private static final Logger logger = LoggerFactory.getLogger(Model.LOG);
     private static final Logger redoLog = LoggerFactory.getLogger(Model.REDO_LOG);
     private static final Logger redoFailLog = LoggerFactory.getLogger(REDO_FAIL_LOG);
 
@@ -98,6 +99,8 @@ public class Redo {
         int n = 0;
         for (File redoFile : redoFileList) {
 
+            logger.info("start redo file={}", redoFile);
+
             redoSummary = new RedoSummary();
             try {
                 lineIterator = FileUtils.lineIterator(redoFile);
@@ -130,6 +133,11 @@ public class Redo {
                 while (lineIterator.hasNext()) {
                     totalCount++;
                     redoLine = lineIterator.nextLine();
+                    if (StringUtils.isBlank(redoLine) || "".equals(redoLine.trim())) {
+                        redoLog.warn("There is blank lines in the file={}, line={}", redoFile.getAbsolutePath(), totalCount);
+                        redoSummary.setSkip(redoSummary.getSkip() + 1);
+                        continue;
+                    }
                     try {
                         // Parse
                         jsonObject = JSONObject.parseObject(redoLine);
@@ -263,6 +271,8 @@ public class Redo {
 
                 File moveFile = new File(moveFilePath + "/" + now + "/" + redoFile.getName() + "." + n++);
                 FileUtils.moveFile(redoFile, moveFile);
+
+                logger.info("Redo file={} complete.", redoFile);
 
             } catch (IOException e) {
                 e.printStackTrace();
