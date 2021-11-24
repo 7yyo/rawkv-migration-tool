@@ -27,6 +27,7 @@ public class Importer {
         // Traverse all the files that need to be written.
         PropertiesUtil.checkConfig(properties, Model.IMPORT_FILE_PATH);
         List<File> importFileList = FileUtil.showFileList(properties.get(Model.IMPORT_FILE_PATH), false);
+        Collections.shuffle(importFileList);
 
         PropertiesUtil.checkConfig(properties, Model.CORE_POOL_SIZE);
         PropertiesUtil.checkConfig(properties, Model.MAX_POOL_SIZE);
