@@ -328,7 +328,7 @@ public class BatchPutJob extends Thread {
                             key = ByteString.copyFromUtf8(k);
                             value = ByteString.copyFromUtf8(JSONObject.toJSONString(indexInfoTiKV));
 
-                            if (ttlPutList.contains(indexInfoCassandra.getType())) {
+                            if (ttlPutList.contains(type)) {
                                 try {
                                     rawKvClient.put(key, value, Long.parseLong(ttl));
                                     auditLog.info("Put ttl success, key={}, file={}, line={}", key.toStringUtf8(), file.getAbsolutePath(), start + totalCount);
@@ -336,7 +336,7 @@ public class BatchPutJob extends Thread {
                                     totalImportCount.addAndGet(1);
                                 } catch (Exception e) {
                                     totalBatchPutFailCount.addAndGet(1);
-                                    logger.error("Put ttl fail, file={}, data={}, line={}", file.getAbsolutePath(), line, start + totalCount);
+                                    logger.error("Put ttl fail, file={}, data={}, line={}, err={}", file.getAbsolutePath(), line, start + totalCount, e);
                                     bpFailLog.info(line);
                                 }
                                 cycleCount = RawKv.batchPut(totalCount, todo, cycleCount, batchSize, rawKvClient, kvPairs, kvList, file, totalImportCount, totalSkipCount, totalBatchPutFailCount, start + totalCount, properties);
