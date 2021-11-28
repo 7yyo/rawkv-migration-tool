@@ -230,6 +230,7 @@ public class CheckSumJsonJob implements Runnable {
                         break;
                     case CSV_FORMAT:
                         indexInfoOriginal = new IndexInfo();
+                        indexInfoOriginalL = new IndexInfoLower();
                         try {
                             IndexInfo.csv2IndexInfo(indexInfoOriginal, checkSumFileLine, delimiter1, delimiter2);
                         } catch (Exception e) {
@@ -243,6 +244,9 @@ public class CheckSumJsonJob implements Runnable {
                         }
                         key = String.format(IndexInfo.KET_FORMAT, keyDelimiter, properties.get(ENV_ID), keyDelimiter, indexInfoOriginal.getType(), keyDelimiter, indexInfoOriginal.getId());
                         originalIndexInfoMap.put(key, indexInfoOriginal);
+                        // for check sum failed
+                        indexInfoOriginalL.setOptype(checkSumFileLine);
+                        originalIndexInfoMapL.put(key, indexInfoOriginalL);
                         keyList.add(ByteString.copyFromUtf8(key));
                         break;
                     default:
@@ -338,12 +342,26 @@ public class CheckSumJsonJob implements Runnable {
                         if (rawKvIndexInfoValue != null) {
                             if (!rawKvIndexInfoValue.equals(originalIndexInfoKv.getValue())) {
                                 checkSumLog.error("Check sum failed! Key={}", JSON.toJSONString(originalIndexInfoKv.getKey()));
-                                csFailLog.info(JSON.toJSONString(originalIndexInfoMapL.get(originalIndexInfoKv.getKey())));
+                                if (properties.get(MODE).equals(JSON_FORMAT)) {
+                                    csFailLog.info(JSON.toJSONString(originalIndexInfoMapL.get(originalIndexInfoKv.getKey())));
+                                } else if (properties.get(MODE).equals(CSV_FORMAT)) {
+                                    csFailLog.info(originalIndexInfoMapL.get(originalIndexInfoKv.getKey()).getOptype());
+                                } else {
+                                    logger.error("Error check format:" + properties.get(MODE));
+                                    System.exit(0);
+                                }
                                 checkSumFail.addAndGet(1);
                             }
                         } else {
                             checkSumLog.error("Key={} is not exists.", JSON.toJSONString(originalIndexInfoKv.getKey()));
-                            csFailLog.info(JSON.toJSONString(originalIndexInfoMapL.get(originalIndexInfoKv.getKey())));
+                            if (properties.get(MODE).equals(JSON_FORMAT)) {
+                                csFailLog.info(JSON.toJSONString(originalIndexInfoMapL.get(originalIndexInfoKv.getKey())));
+                            } else if (properties.get(MODE).equals(CSV_FORMAT)) {
+                                csFailLog.info(originalIndexInfoMapL.get(originalIndexInfoKv.getKey()).getOptype());
+                            } else {
+                                logger.error("Error check format:" + properties.get(MODE));
+                                System.exit(0);
+                            }
                             notInsert.addAndGet(1);
                         }
                     }
