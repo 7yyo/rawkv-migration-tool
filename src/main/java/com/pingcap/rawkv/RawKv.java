@@ -11,7 +11,6 @@ import org.tikv.common.TiSession;
 import org.tikv.kvproto.Kvrpcpb;
 import org.tikv.raw.RawKVClient;
 import org.tikv.shade.com.google.protobuf.ByteString;
-
 import java.io.File;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -32,7 +31,8 @@ public class RawKv {
             if (!kvPairs.isEmpty()) {
 
                 PropertiesUtil.checkConfig(properties, Model.CHECK_EXISTS_KEY);
-                if (Model.ON.equals(properties.get(Model.CHECK_EXISTS_KEY))) {
+                //It jump check exists key when use rollback
+                if (Model.ON.equals(properties.get(Model.CHECK_EXISTS_KEY)) && StringUtils.isBlank(properties.get(Model.ROLLBACK))) {
                     // Only json file skip exists key.
                     String importMode = properties.get(Model.MODE);
                     if (Model.JSON_FORMAT.equals(importMode)) {
@@ -74,11 +74,7 @@ public class RawKv {
                 PropertiesUtil.checkConfig(properties, Model.TTL);
                 try {
                     Histogram.Timer batchPutTimer = REQUEST_LATENCY.labels("batch put").startTimer();
-                    if (Model.INDEX_INFO.equals(properties.get(Model.SCENES))) {
-                        rawKvClient.batchPut(kvPairs);
-                    } else if (Model.TEMP_INDEX_INFO.equals(properties.get(Model.SCENES))) {
-                        rawKvClient.batchPut(kvPairs, Long.parseLong(properties.get(Model.TTL)));
-                    }
+                    batchProcess( rawKvClient, properties, kvPairs);
                     batchPutTimer.observeDuration();
                     totalLineCount.addAndGet(kvPairs.size());
                 } catch (Exception e) {
@@ -104,6 +100,22 @@ public class RawKv {
             }
         }
         return count;
+    }
+    
+    public static void batchProcess(RawKVClient rawKvClient, Map<String, String> properties, Map<ByteString, ByteString> kvPairs) {
+    	String rollbackMode = properties.get(Model.ROLLBACK);
+        if(StringUtils.isBlank(rollbackMode)) {
+        	//normal mode
+            if (Model.INDEX_INFO.equals(properties.get(Model.SCENES))) {
+                rawKvClient.batchPut(kvPairs);
+            } else if (Model.TEMP_INDEX_INFO.equals(properties.get(Model.SCENES))) {
+                rawKvClient.batchPut(kvPairs, Long.parseLong(properties.get(Model.TTL)));
+            }
+        }
+        else {
+        	//callback mode
+        	rawKvClient.batchPut(kvPairs, Long.parseLong(rollbackMode));
+        }
     }
 
 //    /**
