@@ -16,6 +16,9 @@ public class Importer {
 
     public static void run(Map<String, String> properties, TiSession tiSession) {
 
+    	// check importer.in.rollback value must be greater than 0 or null
+    	PropertiesUtil.checkConfigRollback(properties);
+    	
         // If it is indexType, run another single-threaded importer
         if (Model.INDEX_TYPE.equals(properties.get(Model.SCENES))) {
             IndexTypeImporter.run(properties, tiSession);

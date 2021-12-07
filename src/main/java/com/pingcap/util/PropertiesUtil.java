@@ -1,6 +1,7 @@
 package com.pingcap.util;
 
 import com.pingcap.enums.Model;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -37,5 +38,20 @@ public class PropertiesUtil {
             System.exit(0);
         }
     }
-
+    
+    public static void checkConfigRollback(Map<String, String> properties) {
+    	String rollbackMode = properties.get(Model.ROLLBACK);
+    	if(null == rollbackMode)
+    		return;
+    	rollbackMode = rollbackMode.trim();
+        if("".equals(rollbackMode)) {
+            logger.error("Configuration {} of item don't is blank character", Model.ROLLBACK);
+            System.exit(0);
+        }
+        if(0 >= Integer.parseInt(rollbackMode)) {
+            logger.error("Configuration {} of item must be greater than 0", Model.ROLLBACK);
+            System.exit(0);        	
+        }
+        return;
+    }
 }

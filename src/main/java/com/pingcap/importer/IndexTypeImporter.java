@@ -27,6 +27,7 @@ public class IndexTypeImporter {
         HashMap<ByteString, ByteString> kvParis = new HashMap<>();
 
         RawKVClient rawKvClient = tiSession.createRawClient();
+        final String rollbackMode = properties.get(Model.ROLLBACK);
 
         List<File> fileList = FileUtil.showFileList(properties.get(Model.IMPORT_FILE_PATH), false);
 
@@ -64,7 +65,10 @@ public class IndexTypeImporter {
                 }
                 if (!kvParis.isEmpty()) {
                     try {
-                        rawKvClient.batchPut(kvParis);
+                    	if(StringUtils.isBlank(rollbackMode))
+                    		rawKvClient.batchPut(kvParis);
+                    	else
+                    		rawKvClient.batchPut(kvParis, Long.parseLong(rollbackMode));
                     } catch (Exception e) {
                         putErr += kvParis.size();
                         logger.error("Batch put failed, file={}", file.getAbsolutePath(), e);

@@ -72,6 +72,8 @@ public class Model {
     public static final String REDO_FILE_PATH = "redo.filePath";
     public static final String REDO_MOVE_PATH = "redo.movePath";
     public static final String REDO_FILE_ORDER = "redo.order";
+    
+    public static final String ROLLBACK = "importer.in.rollback";
 
 
 }
