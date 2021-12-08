@@ -2,6 +2,13 @@ package com.pingcap.enums;
 
 public class Model {
 
+    public static final String READ_TIMEOUT = "tikv.read.timeout";
+    public static final String WRITE_TIMEOUT = "tikv.write.timeout";
+    public static final String BATCH_READ_TIMEOUT = "tikv.batchRead.timeout";
+    public static final String BATCH_WRITE_TIMEOUT = "tikv.batchWrite.timeout";
+    public static final String SCAN_TIMEOUT = "tikv.scan.timeout";
+    public static final String CLEAN_TIMEOUT = "tikv.clean.timeout";
+
     public static final String IMPORT = "import";
     public static final String CHECK_SUM = "checkSum";
     public static final String REDO = "redo";

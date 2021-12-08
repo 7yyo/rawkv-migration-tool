@@ -1,0 +1,113 @@
+global:
+  user: "tidb"
+  ssh_port: 22
+  deploy_dir: "/tidb-deploy"
+  data_dir: "/tidb-data"
+
+monitored:
+  node_exporter_port: 9100
+  blackbox_exporter_port: 9115
+
+server_configs:
+  tidb:
+  tikv:
+    pd.enable-forwarding: true
+    raftdb.defaultcf.hard-pending-compaction-bytes-limit: 4096GB
+    raftdb.defaultcf.compression-per-level: [ "lz4","lz4","lz4","lz4","lz4","lz4","lz4" ]
+    raftdb.defaultcf.soft-pending-compaction-bytes-limit: 4096GB
+    raftdb.defaultcf.level0-slowdown-writes-trigger: 32
+    raftdb.defaultcf.level0-stop-writes-trigger: 1024
+    raftdb.defaultcf.max-write-buffer-number: 16
+    raftdb.defaultcf.write-buffer-size: 256MB
+    raftdb.max-background-jobs: 4
+    raftdb.max-sub-compactions: 2
+    raftdb.use-direct-io-for-flush-and-compaction: true
+    raftstore.apply-pool-size: 6
+    raftstore.hibernate-regions: false
+    raftstore.pd-heartbeat-tick-interval: 5s
+    raftstore.raft-base-tick-interval: 200ms
+    raftstore.raft-election-timeout-ticks: 5
+    raftstore.raft-heartbeat-ticks: 1
+    raftstore.raft-max-inflight-msgs: 2048
+    raftstore.raft-store-max-leader-lease: 800ms
+    raftstore.store-pool-size: 4
+    readpool.storage.use-unified-pool: true
+    readpool.unified.max-thread-count: 10
+    rocksdb.defaultcf.block-size: 8KB
+    rocksdb.defaultcf.hard-pending-compaction-bytes-limit: 4096GB
+    rocksdb.defaultcf.max-bytes-for-level-base: 1GB
+    rocksdb.defaultcf.soft-pending-compaction-bytes-limit: 4096GB
+    rocksdb.defaultcf.level0-slowdown-writes-trigger: 32
+    rocksdb.defaultcf.level0-stop-writes-trigger: 1024
+    rocksdb.defaultcf.max-write-buffer-number: 16
+    rocksdb.defaultcf.write-buffer-size: 1024MB
+    rocksdb.defaultcf.compression-per-level: [ "lz4","lz4","lz4","lz4","lz4","lz4","lz4" ]
+    rocksdb.max-background-jobs: 16
+    rocksdb.max-sub-compactions: 4
+    rocksdb.rate-bytes-per-sec: 500MB
+    rocksdb.use-direct-io-for-flush-and-compaction: true
+    server.grpc-raft-conn-num: 3
+    storage.enable-ttl: true
+    storage.ttl-check-poll-interval: 24h
+  pd:
+    election-interval: 1s
+    lease: 1
+    tick-interval: 200ms
+
+pd_servers:
+  - host: 172.16.4.149
+     ssh_port: 22
+     client_port: 2379
+     peer_port: 2380
+     deploy_dir: "/tidb-deploy/pd-2379"
+     data_dir: "/tidb-data/pd-2379"
+     log_dir: "/tidb-deploy/pd-2379/log"
+  - host: 172.16.5.133
+      ssh_port: 22
+      # name: "pd-1"
+      client_port: 2379
+      peer_port: 2380
+      deploy_dir: "/tidb-deploy/pd-2379"
+      data_dir: "/tidb-data/pd-2379"
+      log_dir: "/tidb-deploy/pd-2379/log"
+  - host: 172.16.5.172
+      ssh_port: 22
+      client_port: 2379
+      peer_port: 2380
+      deploy_dir: "/tidb-deploy/pd-2379"
+      data_dir: "/tidb-data/pd-2379"
+      log_dir: "/tidb-deploy/pd-2379/log"
+
+tidb_servers:
+
+tikv_servers:
+  - host: 172.16.4.149
+    ssh_port: 22
+    port: 20160
+    status_port: 20180
+    deploy_dir: "/tidb-deploy/tikv-20160"
+    data_dir: "/tidb-data/tikv-20160"
+    log_dir: "/tidb-deploy/tikv-20160/log"
+  - host: 172.16.5.133
+    ssh_port: 22
+    port: 20160
+    status_port: 20180
+    deploy_dir: "/tidb-deploy/tikv-20160"
+    data_dir: "/tidb-data/tikv-20160"
+    log_dir: "/tidb-deploy/tikv-20160/log"
+  - host: 172.16.5.172
+    ssh_port: 22
+    port: 20160
+    status_port: 20180
+    deploy_dir: "/tidb-deploy/tikv-20160"
+    data_dir: "/tidb-data/tikv-20160"
+    log_dir: "/tidb-deploy/tikv-20160/log"
+
+monitoring_servers:
+  - host: 172.16.5.133
+
+grafana_servers:
+  - host: 172.16.5.133
+
+alertmanager_servers:
+  - host: 172.16.5.133

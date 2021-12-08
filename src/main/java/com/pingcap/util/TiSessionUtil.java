@@ -9,9 +9,6 @@ import org.tikv.common.TiSession;
 import java.util.Map;
 import java.util.Properties;
 
-/**
- * @author yuyang
- */
 public class TiSessionUtil {
 
     private static final Logger logger = LoggerFactory.getLogger(Model.LOG);
@@ -22,6 +19,12 @@ public class TiSessionUtil {
         TiSession tiSession = null;
         try {
             conf = TiConfiguration.createRawDefault(pd);
+            conf.setRawKVWriteTimeoutInMS(Integer.parseInt(properties.get(Model.WRITE_TIMEOUT)));
+            conf.setRawKVReadTimeoutInMS(Integer.parseInt(properties.get(Model.READ_TIMEOUT)));
+            conf.setRawKVBatchWriteTimeoutInMS(Integer.parseInt(properties.get(Model.BATCH_WRITE_TIMEOUT)));
+            conf.setRawKVBatchReadTimeoutInMS(Integer.parseInt(properties.get(Model.BATCH_READ_TIMEOUT)));
+            conf.setRawKVScanTimeoutInMS(Integer.parseInt(properties.get(Model.SCAN_TIMEOUT)));
+            conf.setRawKVCleanTimeoutInMS(Integer.parseInt(properties.get(Model.CLEAN_TIMEOUT)));
             tiSession = TiSession.create(conf);
             logger.info("Create TiSession success.");
         } catch (Exception e) {
