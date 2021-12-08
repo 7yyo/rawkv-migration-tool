@@ -17,6 +17,12 @@ public class TiSessionUtil {
         String pd = properties.get(Model.PD);
         TiConfiguration conf;
         TiSession tiSession = null;
+        PropertiesUtil.checkConfig(properties, Model.WRITE_TIMEOUT);
+        PropertiesUtil.checkConfig(properties, Model.READ_TIMEOUT);
+        PropertiesUtil.checkConfig(properties, Model.BATCH_WRITE_TIMEOUT);
+        PropertiesUtil.checkConfig(properties, Model.BATCH_READ_TIMEOUT);
+        PropertiesUtil.checkConfig(properties, Model.SCAN_TIMEOUT);
+        PropertiesUtil.checkConfig(properties, Model.CLEAN_TIMEOUT);
         try {
             conf = TiConfiguration.createRawDefault(pd);
             conf.setRawKVWriteTimeoutInMS(Integer.parseInt(properties.get(Model.WRITE_TIMEOUT)));
@@ -28,7 +34,7 @@ public class TiSessionUtil {
             tiSession = TiSession.create(conf);
             logger.info("Create TiSession success.");
         } catch (Exception e) {
-            logger.error("Create TiSession failed!");
+            logger.error("Create TiSession failed! Error: ", e);
             System.exit(0);
         }
         return tiSession;
