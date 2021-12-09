@@ -293,6 +293,14 @@ public class BatchPutJob extends Thread {
                                 System.exit(0);
                             }
 
+                            if (line.split(delimiter1).length > 3) {
+                                logger.error("Failed to parse csv, file={}, csv={}, line={}", file, line, start + totalCount);
+                                totalParseErrorCount.addAndGet(1);
+                                // if _todo_ == totalCount in json failed, batch put.
+                                cycleCount = RawKv.batchPut(totalCount, todo, cycleCount, batchSize, rawKvClient, kvPairs, kvList, file, totalImportCount, totalSkipCount, totalBatchPutFailCount, start + totalCount, properties);
+                                continue;
+                            }
+
                             // CSV has no timestamp, so don't consider.
                             String targetId = line.split(delimiter1)[2].split(delimiter2)[0];
                             indexInfoTiKV.setTargetId(targetId);
