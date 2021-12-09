@@ -236,6 +236,7 @@ public class CheckSumJsonJob implements Runnable {
                         } catch (Exception e) {
                             logger.error("Failed to parse csv, file={}, csv={}, line={}", checkSumFile, checkSumFileLine, totalCount);
                             parseErr.addAndGet(1);
+                            limit = checkSum(limit, limitSize, totalCount, lineCount, rawKvClient, keyList, properties, checkSumFile, originalIndexInfoMap, rawKvIndexInfoMap, checkSumFail, notInsert, rawKvTempIndexInfoMap, originalTempIndexInfoMap, totalCheck, originalIndexInfoMapL, originalTempIndexInfoMapL);
                             continue;
                         }
                         if (StringUtils.isEmpty(properties.get(ENV_ID))) {
