@@ -23,7 +23,7 @@ public class CheckSum {
 
         long checkSumStartTime = System.currentTimeMillis();
 
-        PropertiesUtil.checkConfig(properties, Model.CHECK_SUM_THREAD_NUM);
+        PropertiesUtil.checkNaturalNumber(properties,Model.CHECK_SUM_THREAD_NUM,false);
         int checkSumThreadNum = Integer.parseInt(properties.get(Model.CHECK_SUM_THREAD_NUM));
 
         PropertiesUtil.checkConfig(properties, Model.IMPORT_FILE_PATH);

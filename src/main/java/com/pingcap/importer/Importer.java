@@ -17,7 +17,7 @@ public class Importer {
     public static void run(Map<String, String> properties, TiSession tiSession) {
 
     	// check importer.in.rollback value must be greater than 0 or null
-    	PropertiesUtil.checkConfigRollback(properties);
+    	PropertiesUtil.checkNaturalNumber(properties,Model.ROLLBACK,true);
     	
         // If it is indexType, run another single-threaded importer
         if (Model.INDEX_TYPE.equals(properties.get(Model.SCENES))) {
@@ -32,8 +32,8 @@ public class Importer {
         List<File> importFileList = FileUtil.showFileList(properties.get(Model.IMPORT_FILE_PATH), false);
         Collections.shuffle(importFileList);
 
-        PropertiesUtil.checkConfig(properties, Model.CORE_POOL_SIZE);
-        PropertiesUtil.checkConfig(properties, Model.MAX_POOL_SIZE);
+        PropertiesUtil.checkNaturalNumber(properties,Model.CORE_POOL_SIZE,false);
+        PropertiesUtil.checkNaturalNumber(properties,Model.MAX_POOL_SIZE,false);
         // Start the Main thread for each file.showFileList.
         ThreadPoolExecutor threadPoolExecutor = ThreadPoolUtil.startJob(Integer.parseInt(properties.get(Model.CORE_POOL_SIZE)), Integer.parseInt(properties.get(Model.MAX_POOL_SIZE)));
 
