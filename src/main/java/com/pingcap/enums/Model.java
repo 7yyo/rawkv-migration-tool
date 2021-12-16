@@ -10,8 +10,8 @@ public class Model {
     public static final String CLEAN_TIMEOUT = "tikv.clean.timeout";
 
     public static final String IMPORT = "import";
-    public static final String CHECK_SUM = "checkSum";
-    public static final String REDO = "redo";
+    public static final String CHECK_SUM = "checksum";
+    public static final String UNIMPORT = "unimport";
     public static final String EXPORT = "export";
 
     public static final String JSON_FORMAT = "json";
@@ -52,6 +52,7 @@ public class Model {
     public static final String IMPORT_FILE_PATH = "importer.in.filePath";
     public static final String MODE = "importer.in.mode";
     public static final String SCENES = "importer.in.scenes";
+    public static final String INTERNAL_THREAD_POOL = "importer.tikv.internalPool";
     public static final String INTERNAL_THREAD_NUM = "importer.tikv.internalThreadNum";
     public static final String CORE_POOL_SIZE = "importer.tikv.corePoolSize";
     public static final String MAX_POOL_SIZE = "importer.tikv.maxPoolSize";

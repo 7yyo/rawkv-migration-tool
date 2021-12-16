@@ -39,17 +39,25 @@ public class PropertiesUtil {
         }
     }
     
-    public static void checkConfigRollback(Map<String, String> properties) {
-    	String rollbackMode = properties.get(Model.ROLLBACK);
-    	if(null == rollbackMode)
-    		return;
+    //Cannot be empty and greater than zero
+    public static void checkNaturalNumber(Map<String, String> properties,String paramName,boolean canEmpty) {
+    	String rollbackMode = properties.get(paramName);
+    	if(null == rollbackMode) {
+    		if(canEmpty) {
+    			return;
+    		}
+    		else {
+                logger.error("Configuration {} of item must exist", paramName);
+                System.exit(0);    			
+    		}
+    	}
     	rollbackMode = rollbackMode.trim();
         if("".equals(rollbackMode)) {
-            logger.error("Configuration {} of item don't is blank character", Model.ROLLBACK);
+            logger.error("Configuration {} of item don't is blank character", paramName);
             System.exit(0);
         }
         if(0 >= Integer.parseInt(rollbackMode)) {
-            logger.error("Configuration {} of item must be greater than 0", Model.ROLLBACK);
+            logger.error("Configuration {} of item must be greater than 0", paramName);
             System.exit(0);        	
         }
         return;

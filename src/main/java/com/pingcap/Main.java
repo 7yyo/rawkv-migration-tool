@@ -1,12 +1,9 @@
 package com.pingcap;
 
-import com.pingcap.checksum.CheckSum;
+import com.pingcap.controller.ExeFactory;
 import com.pingcap.enums.Model;
-import com.pingcap.export.Exporter;
-import com.pingcap.importer.Importer;
 import com.pingcap.metrics.Prometheus;
 import com.pingcap.rawkv.RawKv;
-import com.pingcap.redo.Redo;
 import com.pingcap.util.*;
 import org.apache.commons.lang.StringUtils;
 import org.slf4j.Logger;
@@ -26,8 +23,9 @@ public class Main {
 
         String propertiesPath = System.getProperty(Model.P) == null ? PERSONAL_PROPERTIES_PATH : System.getProperty(Model.P);
         Map<String, String> properties = PropertiesUtil.getProperties(propertiesPath);
+        ExeFactory.checkEnv(properties);
         TiSession tiSession = TiSessionUtil.getTiSession(properties);
-
+        //TiSession tiSession = null;
         if (!StringUtils.isEmpty(System.getProperty(Model.M))) {
             switch (System.getProperty(Model.M)) {
                 case Model.GET:
@@ -56,26 +54,8 @@ public class Main {
                 }
             }
 
-            if (!StringUtils.isEmpty(task)) {
-                switch (task) {
-                    case Model.IMPORT:
-                        Importer.run(properties, tiSession);
-                        break;
-                    case Model.CHECK_SUM:
-                        CheckSum.run(properties, tiSession);
-                        break;
-                    case Model.EXPORT:
-                        Exporter.run(properties, tiSession);
-                        break;
-                    case Model.REDO:
-                        Redo.run(properties, tiSession);
-                        break;
-                    default:
-                        throw new IllegalStateException(task);
-                }
-            } else {
-                logger.error("{} cannot be empty.", Model.TASK);
-            }
+           	ExeFactory exefactory = ExeFactory.getInstance(tiSession,task,properties);
+            exefactory.run();
         }
 
         tiSession.close();
