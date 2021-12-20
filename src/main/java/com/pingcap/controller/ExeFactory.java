@@ -1,6 +1,5 @@
 package com.pingcap.controller;
 
-import java.util.Locale;
 import java.util.Map;
 
 import org.apache.commons.lang.StringUtils;
@@ -8,8 +7,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.tikv.common.TiSession;
 
-import com.pingcap.cmd.CmdInterface;
 import com.pingcap.enums.Model;
+import com.pingcap.task.TaskInterface;
 import com.pingcap.util.JavaUtil;
 import com.pingcap.util.PropertiesUtil;
 
@@ -20,11 +19,11 @@ public class ExeFactory {
     private String task;
     
 	public static ExeFactory getInstance(TiSession tiSession,String task,Map<String, String> properties) {
-        if (StringUtils.isEmpty(task)) {
+        if (StringUtils.isBlank(task)) {
             logger.error("{} cannot be empty.", Model.TASK);
             return new ExeFactory(null,task,properties);
         }
-		return new ExeFactory(tiSession,task.toLowerCase(Locale.ENGLISH),properties);
+		return new ExeFactory(tiSession,task,properties);
 	}
 	
 	public ExeFactory(TiSession tiSession,String task,Map<String, String> properties) {
@@ -42,34 +41,20 @@ public class ExeFactory {
         PropertiesUtil.checkConfig(properties, Model.CLEAN_TIMEOUT);		
 	}
 	
-    private CmdInterface getCmdInterface() {
-    	//String scenes = properties.get(Model.SCENES);
-    	String taskClass = "com.pingcap.cmd." + task;
+    private TaskInterface getCmdInterface() {
+    	String taskClass = TaskInterface.class.getPackage().getName()+"." + task;
     	if(!JavaUtil.hasClass(taskClass)) {
     		System.out.println("unknow function " + task);
     		System.exit(0);
     	}
-        CmdInterface cmdInterFace = (CmdInterface) JavaUtil.newClazz( taskClass );
-/*        if (Model.INDEX_TYPE.equals(scenes)) {
-        	cmdInterFace = new IndexTypeImporter();
-        }
-        else if(Model.IMPORT.equals(task)) {
-        	cmdInterFace = new CommonImporter();
-        }
-        else if(Model.UNIMPORT.equals(task)) {
-        	cmdInterFace = new UnImport();
-        }
-        else if(Model.CHECK_SUM.equals(task)) {
-        	cmdInterFace = new CheckSum();
-        	//headLogger = "checksum";
-        }*/
-        cmdInterFace.checkAllParameters(properties);
+        TaskInterface cmdInterFace = (TaskInterface) JavaUtil.newClazz( taskClass );
+        cmdInterFace.setProperties(properties);
         return cmdInterFace;
     }
     
 	public void run() {
 		if(null != tiSession){
-			FileScanner scanner = new FileScanner( task, properties );
+			FileScanner scanner = new FileScanner(task);
 			scanner.run( tiSession , getCmdInterface() );
 		}
 	}

@@ -9,7 +9,6 @@ import org.tikv.shade.com.google.protobuf.ByteString;
 import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONObject;
 import com.alibaba.fastjson.serializer.PascalNameFilter;
-import com.pingcap.dataformat.DataFormatInterface.DataFormatCallBack;
 import com.pingcap.enums.Model;
 import com.pingcap.pojo.IndexInfo;
 import com.pingcap.pojo.ServiceTag;
@@ -49,6 +48,8 @@ public class DataFormatForCsv implements DataFormatInterface {
 			String arr[] = line.split(Model.INDEX_TYPE_DELIMITER);
 			if(2 != arr.length)
 				throw new Exception("IndexType format error");
+			if(StringUtils.isBlank(arr[0]))
+				throw new Exception("IndexType key is empty");
             // Key@Value
             key = ByteString.copyFromUtf8(arr[0]);
             if (StringUtils.isEmpty(key.toStringUtf8())) {
@@ -57,12 +58,13 @@ public class DataFormatForCsv implements DataFormatInterface {
             value = ByteString.copyFromUtf8(arr[1]);
 		}
 		else {
-		    IndexInfo indexInfoTiKV = new IndexInfo();	    
-	        String id = line.split(delimiter1)[0];
-	        type = line.split(delimiter1)[1];
+		    IndexInfo indexInfoTiKV = new IndexInfo();
+		    String arr[] = line.split(delimiter1);
+	        String id = arr[0];
+	        type = arr[1];
 	        String k = String.format(IndexInfo.KET_FORMAT, keyDelimiter, envId, keyDelimiter, type, keyDelimiter, id);
 	        // CSV has no timestamp, so don't consider.
-	        String targetId = line.split(delimiter1)[2].split(delimiter2)[0];
+	        String targetId = arr[2].split(delimiter2)[0];
 	        indexInfoTiKV.setTargetId(targetId);
 	        indexInfoTiKV.setAppId(appId);
 	        String v = line.split(delimiter1)[2];

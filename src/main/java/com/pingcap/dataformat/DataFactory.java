@@ -1,9 +1,12 @@
 package com.pingcap.dataformat;
 
+import java.util.HashMap;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import com.pingcap.dataformat.DataFormatInterface.DataFormatCallBack;
+import org.tikv.shade.com.google.protobuf.ByteString;
+
 import com.pingcap.enums.Model;
 
 import io.prometheus.client.Histogram;
@@ -28,6 +31,19 @@ public class DataFactory implements DataFormatInterface {
 	@Override
 	public boolean formatToKeyValue(Histogram.Timer timer,AtomicInteger totalParseErrorCount, String scenes,String line,DataFormatCallBack dataFormatCallBack) throws Exception {
 		return formatInterface.formatToKeyValue( timer, totalParseErrorCount, scenes, line, dataFormatCallBack);
+	}
+	
+	public static String getRowsHeader(HashMap<ByteString, String> kvPairLines){
+		StringBuffer rowsHeader = new StringBuffer();
+		if(null == kvPairLines)
+			return rowsHeader.toString();
+		for(Entry<ByteString, String> obj:kvPairLines.entrySet()){
+			if(0 == rowsHeader.length())
+				rowsHeader.append(obj.getValue());
+			else
+				rowsHeader.append(",").append(obj.getValue());
+		}
+		return rowsHeader.toString();
 	}
 
 }

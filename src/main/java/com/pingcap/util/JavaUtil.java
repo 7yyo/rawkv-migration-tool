@@ -1,5 +1,7 @@
 package com.pingcap.util;
 
+import java.lang.management.ManagementFactory;
+
 public class JavaUtil {
 
 	public JavaUtil() {
@@ -34,5 +36,14 @@ public class JavaUtil {
 		catch (Exception e) {
 		}
 		return clazz;
+	}
+	
+	public static String getPid(){
+		// get name representing the running Java virtual machine.  
+		String name = ManagementFactory.getRuntimeMXBean().getName();  
+		if(null == name)
+			return "";
+		// get pid  
+		return name.split("@")[0]; 
 	}
 }

@@ -8,7 +8,6 @@ import org.tikv.shade.com.google.protobuf.ByteString;
 
 import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONObject;
-import com.pingcap.dataformat.DataFormatInterface.DataFormatCallBack;
 import com.pingcap.enums.Model;
 import com.pingcap.pojo.IndexInfo;
 import com.pingcap.pojo.TempIndexInfo;
@@ -40,7 +39,6 @@ public class DataFormatForJson implements DataFormatInterface {
             jsonObject = JSONObject.parseObject(line);
             timer.observeDuration();
         } catch (Exception e) {
-        	totalParseErrorCount.addAndGet(1);
         	throw e;
         }
         IndexInfo indexInfoCassandra;
@@ -52,7 +50,6 @@ public class DataFormatForJson implements DataFormatInterface {
         ByteString key = ByteString.EMPTY, value = ByteString.EMPTY;
         // IndexInfo or TempIndexInfo
         switch (scenes) {
-
             case Model.INDEX_INFO:
                 // Cassandra IndexInfo
                 indexInfoCassandra = JSON.toJavaObject(jsonObject, IndexInfo.class);
@@ -62,10 +59,8 @@ public class DataFormatForJson implements DataFormatInterface {
                     // If updateTime = null, set current time.
                     indexInfoCassandra.setUpdateTime(updateTime);
                 }
-
                 // TiKV indexInfo
-                IndexInfo.initValueIndexInfoTiKV(indexInfoTiKV, indexInfoCassandra);
-                
+                IndexInfo.initValueIndexInfoTiKV(indexInfoTiKV, indexInfoCassandra);           
                 // If the configuration file is configured with envId, we need to overwrite the corresponding value in the json file
                 if (!StringUtils.isEmpty(envId)) {
                     k = String.format(IndexInfo.KET_FORMAT, keyDelimiter, envId, keyDelimiter, indexInfoCassandra.getType(), keyDelimiter, indexInfoCassandra.getId());
@@ -82,24 +77,17 @@ public class DataFormatForJson implements DataFormatInterface {
                 break;
 
             case Model.TEMP_INDEX_INFO:
-
                 tempIndexInfoCassandra = JSON.toJavaObject(jsonObject, TempIndexInfo.class);
-
                 // TiKV tempIndexInfo
                 TempIndexInfo.initValueTempIndexInfo(tempIndexInfoTiKV, tempIndexInfoCassandra);
-                
                 if (!StringUtils.isEmpty(envId)) {
                     k = String.format(TempIndexInfo.KEY_FORMAT, keyDelimiter, envId, keyDelimiter, tempIndexInfoCassandra.getId());
                 } else {
                     k = String.format(TempIndexInfo.KEY_FORMAT, keyDelimiter, tempIndexInfoCassandra.getEnvId(), keyDelimiter, tempIndexInfoCassandra.getId());
                 }
-                
                 key = ByteString.copyFromUtf8(k);
                 value = ByteString.copyFromUtf8(JSONObject.toJSONString(tempIndexInfoTiKV));
                 break;
-            ////default:
-                ////logger.error("Illegal format={}", Model.MODE);
-            ////    System.exit(0);
         }
         return dataFormatCallBack.putDataCallBack( ttlType, key, value);
 	}

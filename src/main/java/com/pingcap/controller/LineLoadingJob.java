@@ -1,9 +1,9 @@
 package com.pingcap.controller;
 
-import com.pingcap.cmd.CheckSum;
-import com.pingcap.cmd.CmdInterface;
 import com.pingcap.enums.Model;
-import com.pingcap.timer.ImportTimer;
+import com.pingcap.task.CheckSum;
+import com.pingcap.task.TaskInterface;
+import com.pingcap.timer.TaskTimer;
 import com.pingcap.util.FileUtil;
 import com.pingcap.util.ThreadPoolUtil;
 
@@ -11,8 +11,6 @@ import io.prometheus.client.Histogram;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.LineIterator;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.tikv.common.TiSession;
 
 import java.io.File;
@@ -23,13 +21,7 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class LineLoadingJob implements Runnable {
-
-    private static final Logger logger = LoggerFactory.getLogger(Model.LOG);
-    static final Histogram DURATION = Histogram.build().name("duration").help("Total duration").labelNames("type").register();
-    
-    private final String task;
     private final String importFilePath;
-    private final Map<String, String> properties;
     private final TiSession tiSession;
 
     private final AtomicInteger totalImportCount = new AtomicInteger(0);
@@ -38,14 +30,13 @@ public class LineLoadingJob implements Runnable {
     private final AtomicInteger totalBatchPutFailCount = new AtomicInteger(0);
     private final AtomicInteger totalDuplicateCount = new AtomicInteger(0);
     private ThreadPoolExecutor threadPoolExecutor = null;
-    private CmdInterface cmdInterFace = null;
+    private TaskInterface cmdInterFace = null;
     
-    public LineLoadingJob( CmdInterface cmdInterFace, String task, String importFilePath, TiSession tiSession, Map<String, String> properties) {
-    	this.task = task;
+    public LineLoadingJob( TaskInterface cmdInterFace, String task, String importFilePath, TiSession tiSession) {
         this.importFilePath = importFilePath;
-        this.properties = properties;
         this.tiSession = tiSession;
         this.cmdInterFace = cmdInterFace;
+        final Map<String, String> properties = cmdInterFace.getProperties();
         threadPoolExecutor = ThreadPoolUtil.startJob(Integer.parseInt(properties.get(Model.INTERNAL_THREAD_POOL)), Integer.parseInt(properties.get(Model.MAX_POOL_SIZE)));
     }
     
@@ -53,6 +44,7 @@ public class LineLoadingJob implements Runnable {
     public void run() {
 
         long startTime = System.currentTimeMillis();
+        final Map<String, String> properties = cmdInterFace.getProperties();
         String headLogger = "[Import summary]";
         if(cmdInterFace instanceof CheckSum) {
         	headLogger = "[CheckSum summary]";
@@ -76,7 +68,7 @@ public class LineLoadingJob implements Runnable {
         ////List<String> threadPerLineList = CountUtil.getPerThreadFileLines(importFileLineNum, internalThreadNum, importFile.getAbsolutePath());
 
         Timer timer = new Timer();
-        ImportTimer importTimer = new ImportTimer(totalImportCount, importFileLineNum, importFilePath);
+        TaskTimer importTimer = new TaskTimer(cmdInterFace, totalImportCount, importFileLineNum, importFilePath);
         timer.schedule(importTimer, 5000, Long.parseLong(properties.get(Model.TIMER_INTERVAL)));
 
         // Block until all child threads end.
@@ -84,11 +76,13 @@ public class LineLoadingJob implements Runnable {
         if(importFileLineNum > avg*internalThreadNum) {
         	avg += ((importFileLineNum - avg*internalThreadNum + internalThreadNum)/internalThreadNum);
         }
-        CountDownLatch countDownLatch = new CountDownLatch(internalThreadNum);
+        final int countDownNum = importFileLineNum/avg;
+        cmdInterFace.getLogger().info("file={}, line={}, each processes={}, countDownNum={}", absolutePath, importFileLineNum, avg, countDownNum);
+        CountDownLatch countDownLatch = new CountDownLatch(countDownNum);
         LineIterator lineIterator = null;
  
         final Map<String, String> container = new HashMap<String, String>(avg+1);
-        Histogram.Timer fileBlockTimer = DURATION.labels("split file").startTimer();
+        Histogram.Timer fileBlockTimer = cmdInterFace.getHistogram().labels("split file").startTimer();
         try {	
 			lineIterator = FileUtils.lineIterator(importFile, "UTF-8");
             // If the data file has a large number of rows, the block time may be slightly longer
@@ -97,13 +91,12 @@ public class LineLoadingJob implements Runnable {
             	try {
             		container.put(""+ m, lineIterator.nextLine());
                 } catch (NoSuchElementException e) {
-                    logger.error("LineIterator error, file = {} ,error={}", absolutePath, e);
-                    totalParseErrorCount.addAndGet(1);
+                	cmdInterFace.getLoggerFail().error("LineIterator error, file = {} ,error={}", absolutePath, e);
+                    totalParseErrorCount.incrementAndGet();
                     continue;
                 }
                 if(avg <= container.size()) {
                 	threadPoolExecutor.execute( new BatchJob(
-                			task,
                 			tiSession,
                             totalImportCount,
                             totalSkipCount,
@@ -113,7 +106,6 @@ public class LineLoadingJob implements Runnable {
                             ttlSkipTypeList,
                             ttlSkipTypeMap,
                             container,
-                            properties,
                             countDownLatch,
                             totalDuplicateCount,
                             ttlPutList,
@@ -124,7 +116,6 @@ public class LineLoadingJob implements Runnable {
             }
             if(0 < container.size()) {
             	threadPoolExecutor.execute( new BatchJob(
-            			task,
                         tiSession,
                         totalImportCount,
                         totalSkipCount,
@@ -134,7 +125,6 @@ public class LineLoadingJob implements Runnable {
                         ttlSkipTypeList,
                         ttlSkipTypeMap,
                         container,
-                        properties,
                         countDownLatch,
                         totalDuplicateCount,
                         ttlPutList,
@@ -143,15 +133,23 @@ public class LineLoadingJob implements Runnable {
             	container.clear();
             }
         	fileBlockTimer.observeDuration();
-		} catch (IOException e1) {
-			// TODO Auto-generated catch block
-			e1.printStackTrace();
 		}
+        catch (RuntimeException e1) {
+        	e1.printStackTrace();
+        	System.exit(1);
+        } 
+        catch(Error e1){
+        	e1.printStackTrace();
+        	System.exit(1);
+        }
+        catch (Throwable e1) {
+        	e1.printStackTrace();
+        	System.exit(1);
+        }
         finally {
         	try {
 				lineIterator.close();
 			} catch (IOException e) {
-				// TODO Auto-generated catch block
 				e.printStackTrace();
 			}
         	fileBlockTimer.close();
@@ -179,7 +177,7 @@ public class LineLoadingJob implements Runnable {
         }
 //        logger.info("Check sum file={} complete. Total={}, totalCheck={}, notExists={}, skip={}, parseErr={}, checkSumFail={}", checkSumFile.getAbsolutePath(), totalCount, totalCheck, notInsert, skip, parseErr, checkSumFail);
         timer.cancel();
-        logger.info(result.toString());
+        cmdInterFace.getLogger().info(result.toString());
 
     }
 }

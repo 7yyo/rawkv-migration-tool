@@ -54,8 +54,7 @@ public class Main {
                 }
             }
 
-           	ExeFactory exefactory = ExeFactory.getInstance(tiSession,task,properties);
-            exefactory.run();
+           	ExeFactory.getInstance(tiSession,task,properties).run();
         }
 
         tiSession.close();
