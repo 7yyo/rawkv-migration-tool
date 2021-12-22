@@ -15,6 +15,8 @@ import org.slf4j.LoggerFactory;
 import org.tikv.raw.RawKVClient;
 import org.tikv.shade.com.google.protobuf.ByteString;
 
+import com.pingcap.controller.FileScanner;
+import com.pingcap.controller.ScannerInterface;
 import com.pingcap.enums.Model;
 import com.pingcap.util.JavaUtil;
 import com.pingcap.util.PropertiesUtil;
@@ -102,6 +104,11 @@ public class CheckSum implements TaskInterface {
 	@Override
 	public Map<String, String> getProperties() {
 		return properties;
+	}
+
+	@Override
+	public ScannerInterface getInitScanner() {
+		return new FileScanner();
 	}
 	
 }

@@ -34,6 +34,8 @@ public class JavaUtil {
 			clazz = Class.forName(fullClassName).getConstructor(classes).newInstance(args);
 		}
 		catch (Exception e) {
+			e.printStackTrace();
+			System.exit(0);
 		}
 		return clazz;
 	}

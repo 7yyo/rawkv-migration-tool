@@ -1,7 +1,6 @@
 package com.pingcap.controller;
 
 import com.pingcap.enums.Model;
-import com.pingcap.task.CheckSum;
 import com.pingcap.task.TaskInterface;
 import com.pingcap.timer.TaskTimer;
 import com.pingcap.util.FileUtil;
@@ -25,6 +24,7 @@ public class LineLoadingJob implements Runnable {
     private final TiSession tiSession;
 
     private final AtomicInteger totalImportCount = new AtomicInteger(0);
+    private final AtomicInteger totalEmptyCount = new AtomicInteger(0);
     private final AtomicInteger totalSkipCount = new AtomicInteger(0);
     private final AtomicInteger totalParseErrorCount = new AtomicInteger(0);
     private final AtomicInteger totalBatchPutFailCount = new AtomicInteger(0);
@@ -32,7 +32,7 @@ public class LineLoadingJob implements Runnable {
     private ThreadPoolExecutor threadPoolExecutor = null;
     private TaskInterface cmdInterFace = null;
     
-    public LineLoadingJob( TaskInterface cmdInterFace, String task, String importFilePath, TiSession tiSession) {
+    public LineLoadingJob( TaskInterface cmdInterFace, String importFilePath, TiSession tiSession) {
         this.importFilePath = importFilePath;
         this.tiSession = tiSession;
         this.cmdInterFace = cmdInterFace;
@@ -45,10 +45,7 @@ public class LineLoadingJob implements Runnable {
 
         long startTime = System.currentTimeMillis();
         final Map<String, String> properties = cmdInterFace.getProperties();
-        String headLogger = "[Import summary]";
-        if(cmdInterFace instanceof CheckSum) {
-        	headLogger = "[CheckSum summary]";
-        }
+        final String headLogger = "["+cmdInterFace.getClass().getSimpleName()+" summary]";
         
         List<String> ttlSkipTypeList = new ArrayList<>(Arrays.asList(properties.get(Model.TTL_SKIP_TYPE).split(",")));
         // Used to count the number of skipped entries for each ttl type.
@@ -99,6 +96,7 @@ public class LineLoadingJob implements Runnable {
                 	threadPoolExecutor.execute( new BatchJob(
                 			tiSession,
                             totalImportCount,
+                            totalEmptyCount,
                             totalSkipCount,
                             totalParseErrorCount,
                             totalBatchPutFailCount,
@@ -118,6 +116,7 @@ public class LineLoadingJob implements Runnable {
             	threadPoolExecutor.execute( new BatchJob(
                         tiSession,
                         totalImportCount,
+                        totalEmptyCount,
                         totalSkipCount,
                         totalParseErrorCount,
                         totalBatchPutFailCount,
@@ -166,6 +165,7 @@ public class LineLoadingJob implements Runnable {
                         " file=" + importFile.getAbsolutePath() + ", " +
                         "total=" + importFileLineNum + ", " +
                         "imported=" + totalImportCount + ", " +
+                        "empty=" + totalEmptyCount + ", " +
                         "skip=" + totalSkipCount + ", " +
                         "parseErr=" + totalParseErrorCount + ", " +
                         "putErr=" + totalBatchPutFailCount + ", " +

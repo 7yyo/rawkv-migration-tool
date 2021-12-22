@@ -9,15 +9,12 @@ import java.io.*;
 import java.util.*;
 import java.util.concurrent.*;
 
-public class FileScanner {
-
-    private String task;
+public class FileScanner implements ScannerInterface {
     
-    public FileScanner(String task) {
-		this.task = task;
+    public FileScanner() {
     }
 	
-    
+    @Override
     public void run(TiSession tiSession,TaskInterface cmdInterFace) {
         long importStartTime = System.currentTimeMillis();
         final Map<String, String> properties = cmdInterFace.getProperties();
@@ -29,7 +26,7 @@ public class FileScanner {
         ThreadPoolExecutor threadPoolExecutor = ThreadPoolUtil.startJob(Integer.parseInt(properties.get(Model.CORE_POOL_SIZE)), Integer.parseInt(properties.get(Model.MAX_POOL_SIZE)));
 
         for (File importFile : importFileList) {
-            threadPoolExecutor.execute(new LineLoadingJob( cmdInterFace, task, importFile.getAbsolutePath(), tiSession));
+            threadPoolExecutor.execute(new LineLoadingJob( cmdInterFace, importFile.getAbsolutePath(), tiSession));
         }
         threadPoolExecutor.shutdown();
 

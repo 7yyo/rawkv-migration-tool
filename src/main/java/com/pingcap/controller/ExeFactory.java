@@ -44,18 +44,19 @@ public class ExeFactory {
     private TaskInterface getCmdInterface() {
     	String taskClass = TaskInterface.class.getPackage().getName()+"." + task;
     	if(!JavaUtil.hasClass(taskClass)) {
-    		System.out.println("unknow function " + task);
+    		logger.error("unknow task: [" + task+"]");
     		System.exit(0);
     	}
-        TaskInterface cmdInterFace = (TaskInterface) JavaUtil.newClazz( taskClass );
-        cmdInterFace.setProperties(properties);
-        return cmdInterFace;
+        TaskInterface taskInterFace = (TaskInterface) JavaUtil.newClazz( taskClass );
+        taskInterFace.setProperties(properties);
+        return taskInterFace;
     }
     
 	public void run() {
 		if(null != tiSession){
-			FileScanner scanner = new FileScanner(task);
-			scanner.run( tiSession , getCmdInterface() );
+			TaskInterface taskInterFace = getCmdInterface();
+			ScannerInterface scanner = taskInterFace.getInitScanner();
+			scanner.run( tiSession , taskInterFace );
 		}
 	}
 

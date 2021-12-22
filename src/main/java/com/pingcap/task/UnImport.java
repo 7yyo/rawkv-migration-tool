@@ -1,20 +1,23 @@
 package com.pingcap.task;
 
-import static com.pingcap.enums.Model.REDO_FAIL_LOG;
 import static com.pingcap.enums.Model.REDO_FILE_PATH;
 import static com.pingcap.enums.Model.REDO_MOVE_PATH;
 import static com.pingcap.enums.Model.REDO_TYPE;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.tikv.kvproto.Kvrpcpb;
 import org.tikv.raw.RawKVClient;
 import org.tikv.shade.com.google.protobuf.ByteString;
 
+import com.pingcap.controller.FileScanner;
+import com.pingcap.controller.ScannerInterface;
 import com.pingcap.enums.Model;
 import com.pingcap.util.JavaUtil;
 import com.pingcap.util.PropertiesUtil;
@@ -23,8 +26,8 @@ import io.prometheus.client.Histogram;
 
 public class UnImport implements TaskInterface {
     private static final Logger logger = LoggerFactory.getLogger(Model.LOG);
-    private static final Logger redoLog = LoggerFactory.getLogger(Model.REDO_LOG);
-    private static final Logger redoFailLog = LoggerFactory.getLogger(REDO_FAIL_LOG);
+    private static final Logger loggerFail = LoggerFactory.getLogger(Model.BP_FAIL_LOG);
+    private static final Logger auditLog = LoggerFactory.getLogger(Model.AUDIT_LOG);
     private Map<String, String> properties = null;
     private String pid = JavaUtil.getPid();
     private Histogram UNIMPORT_DURATION = Histogram.build().name("unimport_duration_"+pid).help("unimport duration").labelNames("type").register();
@@ -43,12 +46,12 @@ public class UnImport implements TaskInterface {
 
 	@Override
 	public Logger getLoggerAudit() {
-		return redoLog;
+		return auditLog;
 	}
 
 	@Override
 	public Logger getLoggerFail() {
-		return redoFailLog;
+		return loggerFail;
 	}
 
 	@Override
@@ -66,6 +69,35 @@ public class UnImport implements TaskInterface {
 	@Override
 	public HashMap<ByteString, ByteString> executeTikv(RawKVClient rawKvClient, HashMap<ByteString, ByteString> pairs,
 			HashMap<ByteString, String> pairs_lines, boolean hasTtl,String filePath) {
+		List<Kvrpcpb.KvPair> kvHaveList = null;
+        if (Model.ON.equals(properties.get(Model.CHECK_EXISTS_KEY))) {
+            // skip not exists key.
+            // For batch get to check exists kv
+        Histogram.Timer batchGetTimer = REQUEST_LATENCY.labels("batch get").startTimer();
+        try {
+            // Batch get from raw kv.
+            kvHaveList = rawKvClient.batchGet(new ArrayList<>(pairs.keySet()));
+        } catch (Exception e) {
+        	TaskInterface.BATCH_PUT_FAIL_COUNTER.labels("batch put fail").inc();
+            throw e;
+        }
+
+        batchGetTimer.observeDuration();
+        boolean isFind;
+        for(Entry<ByteString, ByteString> obj:pairs.entrySet()){
+        	isFind = false;
+            for (Kvrpcpb.KvPair kv : kvHaveList) {
+            	if(obj.getKey().equals(kv.getKey())){
+            		isFind = true;
+            		break;
+            	}
+            }
+            if(!isFind){
+            	auditLog.info("Skip not exists key={}, file={}, almost line={}", obj.getKey().toStringUtf8(), filePath, pairs_lines.get(obj.getKey()));
+            	pairs.remove(obj.getKey());                  	
+            }
+        }
+        }
 		rawKvClient.batchDelete(new ArrayList<>(pairs.keySet()));
 		return pairs;
 	}
@@ -85,7 +117,7 @@ public class UnImport implements TaskInterface {
 	@Override
 	public void faildWriteRowsLogger(HashMap<ByteString, ByteString> pairs) {
 		for(Entry<ByteString, ByteString> obj:pairs.entrySet()){
-			redoFailLog.info(obj.getValue().toStringUtf8());
+			loggerFail.info(obj.getValue().toStringUtf8());
 		}
 	}
 	
@@ -98,6 +130,11 @@ public class UnImport implements TaskInterface {
 	@Override
 	public Map<String, String> getProperties() {
 		return properties;
+	}
+
+	@Override
+	public ScannerInterface getInitScanner() {
+		return new FileScanner();
 	}
 	
 }

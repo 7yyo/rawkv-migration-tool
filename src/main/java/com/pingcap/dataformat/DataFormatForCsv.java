@@ -5,14 +5,12 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.commons.lang.StringUtils;
 import org.tikv.shade.com.google.protobuf.ByteString;
-
 import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONObject;
 import com.alibaba.fastjson.serializer.PascalNameFilter;
 import com.pingcap.enums.Model;
 import com.pingcap.pojo.IndexInfo;
 import com.pingcap.pojo.ServiceTag;
-
 import io.prometheus.client.Histogram.Timer;
 
 public class DataFormatForCsv implements DataFormatInterface {
@@ -60,31 +58,31 @@ public class DataFormatForCsv implements DataFormatInterface {
 		else {
 		    IndexInfo indexInfoTiKV = new IndexInfo();
 		    String arr[] = line.split(delimiter1);
-	        String id = arr[0];
+		    if(3 != arr.length)
+		    	throw new Exception("indexInfo format error");
+	        final String id = arr[0];
 	        type = arr[1];
 	        String k = String.format(IndexInfo.KET_FORMAT, keyDelimiter, envId, keyDelimiter, type, keyDelimiter, id);
 	        // CSV has no timestamp, so don't consider.
-	        String targetId = arr[2].split(delimiter2)[0];
-	        indexInfoTiKV.setTargetId(targetId);
+	        String extArr[] = arr[2].split(delimiter2);
+	        indexInfoTiKV.setTargetId(extArr[0]);
 	        indexInfoTiKV.setAppId(appId);
-	        String v = line.split(delimiter1)[2];
 	
 	        // except <id|type|targetId>
-	        if (v.split(delimiter2).length > 1) {
+	        if (extArr.length > 1) {
 	            ServiceTag serviceTag = new ServiceTag();
-	            String[] vs = v.split(delimiter2);
-	            if (vs.length == 2) {
+	            if (extArr.length == 2) {
 	                // id|type|targetId##BLKMDL_ID
-	                serviceTag.setBLKMDL_ID(vs[1]);
+	                serviceTag.setBLKMDL_ID(extArr[1]);
 	            } else {
 	                // id|type|targetId##BLKMDL_ID##PD_SALE_FTA_CD##ACCT_DTL_TYPE##CORPPRVT_FLAG##CMTRST_CST_ACCNO##AR_ID##QCRCRD_IND
-	                serviceTag.setBLKMDL_ID(v.split(delimiter2)[1]);
-	                serviceTag.setPD_SALE_FTA_CD(v.split(delimiter2)[2]);
-	                serviceTag.setACCT_DTL_TYPE(v.split(delimiter2)[3]);
-	                serviceTag.setCORPPRVT_FLAG(v.split(delimiter2)[4]);
-	                serviceTag.setCMTRST_CST_ACCNO(v.split(delimiter2)[5]);
-	                serviceTag.setAR_ID(v.split(delimiter2)[6]);
-	                serviceTag.setQCRCRD_IND(v.split(delimiter2)[7]);
+	                serviceTag.setBLKMDL_ID(extArr[1]);
+	                serviceTag.setPD_SALE_FTA_CD(extArr[2]);
+	                serviceTag.setACCT_DTL_TYPE(extArr[3]);
+	                serviceTag.setCORPPRVT_FLAG(extArr[4]);
+	                serviceTag.setCMTRST_CST_ACCNO(extArr[5]);
+	                serviceTag.setAR_ID(extArr[6]);
+	                serviceTag.setQCRCRD_IND(extArr[7]);
 	            }
 	            indexInfoTiKV.setServiceTag(JSON.toJSONString(serviceTag, nameFilter));
 	        }
@@ -95,6 +93,46 @@ public class DataFormatForCsv implements DataFormatInterface {
 	        value = ByteString.copyFromUtf8(JSONObject.toJSONString(indexInfoTiKV));
 		}
         return dataFormatCallBack.putDataCallBack( type, key, value);
+	}
+
+	@Override
+	public boolean unFormatToKeyValue(Timer timer, AtomicInteger totalParseErrorCount, String scenes, String key,
+			String value, UnDataFormatCallBack unDataFormatCallBack) throws Exception {
+		String jsonString = null;
+		String dataType;
+		int dataTypeInt;
+        if (key.startsWith(Model.INDEX_INFO)) {
+        	dataType = Model.INDEX_INFO;
+        	JSONObject jsonObject = JSONObject.parseObject(value);
+        	IndexInfo indexInfoTiKV = JSON.toJavaObject(jsonObject, IndexInfo.class);
+        	String keyArr[] = key.split(keyDelimiter);
+        	// key = indexInfo_:_{envid}_:_{type}_:_{id}
+        	// id|type|targetId##BLKMDL_ID
+        	// id|type|targetId##BLKMDL_ID##PD_SALE_FTA_CD##ACCT_DTL_TYPE##CORPPRVT_FLAG##CMTRST_CST_ACCNO##AR_ID##QCRCRD_IND
+        	String tag = indexInfoTiKV.getServiceTag();
+        	jsonString = keyArr[3]+delimiter2+keyArr[2]+delimiter2+indexInfoTiKV.getTargetId();
+        	if(!StringUtils.isBlank(tag)) {
+        		jsonObject = JSONObject.parseObject(tag);
+        		ServiceTag serviceTag = JSON.toJavaObject(jsonObject, ServiceTag.class);
+        		if( StringUtils.isBlank(serviceTag.getPD_SALE_FTA_CD())&&
+        				StringUtils.isBlank(serviceTag.getACCT_DTL_TYPE())&&
+        				StringUtils.isBlank(serviceTag.getCORPPRVT_FLAG())&&
+        				StringUtils.isBlank(serviceTag.getCMTRST_CST_ACCNO())&&
+        				StringUtils.isBlank(serviceTag.getAR_ID())&&
+        				StringUtils.isBlank(serviceTag.getQCRCRD_IND())
+        				)
+            		jsonString += (delimiter2+serviceTag.getBLKMDL_ID());
+        		else
+        			jsonString += (delimiter2+serviceTag.getBLKMDL_ID()+delimiter2+serviceTag.getPD_SALE_FTA_CD()+delimiter2+serviceTag.getACCT_DTL_TYPE()+delimiter2+serviceTag.getCORPPRVT_FLAG()+delimiter2+serviceTag.getCMTRST_CST_ACCNO()+delimiter2+serviceTag.getAR_ID()+delimiter2+serviceTag.getQCRCRD_IND());
+        	}
+            dataTypeInt = 1;
+        }
+        else {
+        	dataType = Model.INDEX_TYPE;
+        	dataTypeInt = 0;
+        	jsonString = key + Model.INDEX_TYPE_DELIMITER + value;
+        }
+		return unDataFormatCallBack.getDataCallBack( jsonString, dataType, dataTypeInt);
 	}
 
 }

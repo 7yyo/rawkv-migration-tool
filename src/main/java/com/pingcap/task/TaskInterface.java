@@ -11,6 +11,7 @@ import org.slf4j.Logger;
 import org.tikv.raw.RawKVClient;
 import org.tikv.shade.com.google.protobuf.ByteString;
 
+import com.pingcap.controller.ScannerInterface;
 import com.pingcap.enums.Model;
 import com.pingcap.util.PropertiesUtil;
 import io.prometheus.client.Histogram;
@@ -29,6 +30,7 @@ public interface TaskInterface {
 	public HashMap<ByteString, ByteString> executeTikv(RawKVClient rawKvClient, HashMap<ByteString, ByteString> pairs, HashMap<ByteString, String> pairs_lines, boolean hasTtl,String filePath);
 	public void  succeedWriteRowsLogger(String filePath, HashMap<ByteString, ByteString> pairs);
 	public void  faildWriteRowsLogger(HashMap<ByteString, ByteString> pairs);
+	public ScannerInterface getInitScanner();
 	
 	public void checkAllParameters(Map<String, String> properties);
 	public Histogram getHistogram();

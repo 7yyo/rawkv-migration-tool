@@ -6,13 +6,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
-import org.apache.commons.lang.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.tikv.kvproto.Kvrpcpb;
 import org.tikv.raw.RawKVClient;
 import org.tikv.shade.com.google.protobuf.ByteString;
 
+import com.pingcap.controller.FileScanner;
+import com.pingcap.controller.ScannerInterface;
 import com.pingcap.enums.Model;
 import com.pingcap.util.JavaUtil;
 import com.pingcap.util.PropertiesUtil;
@@ -62,16 +63,13 @@ public class Import implements TaskInterface {
         PropertiesUtil.checkConfig(properties, Model.APP_ID);
         PropertiesUtil.checkConfig(properties, Model.UPDATE_TIME);
         PropertiesUtil.checkNaturalNumber( properties, Model.TTL, false);
-    	// check importer.in.rollback value must be greater than 0 or null
-    	PropertiesUtil.checkNaturalNumber( properties, Model.ROLLBACK, true);
 	}
 
 	@Override
 	public HashMap<ByteString, ByteString> executeTikv(RawKVClient rawKvClient, HashMap<ByteString, ByteString> pairs,
 			HashMap<ByteString, String> pairs_lines, boolean hasTtl,String filePath) {
         List<Kvrpcpb.KvPair> kvHaveList = null;
-        //It jump check exists key when use rollback
-        if (Model.ON.equals(properties.get(Model.CHECK_EXISTS_KEY)) && StringUtils.isBlank(properties.get(Model.ROLLBACK))) {
+        if (Model.ON.equals(properties.get(Model.CHECK_EXISTS_KEY))) {
             // Only json file skip exists key.
             String importMode = properties.get(Model.MODE);
             if (Model.JSON_FORMAT.equals(importMode)) {
@@ -133,6 +131,11 @@ public class Import implements TaskInterface {
 	@Override
 	public Map<String, String> getProperties() {
 		return properties;
+	}
+
+	@Override
+	public ScannerInterface getInitScanner() {
+		return new FileScanner();
 	}
 
 }

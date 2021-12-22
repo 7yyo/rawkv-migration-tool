@@ -13,6 +13,7 @@ import com.pingcap.pojo.IndexInfo;
 import com.pingcap.pojo.TempIndexInfo;
 
 import io.prometheus.client.Histogram;
+import io.prometheus.client.Histogram.Timer;
 
 public class DataFormatForJson implements DataFormatInterface {
 	
@@ -20,7 +21,6 @@ public class DataFormatForJson implements DataFormatInterface {
 	private String envId;
 	private String keyDelimiter;
     
-    private JSONObject jsonObject = null;
     // Cassandra is from original data file, TiKV is will be put raw kv.
     IndexInfo indexInfoCassandra = null;
     IndexInfo indexInfoTiKV = new IndexInfo();
@@ -35,6 +35,7 @@ public class DataFormatForJson implements DataFormatInterface {
 
 	@Override
 	public boolean formatToKeyValue(Histogram.Timer timer,AtomicInteger totalParseErrorCount, String scenes,String line,DataFormatCallBack dataFormatCallBack) throws Exception {
+		JSONObject jsonObject = null;
 		try {
             jsonObject = JSONObject.parseObject(line);
             timer.observeDuration();
@@ -90,6 +91,43 @@ public class DataFormatForJson implements DataFormatInterface {
                 break;
         }
         return dataFormatCallBack.putDataCallBack( ttlType, key, value);
+	}
+
+	@Override
+	public boolean unFormatToKeyValue(Timer timer, AtomicInteger totalParseErrorCount, String scenes, String key,
+			String value, UnDataFormatCallBack unDataFormatCallBack) throws Exception {
+        String jsonString = null;
+        JSONObject jsonObject = null;
+        int dataTypeInt;
+        String dataType;
+        if (key.startsWith(Model.INDEX_INFO)) {
+        	dataType = Model.INDEX_INFO;
+        	dataTypeInt = 1;
+            jsonObject = JSONObject.parseObject(value);
+            IndexInfo indexInfo = JSON.toJavaObject(jsonObject, IndexInfo.class);
+            // key = indexInfo_:_{envid}_:_{type}_:_{id}
+            String keyArr[] = key.split(keyDelimiter);
+            indexInfo.setEnvId(keyArr[1]);
+            indexInfo.setType(keyArr[2]);
+            indexInfo.setId(keyArr[3]);
+            jsonString = JSON.toJSONString(indexInfo);
+        } else if (key.startsWith(Model.TEMP_INDEX_INFO)) {
+        	dataType = Model.TEMP_INDEX_INFO;
+        	dataTypeInt = 2;
+            jsonObject = JSONObject.parseObject(value);
+            TempIndexInfo tempIndexInfo = JSON.toJavaObject(jsonObject, TempIndexInfo.class);
+            // key = tempIndex_:_{envid}_:_{id}
+            String keyArr[] = key.split(keyDelimiter);
+            tempIndexInfo.setEnvId(keyArr[1]);
+            tempIndexInfo.setId(keyArr[2]);
+            jsonString = JSON.toJSONString(tempIndexInfo);
+        }
+        else {
+        	dataType = Model.INDEX_TYPE;
+        	dataTypeInt = 0;
+        	jsonString = key + Model.INDEX_TYPE_DELIMITER + value;
+        }
+		return unDataFormatCallBack.getDataCallBack( jsonString, dataType, dataTypeInt);
 	}
 
 }
