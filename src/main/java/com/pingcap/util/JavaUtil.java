@@ -13,6 +13,8 @@ public class JavaUtil {
 			hasAvailable = null != Class.forName(className);
 		} catch (ClassNotFoundException e) {
 			e.printStackTrace();
+		} catch (Throwable e){
+			e.printStackTrace();
 		}
 		return hasAvailable;
 	}
