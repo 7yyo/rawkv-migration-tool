@@ -84,8 +84,9 @@ public class Import implements TaskInterface {
                 	TaskInterface.BATCH_PUT_FAIL_COUNTER.labels("batch put fail").inc();
                     throw e;
                 }
-
-                batchGetTimer.observeDuration();
+                finally {
+                	batchGetTimer.observeDuration();
+                }
                 for (Kvrpcpb.KvPair kv : kvHaveList) {	
                 	auditLog.info("Skip exists key={}, file={}, almost line={}", kv.getKey().toStringUtf8(), filePath, pairs_lines.get(kv.getKey()));
                 	pairs.remove(kv.getKey());

@@ -48,9 +48,9 @@ public class InitCsv {
     		headStr = System.getProperty(Model.K);
     	}
         for (int i = 1; i <= num; i++) {
-            ByteBuffer byteBuffer1 = StandardCharsets.UTF_8.encode(String.format(headStr+csv1, num++) + "\n");
-            ByteBuffer byteBuffer2 = StandardCharsets.UTF_8.encode(String.format(headStr+csv2, num++) + "\n");
-            ByteBuffer byteBuffer3 = StandardCharsets.UTF_8.encode(String.format(headStr+csv3, num++) + "\n");
+            ByteBuffer byteBuffer1 = StandardCharsets.UTF_8.encode(String.format(headStr+csv1, i) + "\n");
+            ByteBuffer byteBuffer2 = StandardCharsets.UTF_8.encode(String.format(headStr+csv2, i++) + "\n");
+            ByteBuffer byteBuffer3 = StandardCharsets.UTF_8.encode(String.format(headStr+csv3, i++) + "\n");
             try {
                 fileChannel.write(byteBuffer1);
                 fileChannel.write(byteBuffer2);

@@ -188,6 +188,7 @@ public class Export implements TaskInterface {
 						catch(IOException e){
 							totalIOError.incrementAndGet();
 							logger.error("IOException unFormatToKeyValue:{}",e.getMessage());
+				        	e.printStackTrace();
 						}
 						return false;
 					}
