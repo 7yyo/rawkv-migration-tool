@@ -71,7 +71,7 @@ public class RawKv {
                     }
                 }
 
-                PropertiesUtil.checkConfig(properties, Model.TTL);
+                PropertiesUtil.checkNaturalNumber(properties,Model.TTL,false);
                 try {
                     Histogram.Timer batchPutTimer = REQUEST_LATENCY.labels("batch put").startTimer();
                     batchProcess( rawKvClient, properties, kvPairs);

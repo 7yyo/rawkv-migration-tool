@@ -87,7 +87,7 @@ public class CheckSumJsonJob implements Runnable {
 
         Timer timer = new Timer();
         CheckSumTimer checkSumTimer = new CheckSumTimer(checkSumFilePath, totalCheck, lineCount);
-        PropertiesUtil.checkConfig(properties, TIMER_INTERVAL);
+        PropertiesUtil.checkNaturalNumber(properties,Model.TIMER_INTERVAL,false);
         timer.schedule(checkSumTimer, 5000, Long.parseLong(properties.get(TIMER_INTERVAL)));
 
         IndexInfo indexInfoOriginal;

@@ -7,7 +7,6 @@ import org.tikv.common.TiConfiguration;
 import org.tikv.common.TiSession;
 
 import java.util.Map;
-import java.util.Properties;
 
 public class TiSessionUtil {
 
@@ -17,12 +16,14 @@ public class TiSessionUtil {
         String pd = properties.get(Model.PD);
         TiConfiguration conf;
         TiSession tiSession = null;
-        PropertiesUtil.checkConfig(properties, Model.WRITE_TIMEOUT);
-        PropertiesUtil.checkConfig(properties, Model.READ_TIMEOUT);
-        PropertiesUtil.checkConfig(properties, Model.BATCH_WRITE_TIMEOUT);
-        PropertiesUtil.checkConfig(properties, Model.BATCH_READ_TIMEOUT);
-        PropertiesUtil.checkConfig(properties, Model.SCAN_TIMEOUT);
-        PropertiesUtil.checkConfig(properties, Model.CLEAN_TIMEOUT);
+        
+        PropertiesUtil.checkNaturalNumber(properties,Model.WRITE_TIMEOUT,false);
+        PropertiesUtil.checkNaturalNumber(properties,Model.READ_TIMEOUT,false);
+        PropertiesUtil.checkNaturalNumber(properties,Model.BATCH_WRITE_TIMEOUT,false);
+        PropertiesUtil.checkNaturalNumber(properties,Model.BATCH_READ_TIMEOUT,false);
+        PropertiesUtil.checkNaturalNumber(properties,Model.SCAN_TIMEOUT,false);
+        PropertiesUtil.checkNaturalNumber(properties,Model.CLEAN_TIMEOUT,false);
+        
         try {
             conf = TiConfiguration.createRawDefault(pd);
             conf.setRawKVWriteTimeoutInMS(Integer.parseInt(properties.get(Model.WRITE_TIMEOUT)));
