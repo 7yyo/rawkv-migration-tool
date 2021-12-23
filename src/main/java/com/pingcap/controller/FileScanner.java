@@ -23,7 +23,7 @@ public class FileScanner implements ScannerInterface {
         ////2021-12-09 delete by zhugp, Collections.shuffle(importFileList);
 
         final int poolSize = Integer.parseInt(properties.get(Model.CORE_POOL_SIZE));
-        final int runnerMax = poolSize*2;
+        final int runnerMax = poolSize + poolSize;
         // Start the Main thread for each file.showFileList.
         ThreadPoolExecutor threadPoolExecutor = ThreadPoolUtil.startJob( poolSize, Integer.parseInt(properties.get(Model.MAX_POOL_SIZE)));
 

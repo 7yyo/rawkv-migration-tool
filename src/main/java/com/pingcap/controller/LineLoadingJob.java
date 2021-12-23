@@ -74,7 +74,6 @@ public class LineLoadingJob implements Runnable {
         	avg += ((importFileLineNum - avg*internalThreadNum + internalThreadNum)/internalThreadNum);
         }
         final int countDownNum = importFileLineNum/avg;
-        final int runnerMax = countDownNum * 2;
         cmdInterFace.getLogger().info("file={}, line={}, each processes={}, countDownNum={}", absolutePath, importFileLineNum, avg, countDownNum);
         CountDownLatch countDownLatch = new CountDownLatch(countDownNum);
         LineIterator lineIterator = null;
@@ -82,7 +81,6 @@ public class LineLoadingJob implements Runnable {
         final Map<String, String> container = new HashMap<String, String>(avg+1);
         Histogram.Timer fileBlockTimer = cmdInterFace.getHistogram().labels("split file").startTimer();
         try {
-        	ThreadPoolUtil.forExecutor( threadPoolExecutor, runnerMax );
 			lineIterator = FileUtils.lineIterator(importFile, "UTF-8");
             // If the data file has a large number of rows, the block time may be slightly longer
 
@@ -95,6 +93,7 @@ public class LineLoadingJob implements Runnable {
                     continue;
                 }
                 if(avg <= container.size()) {
+                	ThreadPoolUtil.forExecutor( threadPoolExecutor, internalThreadNum );
                 	threadPoolExecutor.execute( new BatchJob(
                 			tiSession,
                             totalImportCount,
@@ -115,6 +114,7 @@ public class LineLoadingJob implements Runnable {
                 }
             }
             if(0 < container.size()) {
+            	ThreadPoolUtil.forExecutor( threadPoolExecutor, internalThreadNum );
             	threadPoolExecutor.execute( new BatchJob(
                         tiSession,
                         totalImportCount,
@@ -164,7 +164,7 @@ public class LineLoadingJob implements Runnable {
         long duration = System.currentTimeMillis() - startTime;
         StringBuilder result = new StringBuilder(
         		headLogger +
-                        " file=" + importFile.getAbsolutePath() + ", " +
+                        ", Process ratio 100% file=" + importFile.getAbsolutePath() + ", " +
                         "total=" + importFileLineNum + ", " +
                         "imported=" + totalImportCount + ", " +
                         "empty=" + totalEmptyCount + ", " +
