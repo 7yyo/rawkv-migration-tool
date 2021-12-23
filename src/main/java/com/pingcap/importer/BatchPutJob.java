@@ -21,7 +21,6 @@ import org.tikv.shade.com.google.protobuf.ByteString;
 
 import java.io.File;
 import java.io.IOException;
-import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -93,7 +92,7 @@ public class BatchPutJob extends Thread {
         PropertiesUtil.checkConfig(properties, Model.UPDATE_TIME);
         String updateTime = properties.get(Model.UPDATE_TIME);
 
-        PropertiesUtil.checkConfig(properties, Model.BATCH_SIZE);
+        PropertiesUtil.checkNaturalNumber(properties,Model.BATCH_SIZE,false);
         int batchSize = Integer.parseInt(properties.get(Model.BATCH_SIZE));
 
         File file = new File(filePath);
@@ -135,7 +134,7 @@ public class BatchPutJob extends Thread {
             PropertiesUtil.checkConfig(properties, Model.DELIMITER_2);
             String delimiter1 = properties.get(Model.DELIMITER_1);
             String delimiter2 = properties.get(Model.DELIMITER_2);
-            PropertiesUtil.checkConfig(properties, Model.TTL);
+            PropertiesUtil.checkNaturalNumber(properties,Model.TTL,false);
             String ttl = properties.get(Model.TTL);
             // The string type of the key.
             String k;

@@ -54,13 +54,13 @@ public class ImporterJob implements Runnable {
         File importFile = new File(importFilePath);
         int importFileLineNum = FileUtil.getFileLines(importFile);
 
-        PropertiesUtil.checkConfig(properties, Model.INTERNAL_THREAD_NUM);
+        PropertiesUtil.checkNaturalNumber(properties,Model.INTERNAL_THREAD_NUM,false);
         int internalThreadNum = Integer.parseInt(properties.get(Model.INTERNAL_THREAD_NUM));
         List<String> threadPerLineList = CountUtil.getPerThreadFileLines(importFileLineNum, internalThreadNum, importFile.getAbsolutePath());
 
         Timer timer = new Timer();
         ImportTimer importTimer = new ImportTimer(totalImportCount, importFileLineNum, importFilePath);
-        PropertiesUtil.checkConfig(properties, Model.TIMER_INTERVAL);
+        PropertiesUtil.checkNaturalNumber(properties,Model.TIMER_INTERVAL,false);
         timer.schedule(importTimer, 5000, Long.parseLong(properties.get(Model.TIMER_INTERVAL)));
 
         // Block until all child threads end.

@@ -22,6 +22,7 @@ public class IndexTypeImporter {
     public static void run(Map<String, String> properties, TiSession tiSession) {
 
         String content;
+        String[] data;
         ByteString key, value;
 
         HashMap<ByteString, ByteString> kvParis = new HashMap<>();
@@ -50,13 +51,25 @@ public class IndexTypeImporter {
                         logger.warn("There is blank, file={}, line={}", file, fileLineNum);
                         continue;
                     }
+
+                    data = content.split(Model.INDEX_TYPE_DELIMITER);
+                    if(2 != data.length) {
+                        logger.error("Parse failed, file={}, data={}, line={}", file, content, fileLineNum);
+                        parseErrNum++;
+                        continue;
+                    }
+                    if(StringUtils.isBlank(data[0])) {
+                        logger.error("Parse failed, file={}, data={}, line={}", file, content, fileLineNum);
+                        parseErrNum++;
+                        continue;
+                    }
                     try {
                         // Key@Value
-                        key = ByteString.copyFromUtf8(content.split(Model.INDEX_TYPE_DELIMITER)[0]);
+                        key = ByteString.copyFromUtf8(data[0]);
                         if (StringUtils.isEmpty(key.toStringUtf8())) {
                             throw new Exception("IndexType key is empty");
                         }
-                        value = ByteString.copyFromUtf8(content.split(Model.INDEX_TYPE_DELIMITER)[1]);
+                        value = ByteString.copyFromUtf8(data[1]);
                         kvParis.put(key, value);
                     } catch (Exception e) {
                         logger.error("Parse failed, file={}, data={}, line={}", file, content, fileLineNum);
