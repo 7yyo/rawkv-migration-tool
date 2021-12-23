@@ -20,7 +20,8 @@ public class Main {
     public static void main(String[] args) throws Exception {
 
         logger.info("Welcome to TiKV Migration tool!");
-
+        
+        moniterShutDown();
         String propertiesPath = System.getProperty(Model.P) == null ? PERSONAL_PROPERTIES_PATH : System.getProperty(Model.P);
         Map<String, String> properties = PropertiesUtil.getProperties(propertiesPath);
         ExeFactory.checkEnv(properties);
@@ -63,4 +64,12 @@ public class Main {
 
     }
 
+    public static void moniterShutDown(){
+	  Runtime.getRuntime().addShutdownHook(new Thread() {
+		   @Override
+		   public void run() {
+			   logger.info("Goodbye TiKV Migration tool by user kill!");
+		   }
+	  });
+    }
 }

@@ -33,7 +33,6 @@ public class BatchJob implements Runnable {
     private TaskInterface cmdInterFace = null;
 	
     public BatchJob(
-    		//String task,
             TiSession tiSession,
             AtomicInteger totalImportCount,
             AtomicInteger totalEmptyCount,
@@ -43,13 +42,11 @@ public class BatchJob implements Runnable {
             String absolutePath,
             List<String> ttlSkipTypeList,
             HashMap<String, Long> ttlSkipTypeMap,
-            ////String fileBlock,
             Map<String, String> lineBlock,
             CountDownLatch countDownLatch,
             AtomicInteger totalDuplicateCount,
             List<String> ttlPutList,
             TaskInterface cmdInterFace) {
-    	//this.task = task;
         this.totalImportCount = totalImportCount;
         this.tiSession = tiSession;
         this.totalEmptyCount = totalEmptyCount;
@@ -61,7 +58,6 @@ public class BatchJob implements Runnable {
         this.ttlSkipTypeList = ttlSkipTypeList;
         this.ttlSkipTypeMap = ttlSkipTypeMap;
         this.lineBlock.putAll(lineBlock);
-        ////this.fileBlock = fileBlock;
         this.countDownLatch = countDownLatch;
         this.totalDuplicateCount = totalDuplicateCount;
         this.cmdInterFace = cmdInterFace;

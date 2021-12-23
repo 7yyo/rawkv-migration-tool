@@ -74,13 +74,15 @@ public class LineLoadingJob implements Runnable {
         	avg += ((importFileLineNum - avg*internalThreadNum + internalThreadNum)/internalThreadNum);
         }
         final int countDownNum = importFileLineNum/avg;
+        final int runnerMax = countDownNum * 2;
         cmdInterFace.getLogger().info("file={}, line={}, each processes={}, countDownNum={}", absolutePath, importFileLineNum, avg, countDownNum);
         CountDownLatch countDownLatch = new CountDownLatch(countDownNum);
         LineIterator lineIterator = null;
  
         final Map<String, String> container = new HashMap<String, String>(avg+1);
         Histogram.Timer fileBlockTimer = cmdInterFace.getHistogram().labels("split file").startTimer();
-        try {	
+        try {
+        	ThreadPoolUtil.forExecutor( threadPoolExecutor, runnerMax );
 			lineIterator = FileUtils.lineIterator(importFile, "UTF-8");
             // If the data file has a large number of rows, the block time may be slightly longer
 
@@ -180,4 +182,5 @@ public class LineLoadingJob implements Runnable {
         cmdInterFace.getLogger().info(result.toString());
 
     }
+
 }

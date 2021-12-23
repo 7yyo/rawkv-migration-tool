@@ -22,10 +22,13 @@ public class FileScanner implements ScannerInterface {
         List<File> importFileList = FileUtil.showFileList( properties.get(Model.IMPORT_FILE_PATH), false );//
         ////2021-12-09 delete by zhugp, Collections.shuffle(importFileList);
 
+        final int poolSize = Integer.parseInt(properties.get(Model.CORE_POOL_SIZE));
+        final int runnerMax = poolSize*2;
         // Start the Main thread for each file.showFileList.
-        ThreadPoolExecutor threadPoolExecutor = ThreadPoolUtil.startJob(Integer.parseInt(properties.get(Model.CORE_POOL_SIZE)), Integer.parseInt(properties.get(Model.MAX_POOL_SIZE)));
+        ThreadPoolExecutor threadPoolExecutor = ThreadPoolUtil.startJob( poolSize, Integer.parseInt(properties.get(Model.MAX_POOL_SIZE)));
 
         for (File importFile : importFileList) {
+        	ThreadPoolUtil.forExecutor( threadPoolExecutor, runnerMax );
             threadPoolExecutor.execute(new LineLoadingJob( cmdInterFace, importFile.getAbsolutePath(), tiSession));
         }
         threadPoolExecutor.shutdown();
