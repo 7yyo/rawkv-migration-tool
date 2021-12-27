@@ -6,6 +6,7 @@ import static com.pingcap.enums.Model.KEY_DELIMITER;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.slf4j.Logger;
 import org.tikv.raw.RawKVClient;
@@ -20,6 +21,7 @@ import io.prometheus.client.Counter;
 public interface TaskInterface {
 	static final Counter BATCH_PUT_FAIL_COUNTER = Counter.build().name("batch_put_fail_counter").help("Batch put fail counter.").labelNames("batch_put_fail").register();
     static final Histogram REQUEST_LATENCY = Histogram.build().name("requests_latency_seconds").help("Request latency in seconds.").labelNames("request_latency").register();
+    public final AtomicInteger totalDataBytes = new AtomicInteger(0);
     
 	public Logger getLogger();
 	public Logger getLoggerAudit();
@@ -40,6 +42,7 @@ public interface TaskInterface {
         PropertiesUtil.checkNaturalNumber( properties, Model.MAX_POOL_SIZE, false);
         PropertiesUtil.checkNaturalNumber( properties, Model.INTERNAL_THREAD_NUM, false);
         PropertiesUtil.checkNaturalNumber( properties, Model.INTERNAL_THREAD_POOL, false);
+        PropertiesUtil.checkNaturalNumber( properties, Model.INTERNAL_MAXTHREAD_POOL, false);
         PropertiesUtil.checkNaturalNumber( properties, Model.TIMER_INTERVAL, false);
         PropertiesUtil.checkNaturalNumber( properties, Model.BATCH_SIZE, false);
         PropertiesUtil.checkConfig(properties, KEY_DELIMITER);

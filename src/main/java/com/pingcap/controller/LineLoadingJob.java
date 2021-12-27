@@ -29,15 +29,26 @@ public class LineLoadingJob implements Runnable {
     private final AtomicInteger totalParseErrorCount = new AtomicInteger(0);
     private final AtomicInteger totalBatchPutFailCount = new AtomicInteger(0);
     private final AtomicInteger totalDuplicateCount = new AtomicInteger(0);
-    private ThreadPoolExecutor threadPoolExecutor = null;
+    private ThreadPoolExecutor threadPoolFileLoading = null;
     private TaskInterface cmdInterFace = null;
+    private LinkedHashMap<String, Long> ttlSkipTypeMap = new LinkedHashMap<>();
+    private List<String> ttlSkipTypeList = new ArrayList<>();
+    private List<String> ttlPutList = new ArrayList<>();
+    private int threadsNumber = 0;
     
-    public LineLoadingJob( TaskInterface cmdInterFace, String importFilePath, TiSession tiSession) {
+    public LineLoadingJob( TaskInterface cmdInterFace, String importFilePath, TiSession tiSession, List<String> ttlSkipTypeList, List<String> ttlPutList) {
         this.importFilePath = importFilePath;
         this.tiSession = tiSession;
         this.cmdInterFace = cmdInterFace;
-        final Map<String, String> properties = cmdInterFace.getProperties();
-        threadPoolExecutor = ThreadPoolUtil.startJob(Integer.parseInt(properties.get(Model.INTERNAL_THREAD_POOL)), Integer.parseInt(properties.get(Model.MAX_POOL_SIZE)));
+        Map<String, String> properties = cmdInterFace.getProperties();
+        this.threadPoolFileLoading = ThreadPoolUtil.startJob(Integer.parseInt(properties.get(Model.INTERNAL_THREAD_POOL)), Integer.parseInt(properties.get(Model.INTERNAL_MAXTHREAD_POOL)));
+        properties = null;
+        this.ttlSkipTypeList.addAll(ttlSkipTypeList);
+        // Used to count the number of skipped entries for each ttl type.
+        if (!ttlSkipTypeList.isEmpty()) {
+            FileUtil.cloneToTtlSkipTypeMap(ttlSkipTypeMap,ttlSkipTypeList);
+        }
+        this.ttlPutList.addAll(ttlPutList);
     }
     
     @Override
@@ -46,15 +57,6 @@ public class LineLoadingJob implements Runnable {
         long startTime = System.currentTimeMillis();
         final Map<String, String> properties = cmdInterFace.getProperties();
         final String headLogger = "["+cmdInterFace.getClass().getSimpleName()+" summary]";
-        
-        List<String> ttlSkipTypeList = new ArrayList<>(Arrays.asList(properties.get(Model.TTL_SKIP_TYPE).split(",")));
-        // Used to count the number of skipped entries for each ttl type.
-        LinkedHashMap<String, Long> ttlSkipTypeMap = new LinkedHashMap<>();
-        if (!ttlSkipTypeList.isEmpty()) {
-            ttlSkipTypeMap = FileUtil.getTtlSkipTypeMap(ttlSkipTypeList);
-        }
-
-        List<String> ttlPutList = new ArrayList<>(Arrays.asList(properties.get(Model.TTL_PUT_TYPE).split(",")));
 
         // Start the file sub-thread, import the data of the file through the sub-thread, and divide the data in advance according to the number of sub-threads.
         File importFile = new File(importFilePath);
@@ -69,68 +71,75 @@ public class LineLoadingJob implements Runnable {
         timer.schedule(importTimer, 5000, Long.parseLong(properties.get(Model.TIMER_INTERVAL)));
 
         // Block until all child threads end.
-        int avg = importFileLineNum / internalThreadNum;
-        if(importFileLineNum > avg*internalThreadNum) {
-        	avg += ((importFileLineNum - avg*internalThreadNum + internalThreadNum)/internalThreadNum);
+/*        int avgTmp = importFileLineNum / internalThreadNum;
+        if(importFileLineNum > avgTmp*internalThreadNum) {
+        	avgTmp += ((importFileLineNum - avgTmp*internalThreadNum + internalThreadNum - 1)/internalThreadNum);
         }
-        final int countDownNum = importFileLineNum/avg;
-        cmdInterFace.getLogger().info("file={}, line={}, each processes={}, countDownNum={}", absolutePath, importFileLineNum, avg, countDownNum);
+        final int avg = avgTmp;*/
+        
+        int fileSplitSize = Integer.parseInt(properties.get(Model.BATCHS_PACKAGE_SIZE));
+        if(importFileLineNum <= fileSplitSize){
+        	fileSplitSize = (importFileLineNum+internalThreadNum-1) / internalThreadNum;
+        }
+        int splitLimit = fileSplitSize;
+        final int countDownNum = (importFileLineNum+fileSplitSize-1)/fileSplitSize;
         CountDownLatch countDownLatch = new CountDownLatch(countDownNum);
         LineIterator lineIterator = null;
  
-        final Map<String, String> container = new HashMap<String, String>(avg+1);
+        final Map<String, String> container = new HashMap<String, String>(fileSplitSize+1);
         Histogram.Timer fileBlockTimer = cmdInterFace.getHistogram().labels("split file").startTimer();
         try {
 			lineIterator = FileUtils.lineIterator(importFile, "UTF-8");
             // If the data file has a large number of rows, the block time may be slightly longer
-
             for (int m = 1; m <= importFileLineNum; m++) {
             	try {
             		container.put(""+ m, lineIterator.nextLine());
-                } catch (NoSuchElementException e) {
+                } catch (Exception e) {
+                	--splitLimit;
                 	cmdInterFace.getLoggerFail().error("LineIterator error, file = {} ,error={}", absolutePath, e);
                     totalParseErrorCount.incrementAndGet();
                     continue;
                 }
-                if(avg <= container.size()) {
-                	ThreadPoolUtil.forExecutor( threadPoolExecutor, internalThreadNum );
-                	threadPoolExecutor.execute( new BatchJob(
-                			tiSession,
-                            totalImportCount,
-                            totalEmptyCount,
-                            totalSkipCount,
-                            totalParseErrorCount,
-                            totalBatchPutFailCount,
-                            absolutePath,
-                            ttlSkipTypeList,
-                            ttlSkipTypeMap,
-                            container,
-                            countDownLatch,
-                            totalDuplicateCount,
-                            ttlPutList,
-                            cmdInterFace)
-                			);
+                if(splitLimit <= container.size()) {
+                	splitLimit = fileSplitSize;
+                	threadPoolFileLoading.execute(
+							new BatchJob(
+	                			tiSession,
+	                            totalImportCount,
+	                            totalEmptyCount,
+	                            totalSkipCount,
+	                            totalParseErrorCount,
+	                            totalBatchPutFailCount,
+	                            absolutePath,
+	                            ttlSkipTypeList,
+	                            ttlSkipTypeMap,
+	                            container,
+	                            countDownLatch,
+	                            totalDuplicateCount,
+	                            ttlPutList,
+	                            cmdInterFace));
+                	++threadsNumber;
                 	container.clear();
                 }
             }
-            if(0 < container.size()) {
-            	ThreadPoolUtil.forExecutor( threadPoolExecutor, internalThreadNum );
-            	threadPoolExecutor.execute( new BatchJob(
-                        tiSession,
-                        totalImportCount,
-                        totalEmptyCount,
-                        totalSkipCount,
-                        totalParseErrorCount,
-                        totalBatchPutFailCount,
-                        absolutePath,
-                        ttlSkipTypeList,
-                        ttlSkipTypeMap,
-                        container,
-                        countDownLatch,
-                        totalDuplicateCount,
-                        ttlPutList,
-                        cmdInterFace)
-            			);
+            if(0 < container.size()) {	
+            	threadPoolFileLoading.execute(
+						new BatchJob(
+	                        tiSession,
+	                        totalImportCount,
+	                        totalEmptyCount,
+	                        totalSkipCount,
+	                        totalParseErrorCount,
+	                        totalBatchPutFailCount,
+	                        absolutePath,
+	                        ttlSkipTypeList,
+	                        ttlSkipTypeMap,
+	                        container,
+	                        countDownLatch,
+	                        totalDuplicateCount,
+	                        ttlPutList,
+	                        cmdInterFace));
+            	++threadsNumber;
             	container.clear();
             }
         	fileBlockTimer.observeDuration();
@@ -155,12 +164,13 @@ public class LineLoadingJob implements Runnable {
 			}
         	fileBlockTimer.close();
         }
+        cmdInterFace.getLogger().info("file={}, line={}, each processes={}, countDownNum={},threadsNumber={}", absolutePath, importFileLineNum, fileSplitSize, countDownNum, threadsNumber);
         try {
             countDownLatch.await();
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
-
+        threadPoolFileLoading.shutdown();
         long duration = System.currentTimeMillis() - startTime;
         StringBuilder result = new StringBuilder(
         		headLogger +
@@ -177,6 +187,10 @@ public class LineLoadingJob implements Runnable {
         for (Map.Entry<String, Long> item : ttlSkipTypeMap.entrySet()) {
             result.append("<").append(item.getKey()).append(">").append("[").append(item.getValue()).append("]").append("]");
         }
+        ttlPutList.clear();
+        ttlPutList = null;
+        ttlSkipTypeMap.clear();
+        ttlSkipTypeMap = null;
 //        logger.info("Check sum file={} complete. Total={}, totalCheck={}, notExists={}, skip={}, parseErr={}, checkSumFail={}", checkSumFile.getAbsolutePath(), totalCount, totalCheck, notInsert, skip, parseErr, checkSumFail);
         timer.cancel();
         cmdInterFace.getLogger().info(result.toString());

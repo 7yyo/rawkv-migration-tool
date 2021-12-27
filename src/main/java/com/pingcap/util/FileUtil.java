@@ -67,8 +67,8 @@ public class FileUtil {
         return line;
     }
 
-    public static LinkedHashMap<String, Long> getTtlSkipTypeMap(List<String> list) {
-        LinkedHashMap<String, Long> ttlTypeCountMap = new LinkedHashMap<>(16);
+    public static LinkedHashMap<String, Long> cloneToTtlSkipTypeMap(LinkedHashMap<String, Long> ttlTypeCountMap,List<String> list) {
+    	ttlTypeCountMap.clear();
         for (String ttlType : list) {
             ttlTypeCountMap.put(ttlType, 0L);
         }

@@ -53,9 +53,11 @@ public class Model {
     public static final String MODE = "importer.in.mode";
     public static final String SCENES = "importer.in.scenes";
     public static final String INTERNAL_THREAD_POOL = "importer.tikv.internalPool";
+    public static final String INTERNAL_MAXTHREAD_POOL = "importer.tikv.maxInternalPoolSize";
     public static final String INTERNAL_THREAD_NUM = "importer.tikv.internalThreadNum";
     public static final String CORE_POOL_SIZE = "importer.tikv.corePoolSize";
     public static final String MAX_POOL_SIZE = "importer.tikv.maxPoolSize";
+    public static final String BATCHS_PACKAGE_SIZE = "importer.in.BatchsPackageSize";
     public static final String BATCH_SIZE = "importer.tikv.batchSize";
 //    public static final String BATCH_PUT_ERR_FILE_PATH = "importer.in.batchPutErrFilePath";
     public static final String DELIMITER_1 = "importer.in.delimiter_1";

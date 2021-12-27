@@ -62,17 +62,20 @@ public class Import implements TaskInterface {
         PropertiesUtil.checkConfig(properties, Model.ENV_ID);
         PropertiesUtil.checkConfig(properties, Model.APP_ID);
         PropertiesUtil.checkConfig(properties, Model.UPDATE_TIME);
+        
+        PropertiesUtil.checkNaturalNumber( properties, Model.BATCHS_PACKAGE_SIZE, false);
         PropertiesUtil.checkNaturalNumber( properties, Model.TTL, false);
 	}
 
 	@Override
 	public HashMap<ByteString, ByteString> executeTikv(RawKVClient rawKvClient, HashMap<ByteString, ByteString> pairs,
 			HashMap<ByteString, String> pairs_lines, boolean hasTtl,String filePath) {
+		logger.debug("Import executeTikv, File={}, lines={}, linesExt={}", filePath, pairs.size(), pairs_lines.size());
         List<Kvrpcpb.KvPair> kvHaveList = null;
         if (Model.ON.equals(properties.get(Model.CHECK_EXISTS_KEY))) {
             // Only json file skip exists key.
-            String importMode = properties.get(Model.MODE);
-            if (Model.JSON_FORMAT.equals(importMode)) {
+            ////String importMode = properties.get(Model.MODE);
+            ////if (Model.JSON_FORMAT.equals(importMode)) {
 
                 // For batch get to check exists kv
                 ////List<ByteString> kvList = new ArrayList<>(pairs.keySet());
@@ -84,14 +87,14 @@ public class Import implements TaskInterface {
                 	TaskInterface.BATCH_PUT_FAIL_COUNTER.labels("batch put fail").inc();
                     throw e;
                 }
-                finally {
+                finally{
                 	batchGetTimer.observeDuration();
                 }
                 for (Kvrpcpb.KvPair kv : kvHaveList) {	
                 	auditLog.info("Skip exists key={}, file={}, almost line={}", kv.getKey().toStringUtf8(), filePath, pairs_lines.get(kv.getKey()));
                 	pairs.remove(kv.getKey());
                 }
-            }
+            ////}
         }
         Histogram.Timer batchPutTimer = REQUEST_LATENCY.labels("batch put").startTimer();
     	if(hasTtl) {

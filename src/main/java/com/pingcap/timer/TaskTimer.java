@@ -12,7 +12,6 @@ public class TaskTimer extends TimerTask {
     private final AtomicInteger totalFileLine;
     private final int totalLines;
     private final String filePath;
-	
     public TaskTimer(TaskInterface cmdInterFace,AtomicInteger totalFileLine, int totalLines, String filePath) {
         this.cmdInterFace = cmdInterFace;
         this.totalFileLine = totalFileLine;
