@@ -9,6 +9,7 @@ import java.nio.CharBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -145,7 +146,6 @@ public class Export implements TaskInterface {
             ByteBuffer line = StandardCharsets.UTF_8.encode(CharBuffer.wrap(kvPair));
             fileChannel.write(line);
             kvPair.setLength(0);
-            //totalExportNum.addAndGet(n);
         } catch (IOException e) {
             throw e;
         }
@@ -165,7 +165,7 @@ public class Export implements TaskInterface {
 
             transformDuration = EXPORT_DURATION.labels("transform duration").startTimer();
             try {
-				ret = dataFactory.unFormatToKeyValue( transformDuration, totalParserError, properties.get(Model.SCENES), kvPairList.get(i).getKey().toStringUtf8(),kvPairList.get(i).getValue().toStringUtf8(),new DataFormatInterface.UnDataFormatCallBack() {					
+				ret = dataFactory.unFormatToKeyValue( properties.get(Model.SCENES), kvPairList.get(i).getKey().toStringUtf8(),kvPairList.get(i).getValue().toStringUtf8(),new DataFormatInterface.UnDataFormatCallBack() {					
 					@Override
 					public boolean getDataCallBack( String jsonData, String type, int typeInt) {
 						try{
@@ -256,6 +256,28 @@ public class Export implements TaskInterface {
                         "parseErr=" + totalParserError + ", " +
                         "IoErr=" + totalIOError + ", " +
                         "duration=" + duration / 1000 + "s, ");
+        logger.info(result.toString());
+	}
+
+	@Override
+	public void finishedReport(String filePath, int importFileLineNum, int totalImportCount, int totalEmptyCount,
+			int totalSkipCount, int totalParseErrorCount, int totalBatchPutFailCount, int totalDuplicateCount,
+			long duration, LinkedHashMap<String, Long> ttlSkipTypeMap) {
+        StringBuilder result = new StringBuilder(
+                "["+getClass().getSimpleName()+" summary]" +
+                        ", Process ratio 100% file=" + filePath + ", " +
+                        "total=" + importFileLineNum + ", " +
+                        "exported=" + totalImportCount + ", " +
+                        "empty=" + totalEmptyCount + ", " +
+                        "skip=" + totalSkipCount + ", " +
+                        "parseErr=" + totalParseErrorCount + ", " +
+                        //"putErr=" + totalBatchPutFailCount + ", " +
+                        //"duplicate=" + totalDuplicateCount + ", " +
+                        "duration=" + duration / 1000 + "s, ");
+        result.append("Skip type[");
+        for (Map.Entry<String, Long> item : ttlSkipTypeMap.entrySet()) {
+            result.append("<").append(item.getKey()).append(">").append("[").append(item.getValue()).append("]").append("]");
+        }
         logger.info(result.toString());
 	}
 }

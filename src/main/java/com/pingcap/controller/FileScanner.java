@@ -29,9 +29,15 @@ public class FileScanner implements ScannerInterface {
         timer.schedule(importTimer, 5000, Long.parseLong(properties.get(Model.TIMER_INTERVAL)));
         
         // Start the Main thread for each file.showFileList.
-        final ThreadPoolExecutor threadPoolFileScanner = ThreadPoolUtil.startJob( Integer.parseInt(properties.get(Model.CORE_POOL_SIZE)), Integer.parseInt(properties.get(Model.MAX_POOL_SIZE)));
+        int corePoolSize = Integer.parseInt(properties.get(Model.CORE_POOL_SIZE));
+        final ThreadPoolExecutor threadPoolFileScanner = ThreadPoolUtil.startJob( corePoolSize, Integer.parseInt(properties.get(Model.MAX_POOL_SIZE)));
         for (File importFile : importFileList) {
-        	threadPoolFileScanner.execute(new LineLoadingJob( cmdInterFace, importFile.getAbsolutePath(), tiSession, ttlSkipTypeList, ttlPutList));
+            if(importTimer.useCPURatio-0.799999 <= 0.000001){
+            	threadPoolFileScanner.execute(new LineLoadingJob( cmdInterFace, importFile.getAbsolutePath(), tiSession, ttlSkipTypeList, ttlPutList, 0));
+            }
+            else{
+            	threadPoolFileScanner.execute(new LineLoadingJob( cmdInterFace, importFile.getAbsolutePath(), tiSession, ttlSkipTypeList, ttlPutList, FileUtil.getFileLines(importFile)));
+            }
         }
         threadPoolFileScanner.shutdown();
 

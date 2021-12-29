@@ -8,6 +8,9 @@ import com.pingcap.task.TaskInterface;
 import com.pingcap.util.OSUtils;
 
 public class SystemMonitorTimer extends TimerTask {
+	public double useCPURatio = 0;
+	private static final long prvNumber[]={1024,1024*1024,1024*1024*1024};
+	private static final String prvNumberUnit[]={"KB","MB","GB"};
 	private TaskInterface cmdInterFace;
 	private List<long[]> traffic = new ArrayList<>();
 	
@@ -21,75 +24,65 @@ public class SystemMonitorTimer extends TimerTask {
 	
 	@Override
 	public void run() {
-		putData();
+		List<long[]> buffer = putData();
 		ThreadGroup group = Thread.currentThread().getThreadGroup();
         ThreadGroup topGroup = group;
         while (group != null) {
             topGroup = group;
             group = group.getParent();
         }
-
-		cmdInterFace.getLogger().info("Process status, CPU= {},MEM=({}/{}),TREADS= {}, SPEED= {}", 
-				OSUtils.getCPURatio(),
-				Runtime.getRuntime().freeMemory(),
-				Runtime.getRuntime().totalMemory(),
+        useCPURatio = OSUtils.getCPURatio();
+		cmdInterFace.getLogger().info("Process status, CPU= {}%,MEM=({}/{}),TREADS= {}, SPEED= {}/s", 
+				String.format("%.2f", useCPURatio),
+				byteTo(Runtime.getRuntime().freeMemory()),
+				byteTo(Runtime.getRuntime().totalMemory()),
 				topGroup.activeCount(),
-				getIBytesString());
+				getIBytesString(buffer));
 	}
 
-	private synchronized void putData(){
+	private synchronized List<long[]> putData(){
 		long curData[] = new long[2];
 		curData[0] = System.currentTimeMillis();
 		curData[1] = TaskInterface.totalDataBytes.getAndSet(0);
 		traffic.add(curData);
 		if(5 < traffic.size())
-			traffic.remove(0);		
+			traffic.remove(0);
+		List<long[]> buffer = new ArrayList<>(traffic.size());
+		buffer.addAll(traffic);
+		return buffer;
 	}
 	
-	private String getIBytesString(){
+	private String getIBytesString(List<long[]> buffer){
 		long preData[],curData[];
 		long dataValue = 0,timeValue = 0;
-		for(int i=1;i<traffic.size();i++){
-			preData = traffic.get(i-1);
-			curData = traffic.get(i);
-			timeValue = (timeValue +(curData[0] - preData[0]))/2;
-			dataValue = (dataValue +(curData[1] - preData[1]))/2;
+		for(int i=1;i<buffer.size();i++){
+			preData = buffer.get(i-1);
+			curData = buffer.get(i);
+			timeValue += (curData[0] - preData[0])/2;
+			dataValue += (curData[1] + preData[1])/2;
 		}
-		return String.format("%.2fMB/s", kbToMB((dataValue*1000)/(timeValue+1)));
+		return byteTo((dataValue*1000)/(timeValue+1));
 	}
 	
-	private static float kbToMB(long value) {
-		if (value == 0) {
-			return 0;
-		}
-		if (value <= 5 ) {
-			return (float)value/1024;
-		}
-		value = 1000*value/1024;
-		return Float.parseFloat(keepNDecimal(value, 2));
-	}
-	
-	public static String keepNDecimal(long value, int n) {
-		int r = (int)(value%10);
-		if (r == 0) {
-			/*do nothing*/
-		} else if (r >= 5) {
-			value += (10-r);
-		} else {
-			value -= r;
-		}
-		StringBuilder sb = new StringBuilder(Long.toString(value));
-		sb.setLength(sb.length()-1);
-		int len = sb.length();
-		if (len < n) {
-			while (++len <= n) {
-				sb.insert(0, '0');
+	public static String byteTo(long value){
+		if(value < prvNumber[0])
+			return value + "byte";
+		for(int i=1;i<prvNumber.length;i++){
+			if(value < prvNumber[i]){
+				return String.format("%.2f%s", (float)value/prvNumber[i-1],prvNumberUnit[i-1]);
 			}
-			sb.insert(0, "0.");
-		} else {
-			sb.insert(sb.length()-n, '.');
 		}
-		return sb.toString();
+		return String.format("%.2f%s", (float)value/prvNumber[2],prvNumberUnit[2]);
 	}
 	
+	public static String kbTo(long value){
+		if(value < prvNumber[0])
+			return value + prvNumberUnit[0];
+		for(int i=1;i<prvNumber.length;i++){
+			if(value < prvNumber[i]){
+				return String.format("%.2f%s", (float)value/prvNumber[i-1],prvNumberUnit[i]);
+			}
+		}
+		return String.format("%.2f%s", (float)value/prvNumber[2],"TB");
+	}	
 }

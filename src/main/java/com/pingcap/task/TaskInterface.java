@@ -5,6 +5,7 @@ import static com.pingcap.enums.Model.DELIMITER_2;
 import static com.pingcap.enums.Model.KEY_DELIMITER;
 
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -33,6 +34,16 @@ public interface TaskInterface {
 	public void  succeedWriteRowsLogger(String filePath, HashMap<ByteString, ByteString> pairs);
 	public void  faildWriteRowsLogger(HashMap<ByteString, ByteString> pairs);
 	public ScannerInterface getInitScanner();
+	public void finishedReport(String filePath,
+			int importFileLineNum,
+			int totalImportCount,
+			int totalEmptyCount,
+			int totalSkipCount,
+			int totalParseErrorCount,
+			int totalBatchPutFailCount,
+			int totalDuplicateCount,
+			long duration,
+			LinkedHashMap<String, Long> ttlSkipTypeMap);
 	
 	public void checkAllParameters(Map<String, String> properties);
 	public Histogram getHistogram();

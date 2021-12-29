@@ -5,7 +5,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import com.pingcap.enums.Model;
 import io.prometheus.client.Histogram;
-import io.prometheus.client.Histogram.Timer;
 
 public class DataFactory implements DataFormatInterface {
 
@@ -30,9 +29,9 @@ public class DataFactory implements DataFormatInterface {
 	}
 
 	@Override
-	public boolean unFormatToKeyValue(Timer timer, AtomicInteger totalParseErrorCount, String scenes, String key,
+	public boolean unFormatToKeyValue(String scenes, String key,
 			String value, UnDataFormatCallBack unDataFormatCallBack) throws Exception {
-		return formatInterface.unFormatToKeyValue(timer,totalParseErrorCount,scenes,key,value,unDataFormatCallBack);
+		return formatInterface.unFormatToKeyValue(scenes,key,value,unDataFormatCallBack);
 	}
 
 }

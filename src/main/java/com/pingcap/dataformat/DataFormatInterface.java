@@ -24,8 +24,6 @@ public interface DataFormatInterface {
 	public boolean formatToKeyValue( Histogram.Timer timer, AtomicInteger totalParseErrorCount, String scenes, String line, DataFormatCallBack dataFormatCallBack) throws Exception;
 	
 	public boolean unFormatToKeyValue(
-			Histogram.Timer timer,
-			AtomicInteger totalParseErrorCount,
 			String scenes,
 			String key,
 			String value,

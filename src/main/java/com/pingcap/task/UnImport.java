@@ -6,6 +6,7 @@ import static com.pingcap.enums.Model.REDO_TYPE;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -57,6 +58,7 @@ public class UnImport implements TaskInterface {
 	@Override
 	public void checkAllParameters(Map<String, String> properties) {
 		TaskInterface.checkShareParameters(properties);
+		PropertiesUtil.checkNaturalNumber( properties, Model.BATCHS_PACKAGE_SIZE, false);
 		
         // Redo file
         PropertiesUtil.checkConfig(properties, REDO_FILE_PATH);
@@ -135,6 +137,29 @@ public class UnImport implements TaskInterface {
 	@Override
 	public ScannerInterface getInitScanner() {
 		return new FileScanner();
+	}
+
+	@Override
+	public void finishedReport(String filePath, int importFileLineNum, int totalImportCount, int totalEmptyCount,
+			int totalSkipCount, int totalParseErrorCount, int totalBatchPutFailCount, int totalDuplicateCount,
+			long duration, LinkedHashMap<String, Long> ttlSkipTypeMap) {
+        StringBuilder result = new StringBuilder(
+                "["+getClass().getSimpleName()+" summary]" +
+                        ", Process ratio 100% file=" + filePath + ", " +
+                        "total=" + importFileLineNum + ", " +
+                        "unImported=" + totalImportCount + ", " +
+                        "empty=" + totalEmptyCount + ", " +
+                        "skip=" + totalSkipCount + ", " +
+                        "parseErr=" + totalParseErrorCount + ", " +
+                        "putErr=" + totalBatchPutFailCount + ", " +
+                        "duplicate=" + totalDuplicateCount + ", " +
+                        "duration=" + duration / 1000 + "s, ");
+        result.append("Skip type[");
+        for (Map.Entry<String, Long> item : ttlSkipTypeMap.entrySet()) {
+            result.append("<").append(item.getKey()).append(">").append("[").append(item.getValue()).append("]").append("]");
+        }
+        logger.info(result.toString());
+		
 	}
 	
 }

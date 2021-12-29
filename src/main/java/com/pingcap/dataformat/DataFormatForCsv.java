@@ -96,7 +96,7 @@ public class DataFormatForCsv implements DataFormatInterface {
 	}
 
 	@Override
-	public boolean unFormatToKeyValue(Timer timer, AtomicInteger totalParseErrorCount, String scenes, String key,
+	public boolean unFormatToKeyValue(String scenes, String key,
 			String value, UnDataFormatCallBack unDataFormatCallBack) throws Exception {
 		String jsonString = null;
 		String dataType;

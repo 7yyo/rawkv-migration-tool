@@ -2,6 +2,7 @@ package com.pingcap.task;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -15,7 +16,6 @@ import org.tikv.shade.com.google.protobuf.ByteString;
 import com.pingcap.controller.FileScanner;
 import com.pingcap.controller.ScannerInterface;
 import com.pingcap.enums.Model;
-import com.pingcap.util.JavaUtil;
 import com.pingcap.util.PropertiesUtil;
 import io.prometheus.client.Histogram;
 
@@ -25,8 +25,8 @@ public class Import implements TaskInterface {
     private static final Logger loggerFail = LoggerFactory.getLogger(Model.BP_FAIL_LOG);
     private static final Logger auditLog = LoggerFactory.getLogger(Model.AUDIT_LOG);
     private Map<String, String> properties = null;
-    private String pid = JavaUtil.getPid();
-    private Histogram DURATION = Histogram.build().name("duration_"+pid).help("Everything duration").labelNames("type").register();
+    //private String pid = JavaUtil.getPid();
+    private Histogram DURATION = Histogram.build().name("duration").help("Everything duration").labelNames("type").register();
     
     private long ttl = 0;
 
@@ -142,4 +142,32 @@ public class Import implements TaskInterface {
 		return new FileScanner();
 	}
 
+	@Override
+	public void finishedReport(String filePath,
+			int importFileLineNum,
+			int totalImportCount,
+			int totalEmptyCount,
+			int totalSkipCount,
+			int totalParseErrorCount,
+			int totalBatchPutFailCount,
+			int totalDuplicateCount,
+			long duration,
+			LinkedHashMap<String, Long> ttlSkipTypeMap){
+        StringBuilder result = new StringBuilder(
+                "["+getClass().getSimpleName()+" summary]" +
+                        ", Process ratio 100% file=" + filePath + ", " +
+                        "total=" + importFileLineNum + ", " +
+                        "imported=" + totalImportCount + ", " +
+                        "empty=" + totalEmptyCount + ", " +
+                        "skip=" + totalSkipCount + ", " +
+                        "parseErr=" + totalParseErrorCount + ", " +
+                        "putErr=" + totalBatchPutFailCount + ", " +
+                        "duplicate=" + totalDuplicateCount + ", " +
+                        "duration=" + duration / 1000 + "s, ");
+        result.append("Skip type[");
+        for (Map.Entry<String, Long> item : ttlSkipTypeMap.entrySet()) {
+            result.append("<").append(item.getKey()).append(">").append("[").append(item.getValue()).append("]").append("]");
+        }
+        logger.info(result.toString());
+	}
 }

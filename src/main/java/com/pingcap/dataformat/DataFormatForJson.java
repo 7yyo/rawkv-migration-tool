@@ -13,7 +13,6 @@ import com.pingcap.pojo.IndexInfo;
 import com.pingcap.pojo.TempIndexInfo;
 
 import io.prometheus.client.Histogram;
-import io.prometheus.client.Histogram.Timer;
 
 public class DataFormatForJson implements DataFormatInterface {
 	
@@ -94,7 +93,7 @@ public class DataFormatForJson implements DataFormatInterface {
 	}
 
 	@Override
-	public boolean unFormatToKeyValue(Timer timer, AtomicInteger totalParseErrorCount, String scenes, String key,
+	public boolean unFormatToKeyValue(String scenes, String key,
 			String value, UnDataFormatCallBack unDataFormatCallBack) throws Exception {
         String jsonString = null;
         JSONObject jsonObject = null;

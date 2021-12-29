@@ -6,20 +6,29 @@ import static com.pingcap.enums.Model.MODE;
 import static com.pingcap.enums.Model.SCENES;
 import static com.pingcap.enums.Model.TTL_SKIP_TYPE;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.tikv.kvproto.Kvrpcpb;
 import org.tikv.raw.RawKVClient;
 import org.tikv.shade.com.google.protobuf.ByteString;
 
+import com.alibaba.fastjson.JSONObject;
 import com.pingcap.controller.FileScanner;
 import com.pingcap.controller.ScannerInterface;
+import com.pingcap.dataformat.DataFactory;
 import com.pingcap.enums.Model;
-import com.pingcap.util.JavaUtil;
 import com.pingcap.util.PropertiesUtil;
+import com.pingcap.pojo.IndexInfo;
+import com.pingcap.pojo.InfoInterface;
+import com.pingcap.pojo.TempIndexInfo;
 import io.prometheus.client.Histogram;
 
 public class CheckSum implements TaskInterface {
@@ -27,11 +36,17 @@ public class CheckSum implements TaskInterface {
     private static final Logger checkSumLog = LoggerFactory.getLogger(CHECK_SUM_LOG);
     private static final Logger csFailLog = LoggerFactory.getLogger(CS_FAIL_LOG);
     private Map<String, String> properties = null;
-    private String pid = JavaUtil.getPid();
-    private Histogram CHECK_SUM_DURATION = Histogram.build().name("checksum_duration+"+pid).help("Check sum duration").labelNames("type").register();
+    
+    //private String pid = JavaUtil.getPid();
+    private Histogram CHECK_SUM_DURATION = Histogram.build().name("checksum_duration").help("Check sum duration").labelNames("type").register();
     
     @SuppressWarnings("unused")
 	private long ttl = 0;
+    // Total not in rawKv num
+    AtomicInteger notInsert = new AtomicInteger(0);
+    // Total check sum fail num
+    AtomicInteger checkSumFail = new AtomicInteger(0);
+    DataFactory dataFactory;
     
 	public CheckSum() {
 		// TODO Auto-generated constructor stub
@@ -61,18 +76,72 @@ public class CheckSum implements TaskInterface {
         PropertiesUtil.checkConfig(properties, Model.CHECK_SUM_MOVE_PATH);
         PropertiesUtil.checkConfig(properties, MODE);
         PropertiesUtil.checkConfig(properties, SCENES);
+        PropertiesUtil.checkNaturalNumber( properties, Model.BATCHS_PACKAGE_SIZE, false);
 
         // Skip ttl type when check sum.
         PropertiesUtil.checkConfig(properties, TTL_SKIP_TYPE);
         // Skip ttl put when check sum.
         PropertiesUtil.checkConfig(properties, Model.TTL_PUT_TYPE);
-
+        dataFactory = DataFactory.getInstance(properties.get(Model.MODE),properties);
 	}
 
 	@Override
 	public HashMap<ByteString, ByteString> executeTikv(RawKVClient rawKvClient, HashMap<ByteString, ByteString> pairs,
 			HashMap<ByteString, String> pairs_lines, boolean hasTtl,String filePath) {
-		// TODO Auto-generated method stub
+		Histogram.Timer batchGetTimer = CHECK_SUM_DURATION.labels("batch_get").startTimer();
+		List<Kvrpcpb.KvPair> kvList = null;
+
+		List<ByteString> keyList = new ArrayList<>(pairs.keySet());
+		InfoInterface infoRawKV,tmpRawKV;
+		Object clazz = new TempIndexInfo();
+		if(Model.INDEX_INFO.equals(properties.get(SCENES)))
+			clazz = new IndexInfo();
+		try {
+			// Batch get keys which to check sum
+			kvList = rawKvClient.batchGet(keyList);
+		} catch (Exception e) {
+            for (Entry<ByteString, ByteString> originalKv : pairs.entrySet()) {
+            	infoRawKV = (InfoInterface)JSONObject.parseObject(originalKv.getValue().toStringUtf8(), clazz.getClass());
+            	logger.error("Batch get failed.Key={}, file={}, almost line={}", originalKv.getKey().toStringUtf8(), filePath, pairs_lines.get(originalKv.getKey()));
+            }
+            throw e;
+        }
+		finally{
+			keyList.clear();
+			batchGetTimer.observeDuration();
+		}
+		Map<ByteString, InfoInterface> rawKvResultMap = new HashMap<>(kvList.size());
+        for (Kvrpcpb.KvPair kvPair : kvList) {
+        	infoRawKV = (InfoInterface)JSONObject.parseObject(kvPair.getValue().toStringUtf8(), clazz.getClass());
+        	rawKvResultMap.put(kvPair.getKey(), infoRawKV);
+        }
+        kvList.clear();
+        kvList = null;
+        int iCheckSumFail=0,iNotInsert=0;
+        for (Entry<ByteString, ByteString> originalKv : pairs.entrySet()) {
+        	infoRawKV = rawKvResultMap.get(originalKv.getKey());
+            if (null != infoRawKV) {
+            	tmpRawKV = (InfoInterface)JSONObject.parseObject(originalKv.getValue().toStringUtf8(), clazz.getClass());
+                if (!infoRawKV.equalsValue(tmpRawKV)) {
+                    checkSumLog.error("Check sum failed. Key={}", originalKv.getKey().toStringUtf8());
+                    csFailLog.info(infoRawKV.toJsonString());
+                    pairs.remove(originalKv.getKey());
+                    ++iCheckSumFail;
+                }
+            } else {
+                checkSumLog.error("Key={} is not exists.", originalKv.getKey().toStringUtf8());
+                infoRawKV = (InfoInterface)JSONObject.parseObject(originalKv.getValue().toStringUtf8(), clazz.getClass());
+                csFailLog.info(infoRawKV.toJsonString());
+                pairs.remove(originalKv.getKey());
+                ++iNotInsert;
+            }
+        }
+        rawKvResultMap.clear();
+        rawKvResultMap = null;
+        if(0<iCheckSumFail)
+        	checkSumFail.addAndGet(iCheckSumFail);
+        if(0<iNotInsert)
+        	notInsert.addAndGet(iNotInsert);
 		return pairs;
 	}
 
@@ -109,6 +178,30 @@ public class CheckSum implements TaskInterface {
 	@Override
 	public ScannerInterface getInitScanner() {
 		return new FileScanner();
+	}
+
+	@Override
+	public void finishedReport(String filePath, int importFileLineNum, int totalImportCount, int totalEmptyCount,
+			int totalSkipCount, int totalParseErrorCount, int totalBatchPutFailCount, int totalDuplicateCount,
+			long duration, LinkedHashMap<String, Long> ttlSkipTypeMap) {
+//      logger.info("Check sum file={} complete. Total={}, totalCheck={}, notExists={}, skip={}, parseErr={}, checkSumFail={}", checkSumFile.getAbsolutePath(), totalCount, totalCheck, notInsert, skip, parseErr, checkSumFail);
+        StringBuilder result = new StringBuilder(
+                "["+getClass().getSimpleName()+" summary]" +
+                        ", Process ratio 100% file=" + filePath + ", " +
+                        "total=" + importFileLineNum + ", " +
+                        "totalCheck=" + totalImportCount + ", " +
+                        "empty=" + totalEmptyCount + ", " +
+                        "skip=" + totalSkipCount + ", " +
+                        "parseErr=" + totalParseErrorCount + ", " +
+                        "notExits=" + notInsert.get() + ", " +
+                        "checkSumFail=" + checkSumFail.get() + ", " +
+                        "duration=" + duration / 1000 + "s, ");
+        result.append("Skip type[");
+        for (Map.Entry<String, Long> item : ttlSkipTypeMap.entrySet()) {
+            result.append("<").append(item.getKey()).append(">").append("[").append(item.getValue()).append("]").append("]");
+        }
+        logger.info(result.toString());
+		
 	}
 	
 }

@@ -9,6 +9,7 @@ import java.io.InputStreamReader;
 import java.io.LineNumberReader;
 import java.util.Locale;
 import java.util.StringTokenizer;
+import java.util.regex.Pattern;
 
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -48,7 +49,7 @@ public class OSUtils {
 			line = line.toLowerCase(Locale.ENGLISH);
 			line = line.replace("linux version ", "");
 			String [] arr = line.split("\\.");
-			if(arr.length >= 2)
+			if(arr.length > 1)
 				linuxVersion = arr[0]+"."+arr[1];
 		} catch (FileNotFoundException e) {
 			e.printStackTrace();
@@ -79,10 +80,10 @@ public class OSUtils {
         BufferedReader brStat = null; 
         StringTokenizer tokenStat = null;
         Process process = null;
+
         try{
         	if(null == linuxVersion)
         		IintVersionInfo();
-            System.out.println("Get usage rate of CPU , linux version: "+linuxVersion); 
             process = Runtime.getRuntime().exec("top -b -n 1"); 
             is = process.getInputStream();
             isr = new InputStreamReader(is);
@@ -103,8 +104,6 @@ public class OSUtils {
                 tokenStat.nextToken(); 
                 String nice = tokenStat.nextToken(); 
                 
-                System.out.println(user+" , "+system+" , "+nice); 
-                
                 user = user.substring(0,user.indexOf("%")); 
                 system = system.substring(0,system.indexOf("%")); 
                 nice = nice.substring(0,nice.indexOf("%")); 
@@ -121,18 +120,22 @@ public class OSUtils {
                 tokenStat = new StringTokenizer(brStat.readLine()); 
                 tokenStat.nextToken(); 
                 tokenStat.nextToken(); 
-                tokenStat.nextToken(); 
-                tokenStat.nextToken(); 
-                tokenStat.nextToken(); 
-                tokenStat.nextToken(); 
-                tokenStat.nextToken(); 
-                String cpuUsage = tokenStat.nextToken();
-                Float usage = new Float(cpuUsage.substring(0,cpuUsage.indexOf("%"))); 
-                
-                return (1-usage.floatValue()/100); 
+                tokenStat.nextToken();
+                tokenStat.nextToken();
+                //get %id,redhat
+                String cpuUsage = abnormalTextToInt(tokenStat.nextToken(), "0");
+                if(StringUtils.isBlank(cpuUsage)){
+                	//centos
+                	tokenStat.nextToken(); 
+                	tokenStat.nextToken(); 
+                	cpuUsage = abnormalTextToInt(tokenStat.nextToken(), "0");
+                }
+
+                Float usage = new Float(cpuUsage);
+                return (1-usage.floatValue()/100);
             } 
              
-        } catch(IOException ioe){ 
+        } catch(IOException ioe){
         	ioe.printStackTrace();
             freeResource(is, isr, brStat); 
             return 1; 
@@ -143,6 +146,15 @@ public class OSUtils {
         } 
     }
 	
+    //clean all not number characters
+    public static String abnormalTextToInt(String text, String defaultValue) {
+        try {
+            return Pattern.compile("[^\\d.]").matcher(text).replaceAll("");
+        } catch (Exception e) {
+            return defaultValue;
+        }
+    }
+
     @SuppressWarnings("deprecation")
 	private static void freeResource(InputStream is, InputStreamReader isr, BufferedReader br){
     	IOUtils.closeQuietly(is);
@@ -155,7 +167,7 @@ public class OSUtils {
 			String procCmd = System.getenv("windir")  
 			+ "\\system32\\wbem\\wmic.exe process get Caption,CommandLine,"  
 			+ "KernelModeTime,ReadOperationCount,ThreadCount,UserModeTime,WriteOperationCount";  
-			// 取进程信息  
+			//get process information
 			long[] c0 = readCpu(Runtime.getRuntime().exec(procCmd));  
 			Thread.sleep(CPUTIME);  
 			long[] c1 = readCpu(Runtime.getRuntime().exec(procCmd));  

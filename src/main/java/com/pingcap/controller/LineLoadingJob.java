@@ -35,8 +35,9 @@ public class LineLoadingJob implements Runnable {
     private List<String> ttlSkipTypeList = new ArrayList<>();
     private List<String> ttlPutList = new ArrayList<>();
     private int threadsNumber = 0;
-    
-    public LineLoadingJob( TaskInterface cmdInterFace, String importFilePath, TiSession tiSession, List<String> ttlSkipTypeList, List<String> ttlPutList) {
+    private int importFileLineNum = 0;
+
+    public LineLoadingJob( TaskInterface cmdInterFace, String importFilePath, TiSession tiSession, List<String> ttlSkipTypeList, List<String> ttlPutList, int importFileLineNum) {
         this.importFilePath = importFilePath;
         this.tiSession = tiSession;
         this.cmdInterFace = cmdInterFace;
@@ -49,19 +50,19 @@ public class LineLoadingJob implements Runnable {
             FileUtil.cloneToTtlSkipTypeMap(ttlSkipTypeMap,ttlSkipTypeList);
         }
         this.ttlPutList.addAll(ttlPutList);
+        this.importFileLineNum = importFileLineNum;
     }
     
     @Override
     public void run() {
-
         long startTime = System.currentTimeMillis();
         final Map<String, String> properties = cmdInterFace.getProperties();
-        final String headLogger = "["+cmdInterFace.getClass().getSimpleName()+" summary]";
 
         // Start the file sub-thread, import the data of the file through the sub-thread, and divide the data in advance according to the number of sub-threads.
         File importFile = new File(importFilePath);
         final String absolutePath  = importFile.getAbsolutePath();
-        final int importFileLineNum = FileUtil.getFileLines(importFile);
+        if(0 == importFileLineNum)
+        	importFileLineNum = FileUtil.getFileLines(importFile);
 
         final int internalThreadNum = Integer.parseInt(properties.get(Model.INTERNAL_THREAD_NUM));
         ////List<String> threadPerLineList = CountUtil.getPerThreadFileLines(importFileLineNum, internalThreadNum, importFile.getAbsolutePath());
@@ -86,7 +87,7 @@ public class LineLoadingJob implements Runnable {
         CountDownLatch countDownLatch = new CountDownLatch(countDownNum);
         LineIterator lineIterator = null;
  
-        final Map<String, String> container = new HashMap<String, String>(fileSplitSize+1);
+        Map<String, String> container = new HashMap<String, String>(fileSplitSize+1);
         Histogram.Timer fileBlockTimer = cmdInterFace.getHistogram().labels("split file").startTimer();
         try {
 			lineIterator = FileUtils.lineIterator(importFile, "UTF-8");
@@ -157,12 +158,17 @@ public class LineLoadingJob implements Runnable {
         	System.exit(1);
         }
         finally {
-        	try {
-				lineIterator.close();
-			} catch (IOException e) {
-				e.printStackTrace();
-			}
+        	if(null != lineIterator){
+	        	try {   		
+					lineIterator.close();
+				} catch (IOException e) {
+					e.printStackTrace();
+				}
+	        	lineIterator = null;
+    		}
         	fileBlockTimer.close();
+        	container.clear();
+        	container = null;
         }
         cmdInterFace.getLogger().info("file={}, line={}, each processes={}, countDownNum={},threadsNumber={}", absolutePath, importFileLineNum, fileSplitSize, countDownNum, threadsNumber);
         try {
@@ -171,30 +177,24 @@ public class LineLoadingJob implements Runnable {
             e.printStackTrace();
         }
         threadPoolFileLoading.shutdown();
-        long duration = System.currentTimeMillis() - startTime;
-        StringBuilder result = new StringBuilder(
-        		headLogger +
-                        ", Process ratio 100% file=" + importFile.getAbsolutePath() + ", " +
-                        "total=" + importFileLineNum + ", " +
-                        "imported=" + totalImportCount + ", " +
-                        "empty=" + totalEmptyCount + ", " +
-                        "skip=" + totalSkipCount + ", " +
-                        "parseErr=" + totalParseErrorCount + ", " +
-                        "putErr=" + totalBatchPutFailCount + ", " +
-                        "duplicate=" + totalDuplicateCount + ", " +
-                        "duration=" + duration / 1000 + "s, ");
-        result.append("Skip type[");
-        for (Map.Entry<String, Long> item : ttlSkipTypeMap.entrySet()) {
-            result.append("<").append(item.getKey()).append(">").append("[").append(item.getValue()).append("]").append("]");
-        }
+
         ttlPutList.clear();
         ttlPutList = null;
         ttlSkipTypeMap.clear();
         ttlSkipTypeMap = null;
-//        logger.info("Check sum file={} complete. Total={}, totalCheck={}, notExists={}, skip={}, parseErr={}, checkSumFail={}", checkSumFile.getAbsolutePath(), totalCount, totalCheck, notInsert, skip, parseErr, checkSumFail);
         timer.cancel();
-        cmdInterFace.getLogger().info(result.toString());
 
+        long duration = System.currentTimeMillis() - startTime;
+        cmdInterFace.finishedReport(importFile.getAbsolutePath(),
+    			importFileLineNum,
+    			totalImportCount.get(),
+    			totalEmptyCount.get(),
+    			totalSkipCount.get(),
+    			totalParseErrorCount.get(),
+    			totalBatchPutFailCount.get(),
+    			totalDuplicateCount.get(),
+    			duration,
+    			ttlSkipTypeMap);
     }
 
 }
