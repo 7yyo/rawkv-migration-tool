@@ -180,8 +180,6 @@ public class LineLoadingJob implements Runnable {
 
         ttlPutList.clear();
         ttlPutList = null;
-        ttlSkipTypeMap.clear();
-        ttlSkipTypeMap = null;
         timer.cancel();
 
         long duration = System.currentTimeMillis() - startTime;
@@ -195,6 +193,8 @@ public class LineLoadingJob implements Runnable {
     			totalDuplicateCount.get(),
     			duration,
     			ttlSkipTypeMap);
+        ttlSkipTypeMap.clear();
+        ttlSkipTypeMap = null;
     }
 
 }

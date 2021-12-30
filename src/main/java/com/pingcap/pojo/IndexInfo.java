@@ -1,7 +1,6 @@
 package com.pingcap.pojo;
 
 import com.alibaba.fastjson.JSON;
-import com.alibaba.fastjson.JSONObject;
 import com.alibaba.fastjson.serializer.PascalNameFilter;
 import org.apache.commons.lang.StringUtils;
 
@@ -199,13 +198,8 @@ public class IndexInfo implements InfoInterface{
     }
 
 	@Override
-	public String toJsonString() {
-		return JSONObject.toJSONString(this);
-	}
-
-	@Override
 	public boolean equalsValue(Object indexInfo) {
-		return this.equals((IndexInfo)indexInfo);
+		return equals((IndexInfo)indexInfo);
 	}
 
 }

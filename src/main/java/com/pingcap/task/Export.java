@@ -79,7 +79,7 @@ public class Export implements TaskInterface {
 
 	@Override
 	public HashMap<ByteString, ByteString> executeTikv(RawKVClient rawKvClient, HashMap<ByteString, ByteString> pairs,
-			HashMap<ByteString, String> pairs_lines, boolean hasTtl,String filePath) {
+			HashMap<ByteString, String> pairs_lines, boolean hasTtl,String filePath,final Map<String, String> lineBlock) {
     	return pairs;
 	}
 	

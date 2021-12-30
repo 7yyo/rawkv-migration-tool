@@ -69,8 +69,8 @@ public class Import implements TaskInterface {
 
 	@Override
 	public HashMap<ByteString, ByteString> executeTikv(RawKVClient rawKvClient, HashMap<ByteString, ByteString> pairs,
-			HashMap<ByteString, String> pairs_lines, boolean hasTtl,String filePath) {
-		logger.debug("Import executeTikv, File={}, lines={}, linesExt={}", filePath, pairs.size(), pairs_lines.size());
+			HashMap<ByteString, String> pairs_lines, boolean hasTtl,String filePath,final Map<String, String> lineBlock) {
+		logger.debug("Import executeTikv, File={}, linesSize={}, linesExtSize={}", filePath, pairs.size(), pairs_lines.size());
         List<Kvrpcpb.KvPair> kvHaveList = null;
         if (Model.ON.equals(properties.get(Model.CHECK_EXISTS_KEY))) {
             // Only json file skip exists key.
@@ -91,7 +91,7 @@ public class Import implements TaskInterface {
                 	batchGetTimer.observeDuration();
                 }
                 for (Kvrpcpb.KvPair kv : kvHaveList) {	
-                	auditLog.info("Skip exists key={}, file={}, almost line={}", kv.getKey().toStringUtf8(), filePath, pairs_lines.get(kv.getKey()));
+                	auditLog.info("Skip exists key={}, file={}, almost line={}", kv.getKey().toStringUtf8(), filePath, lineBlock.get(pairs_lines.get(kv.getKey())));
                 	pairs.remove(kv.getKey());
                 }
             ////}

@@ -87,7 +87,7 @@ public class CheckSum implements TaskInterface {
 
 	@Override
 	public HashMap<ByteString, ByteString> executeTikv(RawKVClient rawKvClient, HashMap<ByteString, ByteString> pairs,
-			HashMap<ByteString, String> pairs_lines, boolean hasTtl,String filePath) {
+			HashMap<ByteString, String> pairs_lines, boolean hasTtl,String filePath,final Map<String, String> lineBlock) {
 		Histogram.Timer batchGetTimer = CHECK_SUM_DURATION.labels("batch_get").startTimer();
 		List<Kvrpcpb.KvPair> kvList = null;
 
@@ -101,8 +101,7 @@ public class CheckSum implements TaskInterface {
 			kvList = rawKvClient.batchGet(keyList);
 		} catch (Exception e) {
             for (Entry<ByteString, ByteString> originalKv : pairs.entrySet()) {
-            	infoRawKV = (InfoInterface)JSONObject.parseObject(originalKv.getValue().toStringUtf8(), clazz.getClass());
-            	logger.error("Batch get failed.Key={}, file={}, almost line={}", originalKv.getKey().toStringUtf8(), filePath, pairs_lines.get(originalKv.getKey()));
+            	logger.error("Batch get failed.Key={}, file={}, almost line={}", originalKv.getKey().toStringUtf8(), filePath, lineBlock.get(pairs_lines.get(originalKv.getKey())));
             }
             throw e;
         }
@@ -124,14 +123,14 @@ public class CheckSum implements TaskInterface {
             	tmpRawKV = (InfoInterface)JSONObject.parseObject(originalKv.getValue().toStringUtf8(), clazz.getClass());
                 if (!infoRawKV.equalsValue(tmpRawKV)) {
                     checkSumLog.error("Check sum failed. Key={}", originalKv.getKey().toStringUtf8());
-                    csFailLog.info(infoRawKV.toJsonString());
+                    csFailLog.info(lineBlock.get(pairs_lines.get(originalKv.getKey())));
                     pairs.remove(originalKv.getKey());
                     ++iCheckSumFail;
                 }
             } else {
                 checkSumLog.error("Key={} is not exists.", originalKv.getKey().toStringUtf8());
                 infoRawKV = (InfoInterface)JSONObject.parseObject(originalKv.getValue().toStringUtf8(), clazz.getClass());
-                csFailLog.info(infoRawKV.toJsonString());
+                csFailLog.info(lineBlock.get(pairs_lines.get(originalKv.getKey())));
                 pairs.remove(originalKv.getKey());
                 ++iNotInsert;
             }

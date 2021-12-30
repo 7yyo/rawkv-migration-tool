@@ -156,7 +156,7 @@ public class BatchJob implements Runnable {
         	
             if(batchSize <= kvPairs.size()){	            	
             	try{
-            		cmdInterFace.executeTikv(rawKvClient, kvPairs, kvPairs_lines, false, absolutePath);
+            		cmdInterFace.executeTikv(rawKvClient, kvPairs, kvPairs_lines, false, absolutePath, lineBlock);
             		TaskInterface.totalDataBytes.getAndAdd(dataSize);
             		dataSize = 0;
 	                totalImportCount.addAndGet(kvPairs.size());
@@ -178,7 +178,7 @@ public class BatchJob implements Runnable {
 
             if(batchSize <= kvPairsTtl.size()){
             	try{
-            		cmdInterFace.executeTikv(rawKvClient, kvPairsTtl, kvPairsTtl_lines, true, absolutePath);
+            		cmdInterFace.executeTikv(rawKvClient, kvPairsTtl, kvPairsTtl_lines, true, absolutePath, lineBlock);
             		TaskInterface.totalDataBytes.getAndAdd(dataTtlSize);
             		dataTtlSize = 0;
             		totalImportCount.addAndGet(kvPairsTtl.size());
@@ -201,7 +201,7 @@ public class BatchJob implements Runnable {
         }
     	if(0 < kvPairs.size()){
     		try {
-    			cmdInterFace.executeTikv(rawKvClient, kvPairs, kvPairs_lines, false, absolutePath);
+    			cmdInterFace.executeTikv(rawKvClient, kvPairs, kvPairs_lines, false, absolutePath, lineBlock);
     			TaskInterface.totalDataBytes.getAndAdd(dataSize);
     			totalImportCount.addAndGet(kvPairs.size());
     			cmdInterFace.succeedWriteRowsLogger(absolutePath, kvPairs);
@@ -222,7 +222,7 @@ public class BatchJob implements Runnable {
     	}
     	if(0 < kvPairsTtl.size()){
     		try {
-    			cmdInterFace.executeTikv(rawKvClient, kvPairsTtl, kvPairsTtl_lines, true, absolutePath);
+    			cmdInterFace.executeTikv(rawKvClient, kvPairsTtl, kvPairsTtl_lines, true, absolutePath, lineBlock);
     			TaskInterface.totalDataBytes.getAndAdd(dataTtlSize);
     			totalImportCount.addAndGet(kvPairsTtl.size());
     			cmdInterFace.succeedWriteRowsLogger(absolutePath, kvPairsTtl);

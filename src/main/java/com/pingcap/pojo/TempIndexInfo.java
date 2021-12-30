@@ -2,8 +2,6 @@ package com.pingcap.pojo;
 
 import org.apache.commons.lang.StringUtils;
 
-import com.alibaba.fastjson.JSONObject;
-
 public class TempIndexInfo implements InfoInterface{
 
     // tempIndex_:_{envid}_:_{id}
@@ -99,12 +97,8 @@ public class TempIndexInfo implements InfoInterface{
     }
 
 	@Override
-	public String toJsonString() {
-		return JSONObject.toJSONString(this);
+	public boolean equalsValue(Object indexInfo) {
+		return equals((TempIndexInfo)indexInfo);
 	}
 
-	@Override
-	public boolean equalsValue(Object indexInfo) {
-		return this.equals((TempIndexInfo)indexInfo);
-	}
 }

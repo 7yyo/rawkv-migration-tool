@@ -70,7 +70,7 @@ public class UnImport implements TaskInterface {
 
 	@Override
 	public HashMap<ByteString, ByteString> executeTikv(RawKVClient rawKvClient, HashMap<ByteString, ByteString> pairs,
-			HashMap<ByteString, String> pairs_lines, boolean hasTtl,String filePath) {
+			HashMap<ByteString, String> pairs_lines, boolean hasTtl,String filePath,final Map<String, String> lineBlock) {
 		List<Kvrpcpb.KvPair> kvHaveList = null;
         if (Model.ON.equals(properties.get(Model.CHECK_EXISTS_KEY))) {
             // skip not exists key.

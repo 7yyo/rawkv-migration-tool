@@ -30,7 +30,7 @@ public interface TaskInterface {
 
 	public Map<String, String> getProperties();
 	public void setProperties(Map<String, String> properties);
-	public HashMap<ByteString, ByteString> executeTikv(RawKVClient rawKvClient, HashMap<ByteString, ByteString> pairs, HashMap<ByteString, String> pairs_lines, boolean hasTtl,String filePath);
+	public HashMap<ByteString, ByteString> executeTikv(RawKVClient rawKvClient, HashMap<ByteString, ByteString> pairs, HashMap<ByteString, String> pairs_lines, boolean hasTtl,String filePath ,final Map<String, String> lineBlock);
 	public void  succeedWriteRowsLogger(String filePath, HashMap<ByteString, ByteString> pairs);
 	public void  faildWriteRowsLogger(HashMap<ByteString, ByteString> pairs);
 	public ScannerInterface getInitScanner();
