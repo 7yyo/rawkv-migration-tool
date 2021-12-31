@@ -122,7 +122,7 @@ public class OSUtils {
                 tokenStat.nextToken(); 
                 tokenStat.nextToken();
                 tokenStat.nextToken();
-                //get %id,redhat
+                //get %id,redhat 
                 String cpuUsage = abnormalTextToInt(tokenStat.nextToken(), "0");
                 if(StringUtils.isBlank(cpuUsage)){
                 	//centos
@@ -134,17 +134,38 @@ public class OSUtils {
                 Float usage = new Float(cpuUsage);
                 return (1-usage.floatValue()/100);
             } 
-             
         } catch(IOException ioe){
         	ioe.printStackTrace();
             freeResource(is, isr, brStat); 
             return 1; 
-        } finally{ 
-            freeResource(is, isr, brStat);
-            if(null != process)
+        } finally{
+        	try {
+				cleanInputStream(is);
+			} catch (IOException e) {
+			}
+            freeResource(is, isr, brStat); 
+        	try {
+        		is = process.getErrorStream();
+				cleanInputStream(is);
+			} catch (IOException e1) {
+			}
+        	finally{
+        		IOUtils.closeQuietly(is);
+        	}
+            if(null != process){
             	process.destroy();
+            }
         } 
     }
+	
+	public static void cleanInputStream(InputStream is) throws IOException{
+		if(null == is)
+			return;
+        byte buff[] = new byte[1024];
+		while (-1 != is.read(buff)) {
+		}
+		buff = null;
+	}
 	
     //clean all not number characters
     public static String abnormalTextToInt(String text, String defaultValue) {
