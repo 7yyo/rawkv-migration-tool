@@ -1,23 +1,17 @@
 package com.pingcap.rawkv;
 
 import com.pingcap.enums.Model;
-import com.pingcap.util.PropertiesUtil;
-import io.prometheus.client.Counter;
-import io.prometheus.client.Histogram;
 import org.apache.commons.lang.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.tikv.common.TiSession;
-import org.tikv.kvproto.Kvrpcpb;
 import org.tikv.raw.RawKVClient;
 import org.tikv.shade.com.google.protobuf.ByteString;
-import java.io.File;
-import java.util.*;
-import java.util.concurrent.atomic.AtomicInteger;
 
 public class RawKv {
 
     private static final Logger logger = LoggerFactory.getLogger(Model.LOG);
+<<<<<<< HEAD
     private static final Logger auditLog = LoggerFactory.getLogger(Model.AUDIT_LOG);
     private static final Logger bpFailLog = LoggerFactory.getLogger(Model.BP_FAIL_LOG);
 
@@ -158,6 +152,8 @@ public class RawKv {
 //
 //
 //    }
+=======
+>>>>>>> dce5cc8c224c54b9cd0c6258e0dc1d74932ed368
 
     public static void get(TiSession tiSession, String key) {
         if (StringUtils.isEmpty(key)) {

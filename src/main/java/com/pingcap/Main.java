@@ -1,12 +1,9 @@
 package com.pingcap;
 
-import com.pingcap.checksum.CheckSum;
+import com.pingcap.controller.ExeFactory;
 import com.pingcap.enums.Model;
-import com.pingcap.export.Exporter;
-import com.pingcap.importer.Importer;
 import com.pingcap.metrics.Prometheus;
 import com.pingcap.rawkv.RawKv;
-import com.pingcap.redo.Redo;
 import com.pingcap.util.*;
 import org.apache.commons.lang.StringUtils;
 import org.slf4j.Logger;
@@ -19,15 +16,16 @@ public class Main {
 
     private static final Logger logger = LoggerFactory.getLogger(Model.LOG);
     private static final String PERSONAL_PROPERTIES_PATH = "src/main/resources/rawkv.properties";
-
     public static void main(String[] args) throws Exception {
 
         logger.info("Welcome to TiKV Migration tool!");
 
         String propertiesPath = System.getProperty(Model.P) == null ? PERSONAL_PROPERTIES_PATH : System.getProperty(Model.P);
         Map<String, String> properties = PropertiesUtil.getProperties(propertiesPath);
+        ExeFactory.checkEnv(properties);
+        properties.put(Model.SYS_CFG_PATH, propertiesPath);
         TiSession tiSession = TiSessionUtil.getTiSession(properties);
-
+        //moniterShutDown();
         if (!StringUtils.isEmpty(System.getProperty(Model.M))) {
             switch (System.getProperty(Model.M)) {
                 case Model.GET:
@@ -56,32 +54,19 @@ public class Main {
                 }
             }
 
-            if (!StringUtils.isEmpty(task)) {
-                switch (task) {
-                    case Model.IMPORT:
-                        Importer.run(properties, tiSession);
-                        break;
-                    case Model.CHECK_SUM:
-                        CheckSum.run(properties, tiSession);
-                        break;
-                    case Model.EXPORT:
-                        Exporter.run(properties, tiSession);
-                        break;
-                    case Model.REDO:
-                        Redo.run(properties, tiSession);
-                        break;
-                    default:
-                        throw new IllegalStateException(task);
-                }
-            } else {
-                logger.error("{} cannot be empty.", Model.TASK);
-            }
+           	ExeFactory.getInstance(tiSession,task,properties).run();
         }
-
         tiSession.close();
-
+        logger.info("Goodbye TiKV Migration tool!");
         System.exit(0);
 
     }
 
+/*    public static void moniterShutDown(final TiSession tiSession){
+	  Runtime.getRuntime().addShutdownHook(new Thread() {
+		   @Override
+		   public void run() {
+		   }
+	  });
+    }*/
 }

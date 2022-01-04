@@ -2,6 +2,7 @@ package com.pingcap.enums;
 
 public class Model {
 
+	public static final String SYS_CFG_PATH = "TIKV.CFGFILE.PATH";
     public static final String READ_TIMEOUT = "tikv.read.timeout";
     public static final String WRITE_TIMEOUT = "tikv.write.timeout";
     public static final String BATCH_READ_TIMEOUT = "tikv.batchRead.timeout";
@@ -10,8 +11,8 @@ public class Model {
     public static final String CLEAN_TIMEOUT = "tikv.clean.timeout";
 
     public static final String IMPORT = "import";
-    public static final String CHECK_SUM = "checkSum";
-    public static final String REDO = "redo";
+    public static final String CHECK_SUM = "checksum";
+    public static final String UNIMPORT = "unimport";
     public static final String EXPORT = "export";
 
     public static final String JSON_FORMAT = "json";
@@ -45,16 +46,19 @@ public class Model {
     public static final String TASK = "tikv.task";
     public static final String PD = "importer.tikv.pd";
 
-    public static final String CHECK_SUM_THREAD_NUM = "importer.checkSum.checkSumThreadNum";
-    public static final String CHECK_SUM_LIMIT = "importer.checkSum.limit";
+    //public static final String CHECK_SUM_THREAD_NUM = "importer.checkSum.checkSumThreadNum";
+    //public static final String CHECK_SUM_LIMIT = "importer.checkSum.limit";
     public static final String CHECK_SUM_MOVE_PATH = "importer.checkSum.movePath";
 
     public static final String IMPORT_FILE_PATH = "importer.in.filePath";
     public static final String MODE = "importer.in.mode";
     public static final String SCENES = "importer.in.scenes";
+    public static final String INTERNAL_THREAD_POOL = "importer.tikv.internalPool";
+    public static final String INTERNAL_MAXTHREAD_POOL = "importer.tikv.maxInternalPoolSize";
     public static final String INTERNAL_THREAD_NUM = "importer.tikv.internalThreadNum";
     public static final String CORE_POOL_SIZE = "importer.tikv.corePoolSize";
     public static final String MAX_POOL_SIZE = "importer.tikv.maxPoolSize";
+    public static final String BATCHS_PACKAGE_SIZE = "importer.in.BatchsPackageSize";
     public static final String BATCH_SIZE = "importer.tikv.batchSize";
 //    public static final String BATCH_PUT_ERR_FILE_PATH = "importer.in.batchPutErrFilePath";
     public static final String DELIMITER_1 = "importer.in.delimiter_1";
@@ -74,13 +78,6 @@ public class Model {
     public static final String EXPORT_FILE_PATH = "exporter.out.filePath";
     public static final String EXPORT_LIMIT = "exporter.tikv.exportLimit";
     public static final String EXPORT_THREAD = "exporter.tikv.exportThread";
-
-    public static final String REDO_TYPE = "redo.type";
-    public static final String REDO_FILE_PATH = "redo.filePath";
-    public static final String REDO_MOVE_PATH = "redo.movePath";
-    public static final String REDO_FILE_ORDER = "redo.order";
-    
-    public static final String ROLLBACK = "importer.in.rollback";
 
 
 }
