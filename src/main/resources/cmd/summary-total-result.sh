@@ -1,0 +1,2 @@
+grep "summary" toTiKV.log | grep "2021-12-23" |awk -F " " '{print $7}' |awk -F "=" '{print $2}' |awk -F , '{print $1}' | awk '{sum+=$1} END {print sum}'
+grep "complete" toTiKV.log | grep "2021-12-23" |grep "Total" |awk -F " " '{print $8}' |awk -F "=" '{print $2}' |awk -F , '{print $1}' | awk '{sum+=$1} END {print sum}'
