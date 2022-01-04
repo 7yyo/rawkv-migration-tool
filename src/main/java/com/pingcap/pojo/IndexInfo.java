@@ -4,7 +4,7 @@ import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.serializer.PascalNameFilter;
 import org.apache.commons.lang.StringUtils;
 
-public class IndexInfo {
+public class IndexInfo implements InfoInterface{
 
     // indexInfo_:_{envid}_:_{type}_:_{id}
     public static final String KET_FORMAT = "indexInfo%s%s%s%s%s%s";
@@ -200,5 +200,10 @@ public class IndexInfo {
             indexInfoTiKV.setDuration(indexInfoCassandra.getDuration());
         }
     }
+
+	@Override
+	public boolean equalsValue(Object indexInfo) {
+		return equals((IndexInfo)indexInfo);
+	}
 
 }

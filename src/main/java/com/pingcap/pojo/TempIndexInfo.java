@@ -2,7 +2,7 @@ package com.pingcap.pojo;
 
 import org.apache.commons.lang.StringUtils;
 
-public class TempIndexInfo {
+public class TempIndexInfo implements InfoInterface{
 
     // tempIndex_:_{envid}_:_{id}
     public static final String KEY_FORMAT = "tempIndex%s%s%s%s";
@@ -95,4 +95,10 @@ public class TempIndexInfo {
             tempIndexInfoTiKV.setDuration(tempIndexInfoCassandra.getDuration());
         }
     }
+
+	@Override
+	public boolean equalsValue(Object indexInfo) {
+		return equals((TempIndexInfo)indexInfo);
+	}
+
 }
