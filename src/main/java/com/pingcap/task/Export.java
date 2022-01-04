@@ -244,7 +244,8 @@ public class Export implements TaskInterface {
 	}
 	
 	public void printFinishedInfo(int total,long duration){
-		 final String headLogger = "["+this.getClass().getSimpleName()+" summary]";
+		final String headLogger = "["+this.getClass().getSimpleName()+" summary]";
+		filesNum.incrementAndGet();
 		StringBuilder result = new StringBuilder(
         		headLogger +
                         " file=" + properties.get(Model.EXPORT_FILE_PATH) + ", " +

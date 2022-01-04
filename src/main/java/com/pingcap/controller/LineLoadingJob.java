@@ -2,8 +2,10 @@ package com.pingcap.controller;
 
 import com.pingcap.enums.Model;
 import com.pingcap.task.TaskInterface;
+import com.pingcap.timer.SystemMonitorTimer;
 import com.pingcap.timer.TaskTimer;
 import com.pingcap.util.FileUtil;
+import com.pingcap.util.PropertiesUtil;
 import com.pingcap.util.ThreadPoolUtil;
 
 import io.prometheus.client.Histogram;
@@ -20,6 +22,7 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class LineLoadingJob implements Runnable {
+	public static final AtomicInteger totalUsedCount = new AtomicInteger(0);
     private final String importFilePath;
     private final TiSession tiSession;
 
@@ -34,10 +37,19 @@ public class LineLoadingJob implements Runnable {
     private LinkedHashMap<String, Long> ttlSkipTypeMap = new LinkedHashMap<>();
     private List<String> ttlSkipTypeList = new ArrayList<>();
     private List<String> ttlPutList = new ArrayList<>();
-    private int threadsNumber = 0;
     private int importFileLineNum = 0;
+    private ThreadPoolExecutor threadPoolFileScanner;
+    private SystemMonitorTimer taskTimer;
+    public static long lastModifiedDate = 0;
 
-    public LineLoadingJob( TaskInterface cmdInterFace, String importFilePath, TiSession tiSession, List<String> ttlSkipTypeList, List<String> ttlPutList, int importFileLineNum) {
+    public LineLoadingJob( TaskInterface cmdInterFace, 
+    		String importFilePath, TiSession tiSession, 
+    		List<String> ttlSkipTypeList, 
+    		List<String> ttlPutList, 
+    		int importFileLineNum,
+    		ThreadPoolExecutor threadPoolFileScanner,
+    		SystemMonitorTimer taskTimer) {
+    	totalUsedCount.incrementAndGet();
         this.importFilePath = importFilePath;
         this.tiSession = tiSession;
         this.cmdInterFace = cmdInterFace;
@@ -51,11 +63,14 @@ public class LineLoadingJob implements Runnable {
         }
         this.ttlPutList.addAll(ttlPutList);
         this.importFileLineNum = importFileLineNum;
+        this.threadPoolFileScanner = threadPoolFileScanner;
+        this.taskTimer = taskTimer;
     }
     
     @Override
     public void run() {
         long startTime = System.currentTimeMillis();
+        lastModifiedDate = taskTimer.getDateAndUpdate(0, false);
         final Map<String, String> properties = cmdInterFace.getProperties();
 
         // Start the file sub-thread, import the data of the file through the sub-thread, and divide the data in advance according to the number of sub-threads.
@@ -68,7 +83,7 @@ public class LineLoadingJob implements Runnable {
         ////List<String> threadPerLineList = CountUtil.getPerThreadFileLines(importFileLineNum, internalThreadNum, importFile.getAbsolutePath());
 
         Timer timer = new Timer();
-        TaskTimer importTimer = new TaskTimer(cmdInterFace, totalImportCount, importFileLineNum, importFilePath);
+        TaskTimer importTimer = new TaskTimer(threadPoolFileLoading,cmdInterFace, totalImportCount, importFileLineNum, importFilePath);
         timer.schedule(importTimer, 5000, Long.parseLong(properties.get(Model.TIMER_INTERVAL)));
 
         // Block until all child threads end.
@@ -93,6 +108,10 @@ public class LineLoadingJob implements Runnable {
 			lineIterator = FileUtils.lineIterator(importFile, "UTF-8");
             // If the data file has a large number of rows, the block time may be slightly longer
             for (int m = 1; m <= importFileLineNum; m++) {
+            	if(lastModifiedDate != taskTimer.getDateAndUpdate(0, false)){
+            		lastModifiedDate = taskTimer.getDateAndUpdate(0, false);
+            		PropertiesUtil.reloadConfiguration(threadPoolFileScanner,cmdInterFace);
+            	}
             	try {
             		container.put(""+ m, lineIterator.nextLine());
                 } catch (Exception e) {
@@ -119,7 +138,6 @@ public class LineLoadingJob implements Runnable {
 	                            totalDuplicateCount,
 	                            ttlPutList,
 	                            cmdInterFace));
-                	++threadsNumber;
                 	container.clear();
                 }
             }
@@ -140,7 +158,6 @@ public class LineLoadingJob implements Runnable {
 	                        totalDuplicateCount,
 	                        ttlPutList,
 	                        cmdInterFace));
-            	++threadsNumber;
             	container.clear();
             }
         	fileBlockTimer.observeDuration();
@@ -170,7 +187,7 @@ public class LineLoadingJob implements Runnable {
         	container.clear();
         	container = null;
         }
-        cmdInterFace.getLogger().info("file={}, line={}, each processes={}, countDownNum={},threadsNumber={}", absolutePath, importFileLineNum, fileSplitSize, countDownNum, threadsNumber);
+        //cmdInterFace.getLogger().info("file={}, line={}, each processes={}, countDownNum={},threadsNumber={}", absolutePath, importFileLineNum, fileSplitSize, countDownNum, threadsNumber);
         try {
             countDownLatch.await();
         } catch (InterruptedException e) {
@@ -195,6 +212,7 @@ public class LineLoadingJob implements Runnable {
     			ttlSkipTypeMap);
         ttlSkipTypeMap.clear();
         ttlSkipTypeMap = null;
+        totalUsedCount.decrementAndGet();
     }
 
 }

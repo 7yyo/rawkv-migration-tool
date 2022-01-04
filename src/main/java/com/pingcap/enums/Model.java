@@ -2,6 +2,7 @@ package com.pingcap.enums;
 
 public class Model {
 
+	public static final String SYS_CFG_PATH = "TIKV.CFGFILE.PATH";
     public static final String READ_TIMEOUT = "tikv.read.timeout";
     public static final String WRITE_TIMEOUT = "tikv.write.timeout";
     public static final String BATCH_READ_TIMEOUT = "tikv.batchRead.timeout";
@@ -45,8 +46,8 @@ public class Model {
     public static final String TASK = "tikv.task";
     public static final String PD = "importer.tikv.pd";
 
-    public static final String CHECK_SUM_THREAD_NUM = "importer.checkSum.checkSumThreadNum";
-    public static final String CHECK_SUM_LIMIT = "importer.checkSum.limit";
+    //public static final String CHECK_SUM_THREAD_NUM = "importer.checkSum.checkSumThreadNum";
+    //public static final String CHECK_SUM_LIMIT = "importer.checkSum.limit";
     public static final String CHECK_SUM_MOVE_PATH = "importer.checkSum.movePath";
 
     public static final String IMPORT_FILE_PATH = "importer.in.filePath";
@@ -77,11 +78,6 @@ public class Model {
     public static final String EXPORT_FILE_PATH = "exporter.out.filePath";
     public static final String EXPORT_LIMIT = "exporter.tikv.exportLimit";
     public static final String EXPORT_THREAD = "exporter.tikv.exportThread";
-
-    public static final String REDO_TYPE = "redo.type";
-    public static final String REDO_FILE_PATH = "redo.filePath";
-    public static final String REDO_MOVE_PATH = "redo.movePath";
-    public static final String REDO_FILE_ORDER = "redo.order";
 
 
 }

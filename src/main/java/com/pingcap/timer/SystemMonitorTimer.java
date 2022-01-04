@@ -4,11 +4,16 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.TimerTask;
 
+import com.pingcap.controller.BatchJob;
+import com.pingcap.controller.LineLoadingJob;
+import com.pingcap.enums.Model;
 import com.pingcap.task.TaskInterface;
+import com.pingcap.util.FileUtil;
 import com.pingcap.util.OSUtils;
 
 public class SystemMonitorTimer extends TimerTask {
 	public double useCPURatio = 0;
+	private long lastModifiedDate = java.lang.Long.MAX_VALUE;
 	private static final long prvNumber[]={1024,1024*1024,1024*1024*1024};
 	private static final String prvNumberUnit[]={"KB","MB","GB"};
 	private TaskInterface cmdInterFace;
@@ -32,12 +37,15 @@ public class SystemMonitorTimer extends TimerTask {
             group = group.getParent();
         }
         useCPURatio = OSUtils.getCPURatio();
-		cmdInterFace.getLogger().info("Process status, CPU= {}%,MEM=({}/{}),TREADS= {}, SPEED= {}/s", 
+		cmdInterFace.getLogger().info("Process ratio, CPU={}%,MEM=({}/{}),TREADS={},FSCAN={},TJOB={},SPEED={}", 
 				String.format("%.2f", useCPURatio),
 				byteTo(Runtime.getRuntime().freeMemory()),
 				byteTo(Runtime.getRuntime().totalMemory()),
 				topGroup.activeCount(),
-				getIBytesString(buffer));
+				LineLoadingJob.totalUsedCount.get(),
+				BatchJob.totalUsedCount.get(),
+				getSpeedString(buffer));
+		 getDateAndUpdate(FileUtil.getFileLastTime(cmdInterFace.getProperties().get(Model.SYS_CFG_PATH)),true);
 	}
 
 	private synchronized List<long[]> putData(){
@@ -52,7 +60,7 @@ public class SystemMonitorTimer extends TimerTask {
 		return buffer;
 	}
 	
-	private String getIBytesString(List<long[]> buffer){
+	private String getSpeedString(List<long[]> buffer){
 		long preData[],curData[];
 		long dataValue = 0,timeValue = 0;
 		for(int i=1;i<buffer.size();i++){
@@ -84,5 +92,12 @@ public class SystemMonitorTimer extends TimerTask {
 			}
 		}
 		return String.format("%.2f%s", (float)value/prvNumber[2],"TB");
-	}	
+	}
+	
+	public synchronized long getDateAndUpdate(long newTime,boolean isUpdate){
+		if(isUpdate){
+			lastModifiedDate = newTime;
+		}
+		return lastModifiedDate;
+	}
 }

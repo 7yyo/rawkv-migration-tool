@@ -1,8 +1,6 @@
 package com.pingcap.dataformat;
 
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicInteger;
-
 import org.apache.commons.lang.StringUtils;
 import org.tikv.shade.com.google.protobuf.ByteString;
 import com.alibaba.fastjson.JSON;
@@ -11,7 +9,6 @@ import com.alibaba.fastjson.serializer.PascalNameFilter;
 import com.pingcap.enums.Model;
 import com.pingcap.pojo.IndexInfo;
 import com.pingcap.pojo.ServiceTag;
-import io.prometheus.client.Histogram.Timer;
 
 public class DataFormatForCsv implements DataFormatInterface {
 	private String keyDelimiter;
@@ -38,7 +35,7 @@ public class DataFormatForCsv implements DataFormatInterface {
      * 4. id,type,targetId
      */
 	@Override
-	public boolean formatToKeyValue(Timer timer, AtomicInteger totalParseErrorCount, String scenes, String line,
+	public boolean formatToKeyValue(String scenes, String line,
 			DataFormatCallBack dataFormatCallBack) throws Exception {
 		String type = null;
 		ByteString key = ByteString.EMPTY, value = ByteString.EMPTY;

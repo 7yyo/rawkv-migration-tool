@@ -70,7 +70,7 @@ public class Import implements TaskInterface {
 	@Override
 	public HashMap<ByteString, ByteString> executeTikv(RawKVClient rawKvClient, HashMap<ByteString, ByteString> pairs,
 			HashMap<ByteString, String> pairs_lines, boolean hasTtl,String filePath,final Map<String, String> lineBlock) {
-		logger.debug("Import executeTikv, File={}, linesSize={}, linesExtSize={}", filePath, pairs.size(), pairs_lines.size());
+		long startTime = System.currentTimeMillis();
         List<Kvrpcpb.KvPair> kvHaveList = null;
         if (Model.ON.equals(properties.get(Model.CHECK_EXISTS_KEY))) {
             // Only json file skip exists key.
@@ -104,6 +104,7 @@ public class Import implements TaskInterface {
     		rawKvClient.batchPut(pairs,ttl);
     	}
     	batchPutTimer.observeDuration();
+		logger.debug("executeTikv, File={}, linesSize={}, usedTime={}", filePath, pairs.size(), String.format("%.2f", (float)(System.currentTimeMillis()-startTime)/1000));
 		return pairs;
 	}
 
@@ -153,6 +154,7 @@ public class Import implements TaskInterface {
 			int totalDuplicateCount,
 			long duration,
 			LinkedHashMap<String, Long> ttlSkipTypeMap){
+		filesNum.incrementAndGet();
         StringBuilder result = new StringBuilder(
                 "["+getClass().getSimpleName()+" summary]" +
                         ", Process ratio 100% file=" + filePath + ", " +
@@ -169,5 +171,6 @@ public class Import implements TaskInterface {
             result.append("<").append(item.getKey()).append(">").append("[").append(item.getValue()).append("]").append("]");
         }
         logger.info(result.toString());
+        
 	}
 }

@@ -1,8 +1,6 @@
 package com.pingcap.dataformat;
 
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicInteger;
-
 import org.apache.commons.lang.StringUtils;
 import org.tikv.shade.com.google.protobuf.ByteString;
 
@@ -11,8 +9,6 @@ import com.alibaba.fastjson.JSONObject;
 import com.pingcap.enums.Model;
 import com.pingcap.pojo.IndexInfo;
 import com.pingcap.pojo.TempIndexInfo;
-
-import io.prometheus.client.Histogram;
 
 public class DataFormatForJson implements DataFormatInterface {
 	
@@ -33,11 +29,10 @@ public class DataFormatForJson implements DataFormatInterface {
 	}
 
 	@Override
-	public boolean formatToKeyValue(Histogram.Timer timer,AtomicInteger totalParseErrorCount, String scenes,String line,DataFormatCallBack dataFormatCallBack) throws Exception {
+	public boolean formatToKeyValue(String scenes,String line,DataFormatCallBack dataFormatCallBack) throws Exception {
 		JSONObject jsonObject = null;
 		try {
             jsonObject = JSONObject.parseObject(line);
-            timer.observeDuration();
         } catch (Exception e) {
         	throw e;
         }

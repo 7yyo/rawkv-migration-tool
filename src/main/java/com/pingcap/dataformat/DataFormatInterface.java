@@ -1,12 +1,9 @@
 package com.pingcap.dataformat;
 
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import org.tikv.shade.com.google.protobuf.ByteString;
-
-import io.prometheus.client.Histogram;
 
 public interface DataFormatInterface {
 	public static final String DATA_LINENO = "LINENO";
@@ -21,7 +18,7 @@ public interface DataFormatInterface {
 		public boolean getDataCallBack(String strJson, String type, int typeInt);
 	}
 
-	public boolean formatToKeyValue( Histogram.Timer timer, AtomicInteger totalParseErrorCount, String scenes, String line, DataFormatCallBack dataFormatCallBack) throws Exception;
+	public boolean formatToKeyValue( String scenes, String line, DataFormatCallBack dataFormatCallBack) throws Exception;
 	
 	public boolean unFormatToKeyValue(
 			String scenes,

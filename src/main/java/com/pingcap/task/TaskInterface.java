@@ -22,7 +22,8 @@ import io.prometheus.client.Counter;
 public interface TaskInterface {
 	static final Counter BATCH_PUT_FAIL_COUNTER = Counter.build().name("batch_put_fail_counter").help("Batch put fail counter.").labelNames("batch_put_fail").register();
     static final Histogram REQUEST_LATENCY = Histogram.build().name("requests_latency_seconds").help("Request latency in seconds.").labelNames("request_latency").register();
-    public final AtomicInteger totalDataBytes = new AtomicInteger(0);
+    static public final AtomicInteger totalDataBytes = new AtomicInteger(0);
+    static public final AtomicInteger filesNum = new AtomicInteger(0);
     
 	public Logger getLogger();
 	public Logger getLoggerAudit();

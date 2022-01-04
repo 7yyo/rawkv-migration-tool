@@ -1,10 +1,7 @@
 package com.pingcap.dataformat;
 
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicInteger;
-
 import com.pingcap.enums.Model;
-import io.prometheus.client.Histogram;
 
 public class DataFactory implements DataFormatInterface {
 
@@ -24,8 +21,8 @@ public class DataFactory implements DataFormatInterface {
 	}
 
 	@Override
-	public boolean formatToKeyValue(Histogram.Timer timer,AtomicInteger totalParseErrorCount, String scenes,String line,DataFormatCallBack dataFormatCallBack) throws Exception {
-		return formatInterface.formatToKeyValue( timer, totalParseErrorCount, scenes, line, dataFormatCallBack);
+	public boolean formatToKeyValue(String scenes,String line,DataFormatCallBack dataFormatCallBack) throws Exception {
+		return formatInterface.formatToKeyValue(scenes,line,dataFormatCallBack);
 	}
 
 	@Override

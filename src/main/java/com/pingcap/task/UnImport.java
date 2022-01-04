@@ -1,9 +1,5 @@
 package com.pingcap.task;
 
-import static com.pingcap.enums.Model.REDO_FILE_PATH;
-import static com.pingcap.enums.Model.REDO_MOVE_PATH;
-import static com.pingcap.enums.Model.REDO_TYPE;
-
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -60,12 +56,6 @@ public class UnImport implements TaskInterface {
 		TaskInterface.checkShareParameters(properties);
 		PropertiesUtil.checkNaturalNumber( properties, Model.BATCHS_PACKAGE_SIZE, false);
 		
-        // Redo file
-        PropertiesUtil.checkConfig(properties, REDO_FILE_PATH);
-        // Redo.log move path
-        PropertiesUtil.checkConfig(properties, REDO_MOVE_PATH);
-        // Redo data type, indexInfo or tempIndexInfo
-        PropertiesUtil.checkConfig(properties, REDO_TYPE);
 	}
 
 	@Override
@@ -75,32 +65,36 @@ public class UnImport implements TaskInterface {
         if (Model.ON.equals(properties.get(Model.CHECK_EXISTS_KEY))) {
             // skip not exists key.
             // For batch get to check exists kv
-        Histogram.Timer batchGetTimer = REQUEST_LATENCY.labels("batch get").startTimer();
-        try {
-            // Batch get from raw kv.
-            kvHaveList = rawKvClient.batchGet(new ArrayList<>(pairs.keySet()));
-        } catch (Exception e) {
-        	TaskInterface.BATCH_PUT_FAIL_COUNTER.labels("batch put fail").inc();
-            throw e;
+	        Histogram.Timer batchGetTimer = REQUEST_LATENCY.labels("batch get").startTimer();
+	        try {
+	            // Batch get from raw kv.
+	            kvHaveList = rawKvClient.batchGet(new ArrayList<>(pairs.keySet()));
+	        } catch (Exception e) {
+	        	TaskInterface.BATCH_PUT_FAIL_COUNTER.labels("batch put fail").inc();
+	            throw e;
+	        }
+	        finally{
+	        	batchGetTimer.observeDuration();
+	        }
+	        
+	        boolean isFind;
+	        for(Entry<ByteString, ByteString> obj:pairs.entrySet()){
+	        	isFind = false;
+	            for (Kvrpcpb.KvPair kv : kvHaveList) {
+	            	if(obj.getKey().equals(kv.getKey())){
+	            		isFind = true;
+	            		break;
+	            	}
+	            }
+	            if(!isFind){
+	            	auditLog.info("Skip not exists key={}, file={}, almost line={}", obj.getKey().toStringUtf8(), filePath, pairs_lines.get(obj.getKey()));
+	            	pairs.remove(obj.getKey());
+	            }
+	        }
         }
-
-        batchGetTimer.observeDuration();
-        boolean isFind;
-        for(Entry<ByteString, ByteString> obj:pairs.entrySet()){
-        	isFind = false;
-            for (Kvrpcpb.KvPair kv : kvHaveList) {
-            	if(obj.getKey().equals(kv.getKey())){
-            		isFind = true;
-            		break;
-            	}
-            }
-            if(!isFind){
-            	auditLog.info("Skip not exists key={}, file={}, almost line={}", obj.getKey().toStringUtf8(), filePath, pairs_lines.get(obj.getKey()));
-            	pairs.remove(obj.getKey());                  	
-            }
-        }
-        }
+        Histogram.Timer batchDeleteTimer = REQUEST_LATENCY.labels("batch delete").startTimer();
 		rawKvClient.batchDelete(new ArrayList<>(pairs.keySet()));
+		batchDeleteTimer.observeDuration();
 		return pairs;
 	}
 
@@ -143,6 +137,7 @@ public class UnImport implements TaskInterface {
 	public void finishedReport(String filePath, int importFileLineNum, int totalImportCount, int totalEmptyCount,
 			int totalSkipCount, int totalParseErrorCount, int totalBatchPutFailCount, int totalDuplicateCount,
 			long duration, LinkedHashMap<String, Long> ttlSkipTypeMap) {
+		filesNum.incrementAndGet();
         StringBuilder result = new StringBuilder(
                 "["+getClass().getSimpleName()+" summary]" +
                         ", Process ratio 100% file=" + filePath + ", " +

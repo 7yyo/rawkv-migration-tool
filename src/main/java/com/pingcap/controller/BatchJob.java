@@ -16,6 +16,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class BatchJob implements Runnable {
+	public static final AtomicInteger totalUsedCount = new AtomicInteger(0);
 	private static int BUFFER_SIZE = 4096;
     private final String absolutePath;
     private final TiSession tiSession;
@@ -56,6 +57,7 @@ public class BatchJob implements Runnable {
             AtomicInteger totalDuplicateCount,
             List<String> ttlPutList,
             TaskInterface cmdInterFace) {
+    	totalUsedCount.incrementAndGet();
         this.totalImportCount = totalImportCount;
         this.tiSession = tiSession;
         this.totalEmptyCount = totalEmptyCount;
@@ -85,7 +87,6 @@ public class BatchJob implements Runnable {
         String line; // Import file line. Import line col: id, type.
         boolean notData;
         DataFactory dataFactory = DataFactory.getInstance(importMode,properties);
-
         for(Entry<String, String> pos:lineBlock.entrySet()) {
             String lineNo= pos.getKey();
             line = pos.getValue();
@@ -98,15 +99,14 @@ public class BatchJob implements Runnable {
             }
 
             Histogram.Timer parseJsonTimer = cmdInterFace.getHistogram().labels("parse json").startTimer();
-            Histogram.Timer toObjTimer = cmdInterFace.getHistogram().labels("to obj").startTimer();
+            //20220104 delete Histogram.Timer toObjTimer = cmdInterFace.getHistogram().labels("to obj").startTimer();
 
             try {
-            	notData = dataFactory.formatToKeyValue( parseJsonTimer, totalParseErrorCount, scenes, line,new DataFormatInterface.DataFormatCallBack() {
-					
+            	notData = dataFactory.formatToKeyValue( scenes, line,new DataFormatInterface.DataFormatCallBack() {
+
 					@Override
 					public boolean putDataCallBack( String ttlType, ByteString key, ByteString value) {
 						// If importer.ttl.put.type exists, put with ttl, then continue.
-						toObjTimer.observeDuration();
 						ByteString du = null;
 						if(null != ttlType) {
 			                if (ttlPutList.contains(ttlType)) {
@@ -151,96 +151,40 @@ public class BatchJob implements Runnable {
             	cmdInterFace.getLoggerAudit().error("Parse failed, file={}, data={}, line={}", absolutePath, line, lineNo);
             	continue;
             }
+            finally{
+            	parseJsonTimer.observeDuration();
+            }
         	if(!notData)
         		continue;
         	
-            if(batchSize <= kvPairs.size()){	            	
-            	try{
-            		cmdInterFace.executeTikv(rawKvClient, kvPairs, kvPairs_lines, false, absolutePath, lineBlock);
-            		TaskInterface.totalDataBytes.getAndAdd(dataSize);
-            		dataSize = 0;
-	                totalImportCount.addAndGet(kvPairs.size());
-	                cmdInterFace.succeedWriteRowsLogger(absolutePath, kvPairs);
-                }
-                catch(Exception e){
-                	totalBatchPutFailCount.addAndGet(kvPairs.size());
-                	cmdInterFace.getLoggerFail().error("Failed to batch put, file={}, size={}, line={}", absolutePath, kvPairs_lines.size(), kvPairs_lines.values().toString());
-                }
-            	finally{
-            		int jumpExistCount = kvPairs_lines.size()-kvPairs.size();
-            		if(0 < jumpExistCount){
-            			totalSkipCount.addAndGet(jumpExistCount);
-            		}
-            		kvPairs.clear();
-            		kvPairs_lines.clear();
-            	}
-            }
-
-            if(batchSize <= kvPairsTtl.size()){
-            	try{
-            		cmdInterFace.executeTikv(rawKvClient, kvPairsTtl, kvPairsTtl_lines, true, absolutePath, lineBlock);
-            		TaskInterface.totalDataBytes.getAndAdd(dataTtlSize);
-            		dataTtlSize = 0;
-            		totalImportCount.addAndGet(kvPairsTtl.size());
-            		cmdInterFace.succeedWriteRowsLogger(absolutePath, kvPairsTtl);
-            	}
-            	catch(Exception e){
-            		totalBatchPutFailCount.addAndGet(kvPairsTtl.size());
-            		cmdInterFace.faildWriteRowsLogger(kvPairsTtl);
-            		cmdInterFace.getLoggerFail().error("Failed to batch put TTL, file={}, size={}, line={}", absolutePath, kvPairsTtl_lines.size(), kvPairsTtl_lines.values().toString());
-            	}
-            	finally{
-            		int jumpExistCount = kvPairsTtl_lines.size()-kvPairsTtl.size();
-            		if(0 < jumpExistCount){
-            			totalSkipCount.addAndGet(jumpExistCount);
-            		}	            		
-            		kvPairsTtl.clear();
-            		kvPairsTtl_lines.clear();
-            	}
+        	if(batchSize <= kvPairs.size()+kvPairsTtl.size()){
+	            if(0 < kvPairs.size()){
+	        		if(doWriteTikv( rawKvClient, kvPairs, kvPairs_lines, lineBlock, false)){
+	            		TaskInterface.totalDataBytes.getAndAdd(dataSize);
+	            		dataSize = 0;
+	        		}
+	            }
+	
+	            if(0 < kvPairsTtl.size()){
+	        		if(doWriteTikv( rawKvClient, kvPairsTtl, kvPairsTtl_lines, lineBlock, true)){
+	            		TaskInterface.totalDataBytes.getAndAdd(dataTtlSize);
+	            		dataTtlSize = 0;
+	        		}
+	        	}
         	}
         }
-    	if(0 < kvPairs.size()){
-    		try {
-    			cmdInterFace.executeTikv(rawKvClient, kvPairs, kvPairs_lines, false, absolutePath, lineBlock);
-    			TaskInterface.totalDataBytes.getAndAdd(dataSize);
-    			totalImportCount.addAndGet(kvPairs.size());
-    			cmdInterFace.succeedWriteRowsLogger(absolutePath, kvPairs);
-    		}
-    		catch(Exception e){
-    			totalBatchPutFailCount.addAndGet(kvPairs.size());
-    			cmdInterFace.faildWriteRowsLogger(kvPairs);
-    			cmdInterFace.getLoggerFail().error("Failed to batch put, file={}, size={}, line={}", absolutePath, kvPairs_lines.size(), kvPairs_lines.values().toString());
-    		}
-    		finally{
-        		int jumpExistCount = kvPairs_lines.size()-kvPairs.size();
-        		if(0 < jumpExistCount){
-        			totalSkipCount.addAndGet(jumpExistCount);
-        		}
-        		kvPairs.clear();
-        		kvPairs_lines.clear();
-    		}
-    	}
-    	if(0 < kvPairsTtl.size()){
-    		try {
-    			cmdInterFace.executeTikv(rawKvClient, kvPairsTtl, kvPairsTtl_lines, true, absolutePath, lineBlock);
-    			TaskInterface.totalDataBytes.getAndAdd(dataTtlSize);
-    			totalImportCount.addAndGet(kvPairsTtl.size());
-    			cmdInterFace.succeedWriteRowsLogger(absolutePath, kvPairsTtl);
-    		}
-    		catch(Exception e){
-    			totalBatchPutFailCount.addAndGet(kvPairsTtl.size());
-    			cmdInterFace.faildWriteRowsLogger(kvPairsTtl);
-    			cmdInterFace.getLoggerFail().error("Failed to batch put TTL, file={}, size={}, line={}", absolutePath, kvPairsTtl_lines.size(), kvPairsTtl_lines.values().toString());
-    		}
-    		finally{
-        		int jumpExistCount = kvPairsTtl_lines.size()-kvPairsTtl.size();
-        		if(0 < jumpExistCount){
-        			totalSkipCount.addAndGet(jumpExistCount);
-        		}	     
-        		kvPairsTtl.clear();
-        		kvPairsTtl_lines.clear();
-    		}
-    	}
+        if(0 < kvPairs.size()+kvPairsTtl.size()){
+	    	if(0 < kvPairs.size()){
+	    		if(doWriteTikv( rawKvClient, kvPairs, kvPairs_lines, lineBlock, false)){
+	        		TaskInterface.totalDataBytes.getAndAdd(dataSize);
+	    		}
+	    	}
+	    	if(0 < kvPairsTtl.size()){
+	    		if(doWriteTikv( rawKvClient, kvPairsTtl, kvPairsTtl_lines, lineBlock, true)){
+	        		TaskInterface.totalDataBytes.getAndAdd(dataTtlSize);
+	    		}
+	    	}
+        }
     	properties = null;
     	lineBlock.clear();
         kvPairs = null;
@@ -256,6 +200,33 @@ public class BatchJob implements Runnable {
         finally{
         	rawKvClient = null;
         }
+        totalUsedCount.decrementAndGet();
     }
  
+    private boolean doWriteTikv(RawKVClient rawKvClient,HashMap<ByteString, ByteString> pairs, HashMap<ByteString, String> pairs_lines,Map<String,String> lineBlock, boolean hasTtl){
+    	boolean ret = true;
+		try {
+			cmdInterFace.executeTikv(rawKvClient, pairs, pairs_lines, hasTtl, absolutePath, lineBlock);
+			totalImportCount.addAndGet(pairs.size());
+			cmdInterFace.succeedWriteRowsLogger(absolutePath, pairs);
+		}
+		catch(Exception e){
+			ret = false;
+			totalBatchPutFailCount.addAndGet(pairs.size());
+			cmdInterFace.faildWriteRowsLogger(pairs);
+			cmdInterFace.getLoggerFail().error("Failed to batch put{}, file={}, size={}, line={}", hasTtl?"TTL":"", absolutePath, pairs_lines.size(), pairs_lines.values().toString());
+		}
+		finally{
+    		int jumpExistCount = pairs_lines.size()-pairs.size();
+    		if(0 < jumpExistCount){
+    			totalSkipCount.addAndGet(jumpExistCount);
+    		}
+/*    		for(Entry<ByteString, String> pos:pairs_lines.entrySet()){
+    			lineBlock.remove(pos.getValue());
+    		}*/
+    		pairs.clear();
+    		pairs_lines.clear();
+		}
+		return ret;
+    }
 }

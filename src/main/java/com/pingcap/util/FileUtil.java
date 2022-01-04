@@ -85,6 +85,16 @@ public class FileUtil {
             logger.error("Failed to mkdir folder={}", folderPath);
         }
     }
+    
+    public static long getFileLastTime(String filePath){
+		 File file = new File(filePath);
+		 if(file.exists()) {
+			 return file.lastModified();
+		 }
+		 else {
+			 return java.lang.Long.MAX_VALUE;
+		 }
+    }
 
     public static void deleteFolder(String folderPath) {
         File deleteFolder = new File(folderPath);
@@ -134,7 +144,7 @@ public class FileUtil {
         return lineIterator;
     }
 
-    public static void redoFile(String filePath, List<File> allFileList, Map<String, String> properties) {
+/*    public static void redoFile(String filePath, List<File> allFileList, Map<String, String> properties) {
         File file = new File(filePath);
         File[] files = file.listFiles();
         if (files != null) {
@@ -156,16 +166,16 @@ public class FileUtil {
                 Collections.addAll(allFileList, fileCount);
             }
         }
-    }
+    }*/
 
     public static void main(String[] args) {
-        String propertiesPath = System.getProperty(Model.P) == null ? "/Users/yuyang/IdeaProjects/tikv_importer/src/main/resources/rawkv.properties" : System.getProperty(Model.P);
+/*        String propertiesPath = System.getProperty(Model.P) == null ? "/Users/yuyang/IdeaProjects/tikv_importer/src/main/resources/rawkv.properties" : System.getProperty(Model.P);
         Map<String, String> properties = PropertiesUtil.getProperties(propertiesPath);
         List<File> files = new ArrayList<>();
         redoFile("/Users/yuyang/redo", files, properties);
         for (File file : files) {
             System.out.println(file);
-        }
+        }*/
     }
 
 }

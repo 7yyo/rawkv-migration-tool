@@ -6,7 +6,11 @@ import static com.pingcap.enums.Model.MODE;
 import static com.pingcap.enums.Model.SCENES;
 import static com.pingcap.enums.Model.TTL_SKIP_TYPE;
 
+import java.io.File;
+import java.io.IOException;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -16,6 +20,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.apache.commons.io.FileUtils;
 import org.tikv.kvproto.Kvrpcpb;
 import org.tikv.raw.RawKVClient;
 import org.tikv.shade.com.google.protobuf.ByteString;
@@ -72,7 +77,6 @@ public class CheckSum implements TaskInterface {
 		TaskInterface.checkShareParameters(properties);
 		
         PropertiesUtil.checkConfig(properties, Model.IMPORT_FILE_PATH);
-        PropertiesUtil.checkConfig(properties, Model.CHECK_SUM_THREAD_NUM);
         PropertiesUtil.checkConfig(properties, Model.CHECK_SUM_MOVE_PATH);
         PropertiesUtil.checkConfig(properties, MODE);
         PropertiesUtil.checkConfig(properties, SCENES);
@@ -117,6 +121,7 @@ public class CheckSum implements TaskInterface {
         kvList.clear();
         kvList = null;
         int iCheckSumFail=0,iNotInsert=0;
+        Histogram.Timer csTimer = CHECK_SUM_DURATION.labels("check_sum").startTimer();
         for (Entry<ByteString, ByteString> originalKv : pairs.entrySet()) {
         	infoRawKV = rawKvResultMap.get(originalKv.getKey());
             if (null != infoRawKV) {
@@ -143,6 +148,7 @@ public class CheckSum implements TaskInterface {
         	checkSumFail.addAndGet(iCheckSumFail);
         if(0<iNotInsert)
         	notInsert.addAndGet(iNotInsert);
+        csTimer.observeDuration();
 		return pairs;
 	}
 
@@ -185,7 +191,16 @@ public class CheckSum implements TaskInterface {
 	public void finishedReport(String filePath, int importFileLineNum, int totalImportCount, int totalEmptyCount,
 			int totalSkipCount, int totalParseErrorCount, int totalBatchPutFailCount, int totalDuplicateCount,
 			long duration, LinkedHashMap<String, Long> ttlSkipTypeMap) {
-//      logger.info("Check sum file={} complete. Total={}, totalCheck={}, notExists={}, skip={}, parseErr={}, checkSumFail={}", checkSumFile.getAbsolutePath(), totalCount, totalCheck, notInsert, skip, parseErr, checkSumFail);
+        SimpleDateFormat simpleDateFormat = new SimpleDateFormat("yyyyMMddHHmmss");
+        String now = simpleDateFormat.format(new Date());
+        String moveFilePath = properties.get(Model.CHECK_SUM_MOVE_PATH);
+        File checkSumFile = new File(filePath);
+        File moveFile = new File(moveFilePath + "/" + now + "/" + checkSumFile.getName() + "." + filesNum.incrementAndGet());
+        try {
+            FileUtils.moveFile(checkSumFile, moveFile);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
         StringBuilder result = new StringBuilder(
                 "["+getClass().getSimpleName()+" summary]" +
                         ", Process ratio 100% file=" + filePath + ", " +
@@ -202,7 +217,6 @@ public class CheckSum implements TaskInterface {
             result.append("<").append(item.getKey()).append(">").append("[").append(item.getValue()).append("]").append("]");
         }
         logger.info(result.toString());
-		
 	}
 	
 }

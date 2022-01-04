@@ -16,7 +16,6 @@ public class Main {
 
     private static final Logger logger = LoggerFactory.getLogger(Model.LOG);
     private static final String PERSONAL_PROPERTIES_PATH = "src/main/resources/rawkv.properties";
-    private static TiSession tiSession = null;
     public static void main(String[] args) throws Exception {
 
         logger.info("Welcome to TiKV Migration tool!");
@@ -24,9 +23,9 @@ public class Main {
         String propertiesPath = System.getProperty(Model.P) == null ? PERSONAL_PROPERTIES_PATH : System.getProperty(Model.P);
         Map<String, String> properties = PropertiesUtil.getProperties(propertiesPath);
         ExeFactory.checkEnv(properties);
-        tiSession = TiSessionUtil.getTiSession(properties);
-        moniterShutDown(tiSession);
-        //TiSession tiSession = null;
+        properties.put(Model.SYS_CFG_PATH, propertiesPath);
+        TiSession tiSession = TiSessionUtil.getTiSession(properties);
+        //moniterShutDown();
         if (!StringUtils.isEmpty(System.getProperty(Model.M))) {
             switch (System.getProperty(Model.M)) {
                 case Model.GET:
@@ -57,24 +56,17 @@ public class Main {
 
            	ExeFactory.getInstance(tiSession,task,properties).run();
         }
-
+        tiSession.close();
         logger.info("Goodbye TiKV Migration tool!");
         System.exit(0);
 
     }
 
-    public static void moniterShutDown(final TiSession tiSession){
+/*    public static void moniterShutDown(final TiSession tiSession){
 	  Runtime.getRuntime().addShutdownHook(new Thread() {
 		   @Override
 		   public void run() {
-			   if(null != tiSession){
-				   try {
-					tiSession.close();
-				} catch (Exception e) {
-					e.printStackTrace();
-				}
-			   }
 		   }
 	  });
-    }
+    }*/
 }
