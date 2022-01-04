@@ -90,6 +90,7 @@ public class OSUtils {
             brStat = new BufferedReader(isr);
             
             if(linuxVersion.equals("2.4")){ 
+            	//did not test
                 brStat.readLine(); 
                 brStat.readLine(); 
                 brStat.readLine(); 
@@ -144,15 +145,15 @@ public class OSUtils {
 			} catch (IOException e) {
 			}
             freeResource(is, isr, brStat); 
-        	try {
-        		is = process.getErrorStream();
-				cleanInputStream(is);
-			} catch (IOException e1) {
-			}
-        	finally{
-        		IOUtils.closeQuietly(is);
-        	}
             if(null != process){
+            	try {
+            		is = process.getErrorStream();
+    				cleanInputStream(is);
+    			} catch (IOException e1) {
+    			}
+            	finally{
+            		IOUtils.closeQuietly(is);
+            	}
             	process.destroy();
             }
         } 
@@ -210,11 +211,13 @@ public class OSUtils {
 	@SuppressWarnings("deprecation")
 	private static long[] readCpu(final Process proc) {  
 		long[] retn = new long[2];
+		InputStream is = null;
 		InputStreamReader ir = null;
 		LineNumberReader input = null;
-		try {  
+		try {
+			is = proc.getInputStream();
 			proc.getOutputStream().close();  
-			ir = new InputStreamReader(proc.getInputStream());  
+			ir = new InputStreamReader(is);  
 			input = new LineNumberReader(ir);  
 			String line = input.readLine();  
 			if (line == null || line.length() < FAULTLENGTH) {
@@ -263,13 +266,22 @@ public class OSUtils {
 		} catch (Exception ex) {  
 			ex.printStackTrace();  
 		} finally {
-			IOUtils.closeQuietly(ir);
-			IOUtils.closeQuietly(input);
-			try {  
-				proc.getInputStream().close();  
-			} catch (Exception e) {  
-				e.printStackTrace();  
-			}  
+        	try {
+				cleanInputStream(is);
+			} catch (IOException e) {
+			}
+            freeResource(is, ir, input); 
+            if(null != proc){
+	        	try {
+	        		is = proc.getErrorStream();
+					cleanInputStream(is);
+				} catch (IOException e1) {
+				}
+	        	finally{
+	        		IOUtils.closeQuietly(is);
+	        	}
+	        	proc.destroy();
+            }
 		}  
 		return null;  
 	}

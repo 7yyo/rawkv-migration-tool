@@ -125,6 +125,7 @@ public class CheckSum implements TaskInterface {
                     checkSumLog.error("Check sum failed. Key={}", originalKv.getKey().toStringUtf8());
                     csFailLog.info(lineBlock.get(pairs_lines.get(originalKv.getKey())));
                     pairs.remove(originalKv.getKey());
+                    pairs_lines.remove(originalKv.getKey());
                     ++iCheckSumFail;
                 }
             } else {
@@ -132,6 +133,7 @@ public class CheckSum implements TaskInterface {
                 infoRawKV = (InfoInterface)JSONObject.parseObject(originalKv.getValue().toStringUtf8(), clazz.getClass());
                 csFailLog.info(lineBlock.get(pairs_lines.get(originalKv.getKey())));
                 pairs.remove(originalKv.getKey());
+                pairs_lines.remove(originalKv.getKey());
                 ++iNotInsert;
             }
         }
