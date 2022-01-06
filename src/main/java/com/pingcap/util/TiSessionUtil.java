@@ -16,17 +16,6 @@ public class TiSessionUtil {
         String pd = properties.get(Model.PD);
         TiConfiguration conf;
         TiSession tiSession = null;
-<<<<<<< HEAD
-        
-        PropertiesUtil.checkNaturalNumber(properties,Model.WRITE_TIMEOUT,false);
-        PropertiesUtil.checkNaturalNumber(properties,Model.READ_TIMEOUT,false);
-        PropertiesUtil.checkNaturalNumber(properties,Model.BATCH_WRITE_TIMEOUT,false);
-        PropertiesUtil.checkNaturalNumber(properties,Model.BATCH_READ_TIMEOUT,false);
-        PropertiesUtil.checkNaturalNumber(properties,Model.SCAN_TIMEOUT,false);
-        PropertiesUtil.checkNaturalNumber(properties,Model.CLEAN_TIMEOUT,false);
-        
-=======
->>>>>>> dce5cc8c224c54b9cd0c6258e0dc1d74932ed368
         try {
             conf = TiConfiguration.createRawDefault(pd);
             conf.setRawKVWriteTimeoutInMS(Integer.parseInt(properties.get(Model.WRITE_TIMEOUT)));
