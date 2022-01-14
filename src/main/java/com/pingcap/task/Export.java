@@ -78,8 +78,8 @@ public class Export implements TaskInterface {
 	}
 
 	@Override
-	public HashMap<ByteString, ByteString> executeTikv(RawKVClient rawKvClient, HashMap<ByteString, ByteString> pairs,
-			HashMap<ByteString, String> pairs_lines, boolean hasTtl,String filePath,final Map<String, String> lineBlock) {
+	public HashMap<ByteString, ByteString> executeTikv(Map<String, Object> propParameters, RawKVClient rawKvClient, HashMap<ByteString, ByteString> pairs,
+			HashMap<ByteString, String> pairs_lines, boolean hasTtl,String filePath,final Map<String, String> lineBlock,int dataSize) {
     	return pairs;
 	}
 	
@@ -263,7 +263,7 @@ public class Export implements TaskInterface {
 	@Override
 	public void finishedReport(String filePath, int importFileLineNum, int totalImportCount, int totalEmptyCount,
 			int totalSkipCount, int totalParseErrorCount, int totalBatchPutFailCount, int totalDuplicateCount,
-			long duration, LinkedHashMap<String, Long> ttlSkipTypeMap) {
+			long duration, LinkedHashMap<String, Long> ttlSkipTypeMap,Map<String, Object> propParameters) {
         StringBuilder result = new StringBuilder(
                 "["+getClass().getSimpleName()+" summary]" +
                         ", Process ratio 100% file=" + filePath + ", " +
@@ -280,5 +280,10 @@ public class Export implements TaskInterface {
             result.append("<").append(item.getKey()).append(">").append("[").append(item.getValue()).append("]").append("]");
         }
         logger.info(result.toString());
+	}
+
+	@Override
+	public void installPrivateParamters(Map<String, Object> propParameters) {
+		// TODO Auto-generated method stub
 	}
 }

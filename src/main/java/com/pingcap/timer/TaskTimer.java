@@ -13,16 +13,16 @@ public class TaskTimer extends TimerTask {
 
 	private ThreadPoolExecutor threadPoolFileLoading = null;
 	private TaskInterface cmdInterFace = null;
-    private final AtomicInteger totalFileLine;
+    private final AtomicInteger processFileLines;
     private final int totalLines;
     private final String filePath;
     private int internalThreadPool = 0;
     private int internalMaxThreadPool = 0;
     private final long startTime = System.currentTimeMillis();
     
-    public TaskTimer(ThreadPoolExecutor threadPoolFileLoading,TaskInterface cmdInterFace,AtomicInteger totalFileLine, int totalLines, String filePath) {
+    public TaskTimer(ThreadPoolExecutor threadPoolFileLoading,TaskInterface cmdInterFace,AtomicInteger processFileLines, int totalLines, String filePath) {
         this.cmdInterFace = cmdInterFace;
-        this.totalFileLine = totalFileLine;
+        this.processFileLines = processFileLines;
         this.totalLines = totalLines;
         this.filePath = filePath;
         this.threadPoolFileLoading = threadPoolFileLoading;
@@ -34,8 +34,9 @@ public class TaskTimer extends TimerTask {
 	@Override
 	public void run() {
         cmpConfingUpdate();
-        float remaining = (float)(totalLines - totalFileLine.get())/((totalFileLine.get()/(System.currentTimeMillis()-startTime))+1)/1000;
-		cmdInterFace.getLogger().info("[{}] [{}/{}],{} ratio {}%,remained {}s", this.filePath, totalFileLine, totalLines,cmdInterFace.getClass().getSimpleName(), CountUtil.getPercentage(totalFileLine.get(), totalLines),String.format("%.2f", remaining));
+        int curProcessLines = processFileLines.get();
+        float remaining = (float)(totalLines - curProcessLines)/((curProcessLines/(System.currentTimeMillis()-startTime))+1)/1000;
+		cmdInterFace.getLogger().info("[{}] [{}/{}],{} ratio {}%,remained {}s", this.filePath, curProcessLines, totalLines,cmdInterFace.getClass().getSimpleName(), CountUtil.getPercentage(curProcessLines, totalLines),String.format("%.2f", remaining));
 	}
 	
 	private synchronized void cmpConfingUpdate(){

@@ -65,11 +65,15 @@ public class OSUtils {
 
 	public static double getCPURatio(){
         double cpuRatio = 0;
-        String osName = System.getProperty("os.name"); 
-        if (osName.toLowerCase().startsWith("windows")) { 
+        String osName = System.getProperty("os.name");
+        if(null == osName)
+        	osName = "";
+        else
+        	osName = osName.toLowerCase(Locale.ENGLISH);
+        if (osName.startsWith("windows")) { 
             cpuRatio = getCpuRatioForWindows(); 
         } 
-        else { 
+        else if(osName.contains("linux")) { 
         	cpuRatio = getCpuRateForLinux(); 
         }
         return cpuRatio;

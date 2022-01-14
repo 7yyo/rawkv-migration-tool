@@ -16,6 +16,7 @@ import org.tikv.shade.com.google.protobuf.ByteString;
 import com.pingcap.controller.FileScanner;
 import com.pingcap.controller.ScannerInterface;
 import com.pingcap.enums.Model;
+import com.pingcap.rawkv.LimitSpeedkv;
 import com.pingcap.util.JavaUtil;
 import com.pingcap.util.PropertiesUtil;
 
@@ -54,21 +55,34 @@ public class UnImport implements TaskInterface {
 	@Override
 	public void checkAllParameters(Map<String, String> properties) {
 		TaskInterface.checkShareParameters(properties);
-		PropertiesUtil.checkNaturalNumber( properties, Model.BATCHS_PACKAGE_SIZE, false);
-		
+
+		PropertiesUtil.checkConfig(properties, Model.CHECK_EXISTS_KEY);
+        PropertiesUtil.checkConfig(properties, Model.IMPORT_FILE_PATH);
+        PropertiesUtil.checkConfig(properties, Model.TTL_SKIP_TYPE);
+        PropertiesUtil.checkConfig(properties, Model.TTL_PUT_TYPE);
+        PropertiesUtil.checkConfig(properties, Model.SCENES);
+        PropertiesUtil.checkConfig(properties, Model.MODE);
+        PropertiesUtil.checkConfig(properties, Model.ENV_ID);
+        PropertiesUtil.checkConfig(properties, Model.APP_ID);
+        PropertiesUtil.checkConfig(properties, Model.UPDATE_TIME);
+        
+        PropertiesUtil.checkNaturalNumber( properties, Model.BATCHS_PACKAGE_SIZE, false);
+        PropertiesUtil.checkNaturalNumber( properties, Model.TTL, false);
+        PropertiesUtil.checkNumberFromTo( properties, Model.TASKSPEEDLIMIT, false,20,1000);
 	}
 
 	@Override
-	public HashMap<ByteString, ByteString> executeTikv(RawKVClient rawKvClient, HashMap<ByteString, ByteString> pairs,
-			HashMap<ByteString, String> pairs_lines, boolean hasTtl,String filePath,final Map<String, String> lineBlock) {
+	public HashMap<ByteString, ByteString> executeTikv(Map<String, Object> propParameters, RawKVClient rawKvClient, HashMap<ByteString, ByteString> pairs,
+			HashMap<ByteString, String> pairs_lines, boolean hasTtl,String filePath,final Map<String, String> lineBlock,int dataSize) {
 		List<Kvrpcpb.KvPair> kvHaveList = null;
         if (Model.ON.equals(properties.get(Model.CHECK_EXISTS_KEY))) {
             // skip not exists key.
             // For batch get to check exists kv
+        	List<ByteString> kvList = new ArrayList<>(pairs.keySet());
 	        Histogram.Timer batchGetTimer = REQUEST_LATENCY.labels("batch get").startTimer();
 	        try {
 	            // Batch get from raw kv.
-	            kvHaveList = rawKvClient.batchGet(new ArrayList<>(pairs.keySet()));
+	            kvHaveList = LimitSpeedkv.batchGet(rawKvClient,kvList,dataSize);
 	        } catch (Exception e) {
 	        	TaskInterface.BATCH_PUT_FAIL_COUNTER.labels("batch put fail").inc();
 	            throw e;
@@ -76,24 +90,19 @@ public class UnImport implements TaskInterface {
 	        finally{
 	        	batchGetTimer.observeDuration();
 	        }
-	        
-	        boolean isFind;
-	        for(Entry<ByteString, ByteString> obj:pairs.entrySet()){
-	        	isFind = false;
-	            for (Kvrpcpb.KvPair kv : kvHaveList) {
-	            	if(obj.getKey().equals(kv.getKey())){
-	            		isFind = true;
-	            		break;
+	        if(kvList.size() != kvHaveList.size()){
+	            for (int i=0;i<kvList.size();i++) {
+	            	if(!pairs.containsKey(kvList.get(i))){
+		            	auditLog.info("Skip not exists key={}, file={}, almost line={}", kvList.get(i).toStringUtf8(), filePath, lineBlock.get(pairs_lines.get(kvList.get(i))));
+		            	pairs.remove(kvList.get(i));
 	            	}
-	            }
-	            if(!isFind){
-	            	auditLog.info("Skip not exists key={}, file={}, almost line={}", obj.getKey().toStringUtf8(), filePath, pairs_lines.get(obj.getKey()));
-	            	pairs.remove(obj.getKey());
-	            }
+	            } 	
 	        }
+        	kvList.clear();
+        	kvList = null;
         }
         Histogram.Timer batchDeleteTimer = REQUEST_LATENCY.labels("batch delete").startTimer();
-		rawKvClient.batchDelete(new ArrayList<>(pairs.keySet()));
+        LimitSpeedkv.batchDelete(rawKvClient,new ArrayList<>(pairs.keySet()),dataSize);
 		batchDeleteTimer.observeDuration();
 		return pairs;
 	}
@@ -106,7 +115,7 @@ public class UnImport implements TaskInterface {
 	@Override
 	public void succeedWriteRowsLogger(String filePath, HashMap<ByteString, ByteString> pairs) {
 		for(Entry<ByteString, ByteString> obj:pairs.entrySet()){
-			getLogger().debug("File={}, key={}, value={}", filePath, obj.getKey().toStringUtf8(), obj.getValue().toStringUtf8());
+			logger.debug("File={}, key={}, value={}", filePath, obj.getKey().toStringUtf8(), obj.getValue().toStringUtf8());
 		}
 	}
 
@@ -136,7 +145,7 @@ public class UnImport implements TaskInterface {
 	@Override
 	public void finishedReport(String filePath, int importFileLineNum, int totalImportCount, int totalEmptyCount,
 			int totalSkipCount, int totalParseErrorCount, int totalBatchPutFailCount, int totalDuplicateCount,
-			long duration, LinkedHashMap<String, Long> ttlSkipTypeMap) {
+			long duration, LinkedHashMap<String, Long> ttlSkipTypeMap,Map<String, Object> propParameters) {
 		filesNum.incrementAndGet();
         StringBuilder result = new StringBuilder(
                 "["+getClass().getSimpleName()+" summary]" +
@@ -155,6 +164,11 @@ public class UnImport implements TaskInterface {
         }
         logger.info(result.toString());
 		
+	}
+
+	@Override
+	public void installPrivateParamters(Map<String, Object> propParameters) {
+		// TODO Auto-generated method stub
 	}
 	
 }

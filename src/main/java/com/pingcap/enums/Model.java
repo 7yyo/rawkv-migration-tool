@@ -44,6 +44,7 @@ public class Model {
     public static final String REDO_FAIL_LOG = "redoFailLog";
 
     public static final String TASK = "tikv.task";
+    public static final String TASKSPEEDLIMIT = "tikv.task.speedLimit";
     public static final String PD = "importer.tikv.pd";
 
     //public static final String CHECK_SUM_THREAD_NUM = "importer.checkSum.checkSumThreadNum";

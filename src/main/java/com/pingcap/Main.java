@@ -49,7 +49,7 @@ public class Main {
 
             if (properties.get(Model.PROMETHEUS_ENABLE) != null) {
                 if (Model.ON.equals(properties.get(Model.PROMETHEUS_ENABLE))) {
-                    PropertiesUtil.checkNaturalNumber(properties,Model.PROMETHEUS_PORT,false);
+                    PropertiesUtil.checkConfig(properties, Model.PROMETHEUS_PORT);
                     Prometheus.initPrometheus(Integer.parseInt(properties.get(Model.PROMETHEUS_PORT)));
                 }
             }

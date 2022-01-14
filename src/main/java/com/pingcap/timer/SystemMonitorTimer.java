@@ -7,6 +7,7 @@ import java.util.TimerTask;
 import com.pingcap.controller.BatchJob;
 import com.pingcap.controller.LineLoadingJob;
 import com.pingcap.enums.Model;
+import com.pingcap.rawkv.LimitSpeedkv;
 import com.pingcap.task.TaskInterface;
 import com.pingcap.util.FileUtil;
 import com.pingcap.util.OSUtils;
@@ -18,13 +19,14 @@ public class SystemMonitorTimer extends TimerTask {
 	private static final String prvNumberUnit[]={"KB","MB","GB"};
 	private TaskInterface cmdInterFace;
 	private List<long[]> traffic = new ArrayList<>();
-	
+
 	public SystemMonitorTimer(TaskInterface cmdInterFace){
 		this.cmdInterFace = cmdInterFace;
 		long curData[] = new long[2];
 		curData[0] = System.currentTimeMillis();
 		curData[1] = 0;
 		traffic.add(curData);
+		checkSpeedConfiguration();
 	}
 	
 	@Override
@@ -35,7 +37,8 @@ public class SystemMonitorTimer extends TimerTask {
         while (group != null) {
             topGroup = group;
             group = group.getParent();
-        }
+        }     
+        checkSpeedConfiguration();
         useCPURatio = OSUtils.getCPURatio();
 		cmdInterFace.getLogger().info("Process ratio, CPU={}%,MEM=({}/{}),TREADS={},FSCAN={},TJOB={},SPEED={}", 
 				String.format("%.2f", useCPURatio),
@@ -46,15 +49,28 @@ public class SystemMonitorTimer extends TimerTask {
 				BatchJob.totalUsedCount.get(),
 				getSpeedString(buffer));
 		 getDateAndUpdate(FileUtil.getFileLastTime(cmdInterFace.getProperties().get(Model.SYS_CFG_PATH)),true);
+		 buffer = null;
+	}
+	
+	private synchronized void checkSpeedConfiguration(){
+        double speedMax = java.lang.Double.MAX_VALUE;
+        String speedMaxStr = cmdInterFace.getProperties().get(Model.TASKSPEEDLIMIT);
+        if(null != speedMaxStr){
+        	speedMax = Integer.parseInt(speedMaxStr)*1024*1024;
+        }
+        if(LimitSpeedkv.getRateValue() != speedMax){
+        	LimitSpeedkv.setRateValue(speedMax);
+        }
 	}
 
 	private synchronized List<long[]> putData(){
 		long curData[] = new long[2];
-		curData[0] = System.currentTimeMillis();
-		curData[1] = TaskInterface.totalDataBytes.getAndSet(0);
+		curData[0] = System.currentTimeMillis();				// time
+		curData[1] = TaskInterface.totalDataBytes.getAndSet(0);	// bytes
 		traffic.add(curData);
 		if(5 < traffic.size())
 			traffic.remove(0);
+		curData = null;
 		List<long[]> buffer = new ArrayList<>(traffic.size());
 		buffer.addAll(traffic);
 		return buffer;
@@ -69,7 +85,9 @@ public class SystemMonitorTimer extends TimerTask {
 			timeValue += (curData[0] - preData[0])/2;
 			dataValue += (curData[1] + preData[1])/2;
 		}
-		return byteTo((dataValue*1000)/(timeValue+1));
+		if(0 == timeValue)
+			return "0,0byte";
+		return byteTo((dataValue*1000)/timeValue);
 	}
 	
 	public static String byteTo(long value){
