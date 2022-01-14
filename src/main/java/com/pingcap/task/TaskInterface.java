@@ -22,7 +22,7 @@ import io.prometheus.client.Counter;
 public interface TaskInterface {
 	static final Counter BATCH_PUT_FAIL_COUNTER = Counter.build().name("batch_put_fail_counter").help("Batch put fail counter.").labelNames("batch_put_fail").register();
     static final Histogram REQUEST_LATENCY = Histogram.build().name("requests_latency_seconds").help("Request latency in seconds.").labelNames("request_latency").register();
-    static public final AtomicInteger totalDataBytes = new AtomicInteger(0);
+    static public final AtomicInteger totalDataBytes = new AtomicInteger(0);  
     static public final AtomicInteger filesNum = new AtomicInteger(0);
     
 	public Logger getLogger();
@@ -31,7 +31,8 @@ public interface TaskInterface {
 
 	public Map<String, String> getProperties();
 	public void setProperties(Map<String, String> properties);
-	public HashMap<ByteString, ByteString> executeTikv(RawKVClient rawKvClient, HashMap<ByteString, ByteString> pairs, HashMap<ByteString, String> pairs_lines, boolean hasTtl,String filePath ,final Map<String, String> lineBlock);
+	public void installPrivateParamters(Map<String, Object> propParameters);
+	public HashMap<ByteString, ByteString> executeTikv(Map<String, Object> propParameters, RawKVClient rawKvClient, HashMap<ByteString, ByteString> pairs, HashMap<ByteString, String> pairs_lines, boolean hasTtl,String filePath ,final Map<String, String> lineBlock,int dataSize);
 	public void  succeedWriteRowsLogger(String filePath, HashMap<ByteString, ByteString> pairs);
 	public void  faildWriteRowsLogger(HashMap<ByteString, ByteString> pairs);
 	public ScannerInterface getInitScanner();
@@ -44,7 +45,7 @@ public interface TaskInterface {
 			int totalBatchPutFailCount,
 			int totalDuplicateCount,
 			long duration,
-			LinkedHashMap<String, Long> ttlSkipTypeMap);
+			LinkedHashMap<String, Long> ttlSkipTypeMap,Map<String, Object> propParameters);
 	
 	public void checkAllParameters(Map<String, String> properties);
 	public Histogram getHistogram();
@@ -62,4 +63,5 @@ public interface TaskInterface {
         PropertiesUtil.checkConfig(properties, DELIMITER_1);
         PropertiesUtil.checkConfig(properties, DELIMITER_2);
 	}
+	
 }

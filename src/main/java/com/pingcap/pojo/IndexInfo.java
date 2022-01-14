@@ -128,7 +128,7 @@ public class IndexInfo implements InfoInterface{
      * @param delimiter1   :   First delimiter
      * @param delimiter2   :   Second separator
      */
-    public static void csv2IndexInfo(IndexInfo indexInfo, String originalLine, String delimiter1, String delimiter2) throws Exception {
+    public static void csv2IndexInfo(IndexInfo indexInfo, String originalLine, String delimiter1, String delimiter2) {
 
 //        String targetId = originalLine.split(delimiter1)[2].split(delimiter2)[0];
 //        indexInfo.setTargetId(targetId);
@@ -145,10 +145,6 @@ public class IndexInfo implements InfoInterface{
 //            serviceTag.setQCRCRD_IND(v.split(delimiter2)[6]);
 //            indexInfo.setServiceTag(JSON.toJSONString(serviceTag));
 //        }
-
-        if (originalLine.split(delimiter1).length > 3) {
-            throw new Exception();
-        }
 
         String id = originalLine.split(delimiter1)[0];
         String type = originalLine.split(delimiter1)[1];

@@ -23,7 +23,7 @@ public class InitJson_IndexInfo {
     	}
     	else{
     		file = FileUtil.createFile("src/main/resources/testFile/indexInfo_json/indexInfo.json");
-    	}       
+    	}   
         FileOutputStream fileOutputStream = new FileOutputStream(file);
         FileChannel fileChannel = fileOutputStream.getChannel();
         int num = 90000001;

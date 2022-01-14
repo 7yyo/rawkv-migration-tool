@@ -65,32 +65,63 @@ public class PropertiesUtil {
         return;
     }
     
+    public static void checkNumberFromTo(Map<String, String> properties,String paramName,boolean canEmpty,int min,int max) {
+    	String temp = properties.get(paramName);
+    	if(null == temp) {
+    		if(canEmpty) {
+    			return;
+    		}
+    		else {
+                logger.error("Configuration {} of item must exist", paramName);
+                System.exit(0);    			
+    		}
+    	}
+    	temp = temp.trim();
+        if("".equals(temp)) {
+            logger.error("Configuration {} of item don't is blank character", paramName);
+            System.exit(0);
+        }
+        int num = Integer.parseInt(temp);
+        if(min > num || max < num) {
+            logger.error("Configuration {} of item from {} to {}", paramName,min,max);
+            System.exit(0);        	
+        }
+        return;
+    }
+    
     public static synchronized void reloadConfiguration(ThreadPoolExecutor threadPoolFileScanner,TaskInterface cmdInterFace){
-    	Map<String, String> oldProperties = cmdInterFace.getProperties();
-    	String configFilePath = oldProperties.get(Model.SYS_CFG_PATH);
-		Map<String, String> newProperties = PropertiesUtil.getProperties(configFilePath);
-		int ret = cmpConfigUpdate(oldProperties,newProperties,Model.CORE_POOL_SIZE,cmdInterFace);
-		if(0 != ret){
-			threadPoolFileScanner.setCorePoolSize(ret);
-		}
-		ret = cmpConfigUpdate(oldProperties,newProperties,Model.MAX_POOL_SIZE,cmdInterFace);
-		if(0 != ret){
-			threadPoolFileScanner.setMaximumPoolSize(ret);
-		}
-		cmpConfigUpdate(oldProperties,newProperties,Model.INTERNAL_THREAD_POOL,cmdInterFace);
-		cmpConfigUpdate(oldProperties,newProperties,Model.INTERNAL_MAXTHREAD_POOL,cmdInterFace);
-		cmpConfigUpdate(oldProperties,newProperties,Model.BATCHS_PACKAGE_SIZE,cmdInterFace);
-		cmpConfigUpdate(oldProperties,newProperties,Model.BATCH_SIZE,cmdInterFace);
+    	try{
+	    	Map<String, String> oldProperties = cmdInterFace.getProperties();
+	    	String configFilePath = oldProperties.get(Model.SYS_CFG_PATH);
+			Map<String, String> newProperties = PropertiesUtil.getProperties(configFilePath);
+			int ret = cmpConfigUpdate(oldProperties,newProperties,Model.CORE_POOL_SIZE,cmdInterFace);
+			if(0 != ret){
+				threadPoolFileScanner.setCorePoolSize(ret);
+			}
+			ret = cmpConfigUpdate(oldProperties,newProperties,Model.MAX_POOL_SIZE,cmdInterFace);
+			if(0 != ret){
+				threadPoolFileScanner.setMaximumPoolSize(ret);
+			}
+			cmpConfigUpdate(oldProperties,newProperties,Model.INTERNAL_THREAD_POOL,cmdInterFace);
+			cmpConfigUpdate(oldProperties,newProperties,Model.INTERNAL_MAXTHREAD_POOL,cmdInterFace);
+			cmpConfigUpdate(oldProperties,newProperties,Model.BATCHS_PACKAGE_SIZE,cmdInterFace);
+			cmpConfigUpdate(oldProperties,newProperties,Model.BATCH_SIZE,cmdInterFace);
+			cmpConfigUpdate(oldProperties,newProperties,Model.TASKSPEEDLIMIT,cmdInterFace);
+    	}
+    	catch(Exception e){
+    		e.printStackTrace();
+    	}
     }
     
     private static int cmpConfigUpdate(Map<String, String> oldProperties,Map<String, String> newProperties,String itemText,TaskInterface cmdInterFace){
-    	int oldVaue = Integer.parseInt(oldProperties.get(itemText));
+    	int oldValue = Integer.parseInt(oldProperties.get(itemText));
 		int newValue = Integer.parseInt(newProperties.get(itemText));
-		if(newValue != oldVaue){
-			cmdInterFace.getLogger().info("The configuration {} has been modified (old={},new={}), reload ...",itemText,oldVaue,newValue);
+		if(newValue != oldValue){
+			cmdInterFace.getLogger().info("The configuration {} has been modified (old={},new={}), reload ...",itemText,oldValue,newValue);
 			oldProperties.put(itemText,""+newValue);
 			return newValue;
 		}
 		return 0;
     }
+    
 }

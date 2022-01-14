@@ -34,23 +34,25 @@ import com.pingcap.util.PropertiesUtil;
 import com.pingcap.pojo.IndexInfo;
 import com.pingcap.pojo.InfoInterface;
 import com.pingcap.pojo.TempIndexInfo;
+import com.pingcap.rawkv.LimitSpeedkv;
+
 import io.prometheus.client.Histogram;
 
 public class CheckSum implements TaskInterface {
     private static final Logger logger = LoggerFactory.getLogger(Model.LOG);
     private static final Logger checkSumLog = LoggerFactory.getLogger(CHECK_SUM_LOG);
     private static final Logger csFailLog = LoggerFactory.getLogger(CS_FAIL_LOG);
+    private static final String AtomicInteger_checkSumFail = "_checkSumFail";
+    private static final String AtomicInteger_notInsert = "_notInsert";
     private Map<String, String> properties = null;
-    
+
     //private String pid = JavaUtil.getPid();
     private Histogram CHECK_SUM_DURATION = Histogram.build().name("checksum_duration").help("Check sum duration").labelNames("type").register();
     
-    @SuppressWarnings("unused")
-	private long ttl = 0;
-    // Total not in rawKv num
+  /*    // Total not in rawKv num
     AtomicInteger notInsert = new AtomicInteger(0);
     // Total check sum fail num
-    AtomicInteger checkSumFail = new AtomicInteger(0);
+    AtomicInteger checkSumFail = new AtomicInteger(0);*/
     DataFactory dataFactory;
     
 	public CheckSum() {
@@ -87,11 +89,12 @@ public class CheckSum implements TaskInterface {
         // Skip ttl put when check sum.
         PropertiesUtil.checkConfig(properties, Model.TTL_PUT_TYPE);
         dataFactory = DataFactory.getInstance(properties.get(Model.MODE),properties);
+        PropertiesUtil.checkNumberFromTo( properties, Model.TASKSPEEDLIMIT, false,20,1000);
 	}
 
 	@Override
-	public HashMap<ByteString, ByteString> executeTikv(RawKVClient rawKvClient, HashMap<ByteString, ByteString> pairs,
-			HashMap<ByteString, String> pairs_lines, boolean hasTtl,String filePath,final Map<String, String> lineBlock) {
+	public HashMap<ByteString, ByteString> executeTikv(Map<String, Object> propParameters,RawKVClient rawKvClient, HashMap<ByteString, ByteString> pairs,
+			HashMap<ByteString, String> pairs_lines, boolean hasTtl,String filePath,final Map<String, String> lineBlock,int dataSize) {
 		Histogram.Timer batchGetTimer = CHECK_SUM_DURATION.labels("batch_get").startTimer();
 		List<Kvrpcpb.KvPair> kvList = null;
 
@@ -102,7 +105,7 @@ public class CheckSum implements TaskInterface {
 			clazz = new IndexInfo();
 		try {
 			// Batch get keys which to check sum
-			kvList = rawKvClient.batchGet(keyList);
+			kvList = LimitSpeedkv.batchGet(rawKvClient,keyList,dataSize);
 		} catch (Exception e) {
             for (Entry<ByteString, ByteString> originalKv : pairs.entrySet()) {
             	logger.error("Batch get failed.Key={}, file={}, almost line={}", originalKv.getKey().toStringUtf8(), filePath, lineBlock.get(pairs_lines.get(originalKv.getKey())));
@@ -110,9 +113,9 @@ public class CheckSum implements TaskInterface {
             throw e;
         }
 		finally{
-			keyList.clear();
 			batchGetTimer.observeDuration();
 		}
+
 		Map<ByteString, InfoInterface> rawKvResultMap = new HashMap<>(kvList.size());
         for (Kvrpcpb.KvPair kvPair : kvList) {
         	infoRawKV = (InfoInterface)JSONObject.parseObject(kvPair.getValue().toStringUtf8(), clazz.getClass());
@@ -122,32 +125,38 @@ public class CheckSum implements TaskInterface {
         kvList = null;
         int iCheckSumFail=0,iNotInsert=0;
         Histogram.Timer csTimer = CHECK_SUM_DURATION.labels("check_sum").startTimer();
-        for (Entry<ByteString, ByteString> originalKv : pairs.entrySet()) {
-        	infoRawKV = rawKvResultMap.get(originalKv.getKey());
+        ByteString curKey;
+        for (int i=0;i<keyList.size();i++) {
+        	curKey = keyList.get(i);
+        	infoRawKV = rawKvResultMap.get(curKey);
             if (null != infoRawKV) {
-            	tmpRawKV = (InfoInterface)JSONObject.parseObject(originalKv.getValue().toStringUtf8(), clazz.getClass());
+            	tmpRawKV = (InfoInterface)JSONObject.parseObject(pairs.get(curKey).toStringUtf8(), clazz.getClass());
                 if (!infoRawKV.equalsValue(tmpRawKV)) {
-                    checkSumLog.error("Check sum failed. Key={}", originalKv.getKey().toStringUtf8());
-                    csFailLog.info(lineBlock.get(pairs_lines.get(originalKv.getKey())));
-                    pairs.remove(originalKv.getKey());
-                    pairs_lines.remove(originalKv.getKey());
+                    checkSumLog.error("Check sum failed. Key={}", curKey.toStringUtf8());
+                    csFailLog.info(lineBlock.get(pairs_lines.get(curKey)));
+                    pairs.remove(curKey);
+                    pairs_lines.remove(curKey);
                     ++iCheckSumFail;
                 }
             } else {
-                checkSumLog.error("Key={} is not exists.", originalKv.getKey().toStringUtf8());
-                infoRawKV = (InfoInterface)JSONObject.parseObject(originalKv.getValue().toStringUtf8(), clazz.getClass());
-                csFailLog.info(lineBlock.get(pairs_lines.get(originalKv.getKey())));
-                pairs.remove(originalKv.getKey());
-                pairs_lines.remove(originalKv.getKey());
+                checkSumLog.error("Key={} is not exists.", curKey.toStringUtf8());
+                infoRawKV = (InfoInterface)JSONObject.parseObject(pairs.get(curKey).toStringUtf8(), clazz.getClass());
+                csFailLog.info(lineBlock.get(pairs_lines.get(curKey)));
+                pairs.remove(curKey);
+                pairs_lines.remove(curKey);
                 ++iNotInsert;
             }
         }
+        keyList.clear();
+        keyList = null;
         rawKvResultMap.clear();
         rawKvResultMap = null;
-        if(0<iCheckSumFail)
-        	checkSumFail.addAndGet(iCheckSumFail);
-        if(0<iNotInsert)
-        	notInsert.addAndGet(iNotInsert);
+        if(0<iCheckSumFail){
+        	((AtomicInteger)propParameters.get(AtomicInteger_checkSumFail)).addAndGet(iCheckSumFail);
+        }
+        if(0<iNotInsert){
+        	((AtomicInteger)propParameters.get(AtomicInteger_notInsert)).addAndGet(iNotInsert);
+        }
         csTimer.observeDuration();
 		return pairs;
 	}
@@ -159,9 +168,11 @@ public class CheckSum implements TaskInterface {
 
 	@Override
 	public void succeedWriteRowsLogger(String filePath, HashMap<ByteString, ByteString> pairs) {
-		for(Entry<ByteString, ByteString> obj:pairs.entrySet()){
+	/*	//CheckSum not record sucess log
+	for(Entry<ByteString, ByteString> obj:pairs.entrySet()){
 			getLogger().debug("File={}, key={}, value={}", filePath, obj.getKey().toStringUtf8(), obj.getValue().toStringUtf8());
 		}
+	*/
 	}
 
 	@Override
@@ -190,14 +201,19 @@ public class CheckSum implements TaskInterface {
 	@Override
 	public void finishedReport(String filePath, int importFileLineNum, int totalImportCount, int totalEmptyCount,
 			int totalSkipCount, int totalParseErrorCount, int totalBatchPutFailCount, int totalDuplicateCount,
-			long duration, LinkedHashMap<String, Long> ttlSkipTypeMap) {
+			long duration, LinkedHashMap<String, Long> ttlSkipTypeMap,Map<String, Object> propParameters) {
         SimpleDateFormat simpleDateFormat = new SimpleDateFormat("yyyyMMddHHmmss");
         String now = simpleDateFormat.format(new Date());
         String moveFilePath = properties.get(Model.CHECK_SUM_MOVE_PATH);
+
+        int iCheckSumFail = ((AtomicInteger)propParameters.get(AtomicInteger_checkSumFail)).get();
+        int iNotInsert = ((AtomicInteger)propParameters.get(AtomicInteger_notInsert)).get();
+
         File checkSumFile = new File(filePath);
         File moveFile = new File(moveFilePath + "/" + now + "/" + checkSumFile.getName() + "." + filesNum.incrementAndGet());
         try {
-            FileUtils.moveFile(checkSumFile, moveFile);
+        	if(!checkSumFile.getParentFile().getAbsolutePath().equals(moveFile.getParentFile().getAbsolutePath()))
+        		FileUtils.moveFile(checkSumFile, moveFile);
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -209,14 +225,20 @@ public class CheckSum implements TaskInterface {
                         "empty=" + totalEmptyCount + ", " +
                         "skip=" + totalSkipCount + ", " +
                         "parseErr=" + totalParseErrorCount + ", " +
-                        "notExits=" + notInsert.get() + ", " +
-                        "checkSumFail=" + checkSumFail.get() + ", " +
+                        "notExits=" + iNotInsert + ", " +
+                        "checkSumFail=" + iCheckSumFail + ", " +
                         "duration=" + duration / 1000 + "s, ");
         result.append("Skip type[");
         for (Map.Entry<String, Long> item : ttlSkipTypeMap.entrySet()) {
             result.append("<").append(item.getKey()).append(">").append("[").append(item.getValue()).append("]").append("]");
         }
         logger.info(result.toString());
+	}
+
+	@Override
+	public void installPrivateParamters(Map<String, Object> propParameters) {
+    	propParameters.put(AtomicInteger_notInsert, new AtomicInteger(0));
+    	propParameters.put(AtomicInteger_checkSumFail, new AtomicInteger(0));
 	}
 	
 }

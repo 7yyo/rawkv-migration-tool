@@ -18,6 +18,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class BatchJob implements Runnable {
 	public static final AtomicInteger totalUsedCount = new AtomicInteger(0);
 	private static int BUFFER_SIZE = 4096;
+	private final Map<String, Object> propParameters;
     private final String absolutePath;
     private final TiSession tiSession;
     private final List<String> ttlSkipTypeList;
@@ -25,6 +26,7 @@ public class BatchJob implements Runnable {
     private final List<String> ttlPutList;
     @SuppressWarnings({ "unchecked", "rawtypes" })
     private final Map<String, String> lineBlock = new HashMap(BUFFER_SIZE);
+    private final AtomicInteger processFileLines;
     private final AtomicInteger totalImportCount;
     private final AtomicInteger totalEmptyCount;
     private final AtomicInteger totalSkipCount;
@@ -44,6 +46,7 @@ public class BatchJob implements Runnable {
 	
     public BatchJob(
             TiSession tiSession,
+            AtomicInteger processFileLines,
             AtomicInteger totalImportCount,
             AtomicInteger totalEmptyCount,
             AtomicInteger totalSkipCount,
@@ -56,8 +59,10 @@ public class BatchJob implements Runnable {
             CountDownLatch countDownLatch,
             AtomicInteger totalDuplicateCount,
             List<String> ttlPutList,
-            TaskInterface cmdInterFace) {
+            TaskInterface cmdInterFace,
+            Map<String, Object> propParameters) {
     	totalUsedCount.incrementAndGet();
+    	this.processFileLines = processFileLines;
         this.totalImportCount = totalImportCount;
         this.tiSession = tiSession;
         this.totalEmptyCount = totalEmptyCount;
@@ -72,6 +77,7 @@ public class BatchJob implements Runnable {
         this.countDownLatch = countDownLatch;
         this.totalDuplicateCount = totalDuplicateCount;
         this.cmdInterFace = cmdInterFace;
+        this.propParameters = propParameters;
     }
 
     @Override
@@ -80,6 +86,7 @@ public class BatchJob implements Runnable {
         String scenes = properties.get(Model.SCENES);
         String importMode = properties.get(Model.MODE);
         final int batchSize = Integer.parseInt(properties.get(Model.BATCH_SIZE));
+        int processCounts;
 
         RawKVClient rawKvClient = tiSession.createRawClient();
 
@@ -90,11 +97,11 @@ public class BatchJob implements Runnable {
         for(Entry<String, String> pos:lineBlock.entrySet()) {
             String lineNo= pos.getKey();
             line = pos.getValue();
-
             // If import file has blank line, continue, recode skip + 1.
             if (StringUtils.isBlank(line)) {
             	cmdInterFace.getLogger().warn("There is blank lines in the file={}, line={}", absolutePath, lineNo);
             	totalEmptyCount.incrementAndGet();
+            	processFileLines.incrementAndGet();
                 continue;
             }
 
@@ -147,6 +154,7 @@ public class BatchJob implements Runnable {
 					}
 				});
             } catch (Exception e) {
+            	processFileLines.incrementAndGet();
             	totalParseErrorCount.getAndIncrement();
             	cmdInterFace.getLoggerAudit().error("Parse failed, file={}, data={}, line={}", absolutePath, line, lineNo);
             	continue;
@@ -154,36 +162,41 @@ public class BatchJob implements Runnable {
             finally{
             	parseJsonTimer.observeDuration();
             }
-        	if(!notData)
+        	if(!notData){
+        		processFileLines.incrementAndGet();
         		continue;
-        	
-        	if(batchSize <= kvPairs.size()+kvPairsTtl.size()){
+        	}
+        	processCounts = kvPairs.size()+kvPairsTtl.size();
+        	if(batchSize <= processCounts){
 	            if(0 < kvPairs.size()){
-	        		if(doWriteTikv( rawKvClient, kvPairs, kvPairs_lines, lineBlock, false)){
-	            		TaskInterface.totalDataBytes.getAndAdd(dataSize);
+	        		if(doWriteTikv( rawKvClient, kvPairs, kvPairs_lines, lineBlock, false,dataSize)){
+	            		TaskInterface.totalDataBytes.addAndGet(dataSize);
 	            		dataSize = 0;
 	        		}
 	            }
 	
 	            if(0 < kvPairsTtl.size()){
-	        		if(doWriteTikv( rawKvClient, kvPairsTtl, kvPairsTtl_lines, lineBlock, true)){
-	            		TaskInterface.totalDataBytes.getAndAdd(dataTtlSize);
+	        		if(doWriteTikv( rawKvClient, kvPairsTtl, kvPairsTtl_lines, lineBlock, true,dataTtlSize)){
+	            		TaskInterface.totalDataBytes.addAndGet(dataTtlSize);
 	            		dataTtlSize = 0;
 	        		}
 	        	}
+	            processFileLines.addAndGet(processCounts);
         	}
         }
-        if(0 < kvPairs.size()+kvPairsTtl.size()){
+        processCounts = kvPairs.size()+kvPairsTtl.size();
+        if(0 < processCounts){
 	    	if(0 < kvPairs.size()){
-	    		if(doWriteTikv( rawKvClient, kvPairs, kvPairs_lines, lineBlock, false)){
-	        		TaskInterface.totalDataBytes.getAndAdd(dataSize);
+	    		if(doWriteTikv( rawKvClient, kvPairs, kvPairs_lines, lineBlock, false,dataSize)){
+	        		TaskInterface.totalDataBytes.addAndGet(dataSize);
 	    		}
 	    	}
 	    	if(0 < kvPairsTtl.size()){
-	    		if(doWriteTikv( rawKvClient, kvPairsTtl, kvPairsTtl_lines, lineBlock, true)){
-	        		TaskInterface.totalDataBytes.getAndAdd(dataTtlSize);
+	    		if(doWriteTikv( rawKvClient, kvPairsTtl, kvPairsTtl_lines, lineBlock, true,dataTtlSize)){
+	        		TaskInterface.totalDataBytes.addAndGet(dataTtlSize);
 	    		}
 	    	}
+	    	processFileLines.addAndGet(processCounts);
         }
     	properties = null;
     	lineBlock.clear();
@@ -203,27 +216,24 @@ public class BatchJob implements Runnable {
         totalUsedCount.decrementAndGet();
     }
  
-    private boolean doWriteTikv(RawKVClient rawKvClient,HashMap<ByteString, ByteString> pairs, HashMap<ByteString, String> pairs_lines,Map<String,String> lineBlock, boolean hasTtl){
+    private boolean doWriteTikv(RawKVClient rawKvClient,HashMap<ByteString, ByteString> pairs, HashMap<ByteString, String> pairs_lines,Map<String,String> lineBlock, boolean hasTtl,int dataSize){
     	boolean ret = true;
 		try {
-			cmdInterFace.executeTikv(rawKvClient, pairs, pairs_lines, hasTtl, absolutePath, lineBlock);
-			totalImportCount.addAndGet(pairs.size());
+			cmdInterFace.executeTikv(propParameters, rawKvClient, pairs, pairs_lines, hasTtl, absolutePath, lineBlock,dataSize);
+		 	totalImportCount.addAndGet(pairs.size());
 			cmdInterFace.succeedWriteRowsLogger(absolutePath, pairs);
 		}
 		catch(Exception e){
 			ret = false;
 			totalBatchPutFailCount.addAndGet(pairs.size());
 			cmdInterFace.faildWriteRowsLogger(pairs);
-			cmdInterFace.getLoggerFail().error("Failed to batch put{}, file={}, size={}, line={}", hasTtl?"TTL":"", absolutePath, pairs_lines.size(), pairs_lines.values().toString());
+			cmdInterFace.getLogger().error("Failed to batch put{}, file={}, size={}", hasTtl?" TTL":"", absolutePath, pairs_lines.size());
 		}
 		finally{
     		int jumpExistCount = pairs_lines.size()-pairs.size();
     		if(0 < jumpExistCount){
     			totalSkipCount.addAndGet(jumpExistCount);
     		}
-/*    		for(Entry<ByteString, String> pos:pairs_lines.entrySet()){
-    			lineBlock.remove(pos.getValue());
-    		}*/
     		pairs.clear();
     		pairs_lines.clear();
 		}

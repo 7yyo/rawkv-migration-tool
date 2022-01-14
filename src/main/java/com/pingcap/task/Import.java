@@ -16,6 +16,7 @@ import org.tikv.shade.com.google.protobuf.ByteString;
 import com.pingcap.controller.FileScanner;
 import com.pingcap.controller.ScannerInterface;
 import com.pingcap.enums.Model;
+import com.pingcap.rawkv.LimitSpeedkv;
 import com.pingcap.util.PropertiesUtil;
 import io.prometheus.client.Histogram;
 
@@ -65,46 +66,43 @@ public class Import implements TaskInterface {
         
         PropertiesUtil.checkNaturalNumber( properties, Model.BATCHS_PACKAGE_SIZE, false);
         PropertiesUtil.checkNaturalNumber( properties, Model.TTL, false);
+        PropertiesUtil.checkNumberFromTo( properties, Model.TASKSPEEDLIMIT, false,20,1000);
+        ttl = Integer.parseInt(properties.get(Model.TTL));
 	}
 
 	@Override
-	public HashMap<ByteString, ByteString> executeTikv(RawKVClient rawKvClient, HashMap<ByteString, ByteString> pairs,
-			HashMap<ByteString, String> pairs_lines, boolean hasTtl,String filePath,final Map<String, String> lineBlock) {
-		long startTime = System.currentTimeMillis();
+	public HashMap<ByteString, ByteString> executeTikv(Map<String, Object> propParameters, RawKVClient rawKvClient, HashMap<ByteString, ByteString> pairs,
+			HashMap<ByteString, String> pairs_lines, boolean hasTtl,String filePath,final Map<String, String> lineBlock,int dataSize) {
         List<Kvrpcpb.KvPair> kvHaveList = null;
         if (Model.ON.equals(properties.get(Model.CHECK_EXISTS_KEY))) {
-            // Only json file skip exists key.
-            ////String importMode = properties.get(Model.MODE);
-            ////if (Model.JSON_FORMAT.equals(importMode)) {
-
                 // For batch get to check exists kv
-                ////List<ByteString> kvList = new ArrayList<>(pairs.keySet());
+                List<ByteString> kvList = new ArrayList<>(pairs.keySet());
                 Histogram.Timer batchGetTimer = REQUEST_LATENCY.labels("batch get").startTimer();
                 try {
                     // Batch get from raw kv.
-                    kvHaveList = rawKvClient.batchGet(new ArrayList<>(pairs.keySet()));
+                    kvHaveList = LimitSpeedkv.batchGet(rawKvClient,kvList,dataSize);
                 } catch (Exception e) {
                 	TaskInterface.BATCH_PUT_FAIL_COUNTER.labels("batch put fail").inc();
                     throw e;
                 }
                 finally{
+                	kvList.clear();
+                	kvList = null;
                 	batchGetTimer.observeDuration();
                 }
                 for (Kvrpcpb.KvPair kv : kvHaveList) {	
                 	auditLog.info("Skip exists key={}, file={}, almost line={}", kv.getKey().toStringUtf8(), filePath, lineBlock.get(pairs_lines.get(kv.getKey())));
                 	pairs.remove(kv.getKey());
                 }
-            ////}
         }
         Histogram.Timer batchPutTimer = REQUEST_LATENCY.labels("batch put").startTimer();
     	if(hasTtl) {
-    		rawKvClient.batchPut(pairs);
+    		LimitSpeedkv.batchPut(rawKvClient,pairs,dataSize);
     	}
     	else {
-    		rawKvClient.batchPut(pairs,ttl);
+    		LimitSpeedkv.batchPut(rawKvClient,pairs,ttl,dataSize);
     	}
     	batchPutTimer.observeDuration();
-		logger.debug("executeTikv, File={}, linesSize={}, usedTime={}", filePath, pairs.size(), String.format("%.2f", (float)(System.currentTimeMillis()-startTime)/1000));
 		return pairs;
 	}
 
@@ -153,7 +151,8 @@ public class Import implements TaskInterface {
 			int totalBatchPutFailCount,
 			int totalDuplicateCount,
 			long duration,
-			LinkedHashMap<String, Long> ttlSkipTypeMap){
+			LinkedHashMap<String, Long> ttlSkipTypeMap,
+			Map<String, Object> propParameters){
 		filesNum.incrementAndGet();
         StringBuilder result = new StringBuilder(
                 "["+getClass().getSimpleName()+" summary]" +
@@ -172,5 +171,10 @@ public class Import implements TaskInterface {
         }
         logger.info(result.toString());
         
+	}
+
+	@Override
+	public void installPrivateParamters(Map<String, Object> propParameters) {
+		// TODO Auto-generated method stub
 	}
 }
