@@ -97,10 +97,10 @@ public class Import implements TaskInterface {
         }
         Histogram.Timer batchPutTimer = REQUEST_LATENCY.labels("batch put").startTimer();
     	if(hasTtl) {
-    		LimitSpeedkv.batchPut(rawKvClient,pairs,dataSize);
+    		LimitSpeedkv.batchPut(rawKvClient,pairs,ttl,dataSize);	
     	}
     	else {
-    		LimitSpeedkv.batchPut(rawKvClient,pairs,ttl,dataSize);
+    		LimitSpeedkv.batchPut(rawKvClient,pairs,dataSize);
     	}
     	batchPutTimer.observeDuration();
 		return pairs;
