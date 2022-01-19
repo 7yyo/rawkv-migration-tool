@@ -39,7 +39,7 @@ public class Export implements TaskInterface {
     private String exportFilePath;
     private int batchSize = 0;
     private int startLine=0;
-    private static final String EXPORT_FILE_PATH = "/export_%s_%d-%d.txt";
+    private static final String EXPORT_FILE_PATH = "/export_%s_%d_%d-%d.txt";
     private Histogram EXPORT_DURATION = Histogram.build().name("Export_duration_"+pid).help("export duration").labelNames("type").register();
     private final AtomicInteger totalExportCount = new AtomicInteger(0);
     private final AtomicInteger totalExportIndexType = new AtomicInteger(0);
@@ -47,6 +47,7 @@ public class Export implements TaskInterface {
     private final AtomicInteger totalExportTempIndex = new AtomicInteger(0);
     private final AtomicInteger totalParserError = new AtomicInteger(0);
     private final AtomicInteger totalIOError = new AtomicInteger(0);
+
     Map<String,Object[]> fileChannelList = new HashMap<>();
     
 	public Export() {
@@ -88,15 +89,16 @@ public class Export implements TaskInterface {
 		//FileOutputStream fileOutputStream;
 		Object[] vec = fileChannelList.get(channelName);
 		if(null == vec){
+			int filenum = filesNum.incrementAndGet();
 			vec = new Object[3];
-            File file = FileUtil.createFile(String.format(exportFilePath + EXPORT_FILE_PATH, channelName,startLine,batchSize));
+            File file = FileUtil.createFile(String.format(exportFilePath + EXPORT_FILE_PATH, channelName,filenum,startLine,batchSize));
             try {
             	@SuppressWarnings("resource")
 				FileOutputStream fileOutputStream = new FileOutputStream(file);
             	FileChannel fileChannel = fileOutputStream.getChannel();
             	vec[0] = fileOutputStream;
             	vec[1] = fileChannel;
-            	vec[2] = (int)0;
+            	vec[2] = 0;
                 fileChannelList.put( channelName, vec);
             } catch (FileNotFoundException e) {
                 e.printStackTrace();
@@ -108,6 +110,7 @@ public class Export implements TaskInterface {
 	public void closeWriteFileChannel(String channelName,Object[] vec){
 		//Object[] vec = fileChannelList.get(channelName);
 		if(null != vec){
+			vec[2] = 0;
 			FileOutputStream fileOutputStream = (FileOutputStream)vec[0];
 			FileChannel fileChannel = (FileChannel)vec[1];
 			if(null != fileChannel){
@@ -119,6 +122,11 @@ public class Export implements TaskInterface {
 			}
 			if(null != fileOutputStream){
 				try {
+					fileOutputStream.flush();
+				} catch (IOException e1) {
+					e1.printStackTrace();
+				}
+				try {
 					fileOutputStream.close();
 				} catch (IOException e) {
 					fileOutputStream = null;
@@ -128,14 +136,14 @@ public class Export implements TaskInterface {
 		}
 	}
 	
-	public Object[] putWriteFileChannel(String channelName,Object[] vec,StringBuilder kvPair) throws IOException{
-		if(null == vec)
-			vec = getWriteFileChannel(channelName);
+	public Object[] putWriteFileChannel(String channelName,StringBuilder kvPair) throws IOException{
+		Object[] vec = getWriteFileChannel(channelName);
 		int num = (int)vec[2];
 		num ++;
 		if(num >= batchSize){
 			closeWriteFileChannel(channelName,vec);
 			vec = getWriteFileChannel(channelName);
+			num = 1;
 		}
 
 		vec[2] = num;
@@ -158,7 +166,6 @@ public class Export implements TaskInterface {
 	public void executeSaveTo(List<Kvrpcpb.KvPair> kvPairList, int startLine,int curLines,String filePath) {
 		Histogram.Timer transformDuration;
         StringBuilder kvPair = new StringBuilder();
-        Object[][] writer = new Object[3][];
         boolean ret;
         DataFactory dataFactory = DataFactory.getInstance(properties.get(Model.MODE),properties);
         for (int i = startLine; i < kvPairList.size(); i++) {
@@ -173,15 +180,15 @@ public class Export implements TaskInterface {
 							switch(typeInt){
 							case 0:
 								totalExportIndexType.incrementAndGet();
-				                writer[0] = putWriteFileChannel(Model.INDEX_TYPE,writer[0],kvPair);
+				                putWriteFileChannel(Model.INDEX_TYPE,kvPair);
 								break;
 							case 1:
 								totalExportIndexInfo.incrementAndGet();
-								writer[1] = putWriteFileChannel(Model.INDEX_INFO,writer[1],kvPair);
+								putWriteFileChannel(Model.INDEX_INFO,kvPair);
 								break;
 							default:
 								totalExportTempIndex.incrementAndGet();
-				            	writer[2] = putWriteFileChannel(Model.TEMP_INDEX_INFO,writer[2],kvPair);	
+				            	putWriteFileChannel(Model.TEMP_INDEX_INFO,kvPair);	
 							}
 							return true;
 						}
@@ -245,7 +252,6 @@ public class Export implements TaskInterface {
 	
 	public void printFinishedInfo(int total,long duration){
 		final String headLogger = "["+this.getClass().getSimpleName()+" summary]";
-		filesNum.incrementAndGet();
 		StringBuilder result = new StringBuilder(
         		headLogger +
                         " file=" + properties.get(Model.EXPORT_FILE_PATH) + ", " +
