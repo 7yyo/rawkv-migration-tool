@@ -210,10 +210,13 @@ public class CheckSum implements TaskInterface {
         int iNotInsert = ((AtomicInteger)propParameters.get(AtomicInteger_notInsert)).get();
 
         File checkSumFile = new File(filePath);
-        File moveFile = new File(moveFilePath + "/" + now + "/" + checkSumFile.getName() + "." + filesNum.incrementAndGet());
+        File moveFile = new File(moveFilePath);
         try {
-        	if(!checkSumFile.getParentFile().getAbsolutePath().equals(moveFile.getParentFile().getAbsolutePath()))
+        	int total = filesNum.incrementAndGet();
+        	if(!checkSumFile.getParentFile().getAbsolutePath().equals(moveFile.getAbsolutePath())){
+        		moveFile = new File(moveFilePath + "/" + now + "/" + checkSumFile.getName() + "." + total);
         		FileUtils.moveFile(checkSumFile, moveFile);
+        	}
         } catch (IOException e) {
             e.printStackTrace();
         }
