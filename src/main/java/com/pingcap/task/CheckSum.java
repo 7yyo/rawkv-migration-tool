@@ -28,8 +28,8 @@ import org.tikv.shade.com.google.protobuf.ByteString;
 import com.alibaba.fastjson.JSONObject;
 import com.pingcap.controller.FileScanner;
 import com.pingcap.controller.ScannerInterface;
-import com.pingcap.dataformat.DataFactory;
 import com.pingcap.enums.Model;
+import com.pingcap.util.FileUtil;
 import com.pingcap.util.PropertiesUtil;
 import com.pingcap.pojo.IndexInfo;
 import com.pingcap.pojo.InfoInterface;
@@ -48,12 +48,6 @@ public class CheckSum implements TaskInterface {
 
     //private String pid = JavaUtil.getPid();
     private Histogram CHECK_SUM_DURATION = Histogram.build().name("checksum_duration").help("Check sum duration").labelNames("type").register();
-    
-  /*    // Total not in rawKv num
-    AtomicInteger notInsert = new AtomicInteger(0);
-    // Total check sum fail num
-    AtomicInteger checkSumFail = new AtomicInteger(0);*/
-    DataFactory dataFactory;
     
 	public CheckSum() {
 		// TODO Auto-generated constructor stub
@@ -88,8 +82,10 @@ public class CheckSum implements TaskInterface {
         PropertiesUtil.checkConfig(properties, TTL_SKIP_TYPE);
         // Skip ttl put when check sum.
         PropertiesUtil.checkConfig(properties, Model.TTL_PUT_TYPE);
-        dataFactory = DataFactory.getInstance(properties.get(Model.MODE),properties);
         PropertiesUtil.checkNumberFromTo( properties, Model.TASKSPEEDLIMIT, false,20,1000);
+        String moveFilePath = properties.get(Model.CHECK_SUM_MOVE_PATH);
+        // MoveFilePath
+        FileUtil.createFolder(moveFilePath);
 	}
 
 	@Override

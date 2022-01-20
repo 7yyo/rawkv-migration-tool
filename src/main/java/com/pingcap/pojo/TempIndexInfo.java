@@ -11,6 +11,7 @@ public class TempIndexInfo implements InfoInterface{
     private String id;
     private String appId;
     private String targetId;
+    private String updateTime;
     private String opType;
     private String duration;
 
@@ -45,7 +46,16 @@ public class TempIndexInfo implements InfoInterface{
     public void setId(String id) {
         this.id = id;
     }
-
+    
+	@Override
+	public String getUpdateTime() {
+		return updateTime;
+	}
+	
+    public void setUpdateTime(String updateTime) {
+        this.updateTime = updateTime;
+    }
+    
     public String getOpType() {
         return opType;
     }
@@ -100,5 +110,5 @@ public class TempIndexInfo implements InfoInterface{
 	public boolean equalsValue(Object indexInfo) {
 		return equals((TempIndexInfo)indexInfo);
 	}
-
+	
 }
