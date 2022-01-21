@@ -40,9 +40,21 @@ public class DataFormatForCsv implements DataFormatInterface {
 		String type = null;
 		ByteString key = ByteString.EMPTY, value = ByteString.EMPTY;
 		if(Model.INDEX_TYPE.equals(scenes)) {
-			String arr[] = line.split(Model.INDEX_TYPE_DELIMITER);
-			if(2 != arr.length)
+			if(Model.INDEX_TYPE_DELIMITER.equals(line))
 				throw new Exception("IndexType format error");
+			String arr[] = line.split(Model.INDEX_TYPE_DELIMITER);
+			if(2 != arr.length){
+				//key@ value is null allowed 
+				if(1 == arr.length && line.endsWith(Model.INDEX_TYPE_DELIMITER)){
+					String temp = arr[0];
+					arr = new String[2];
+					arr[0] = temp;
+					arr[1] = "";
+				}
+				else{
+					throw new Exception("IndexType format error");
+				}
+			}
 			if(StringUtils.isBlank(arr[0]))
 				throw new Exception("IndexType key is empty");
             // Key@Value
@@ -58,6 +70,8 @@ public class DataFormatForCsv implements DataFormatInterface {
 		    if(3 != arr.length)
 		    	throw new Exception("indexInfo format error");
 	        final String id = arr[0];
+	        if(StringUtils.isEmpty(id))
+	        	throw new Exception("indexInfo format error");
 	        type = arr[1];
 	        String k = String.format(IndexInfo.KET_FORMAT, keyDelimiter, envId, keyDelimiter, type, keyDelimiter, id);
 	        // CSV has no timestamp, so don't consider.
@@ -95,7 +109,7 @@ public class DataFormatForCsv implements DataFormatInterface {
 	@Override
 	public boolean unFormatToKeyValue(String scenes, String key,
 			String value, UnDataFormatCallBack unDataFormatCallBack) throws Exception {
-		String jsonString = null;
+		StringBuffer jsonString = new StringBuffer();
 		String dataType;
 		int dataTypeInt;
         if (key.startsWith(Model.INDEX_INFO)) {
@@ -107,7 +121,8 @@ public class DataFormatForCsv implements DataFormatInterface {
         	// id|type|targetId##BLKMDL_ID
         	// id|type|targetId##BLKMDL_ID##PD_SALE_FTA_CD##ACCT_DTL_TYPE##CORPPRVT_FLAG##CMTRST_CST_ACCNO##AR_ID##QCRCRD_IND
         	String tag = indexInfoTiKV.getServiceTag();
-        	jsonString = keyArr[3]+delimiter2+keyArr[2]+delimiter2+indexInfoTiKV.getTargetId();
+        	jsonString.append(keyArr[3]).append(DataFormatInterface.delimiterMatcher(delimiter1)).append(keyArr[2]).append(DataFormatInterface.delimiterMatcher(delimiter1)).append(indexInfoTiKV.getTargetId());
+        	//jsonString = keyArr[3]+delimiter1+keyArr[2]+delimiter1+indexInfoTiKV.getTargetId();
         	if(!StringUtils.isBlank(tag)) {
         		jsonObject = JSONObject.parseObject(tag);
         		ServiceTag serviceTag = JSON.toJavaObject(jsonObject, ServiceTag.class);
@@ -118,18 +133,21 @@ public class DataFormatForCsv implements DataFormatInterface {
         				StringUtils.isBlank(serviceTag.getAR_ID())&&
         				StringUtils.isBlank(serviceTag.getQCRCRD_IND())
         				)
-            		jsonString += (delimiter2+serviceTag.getBLKMDL_ID());
+            		//jsonString += (delimiter2+serviceTag.getBLKMDL_ID());
+        			jsonString.append(delimiter2).append(serviceTag.getBLKMDL_ID());
         		else
-        			jsonString += (delimiter2+serviceTag.getBLKMDL_ID()+delimiter2+serviceTag.getPD_SALE_FTA_CD()+delimiter2+serviceTag.getACCT_DTL_TYPE()+delimiter2+serviceTag.getCORPPRVT_FLAG()+delimiter2+serviceTag.getCMTRST_CST_ACCNO()+delimiter2+serviceTag.getAR_ID()+delimiter2+serviceTag.getQCRCRD_IND());
+        			//jsonString += (delimiter2+serviceTag.getBLKMDL_ID()+delimiter2+serviceTag.getPD_SALE_FTA_CD()+delimiter2+serviceTag.getACCT_DTL_TYPE()+delimiter2+serviceTag.getCORPPRVT_FLAG()+delimiter2+serviceTag.getCMTRST_CST_ACCNO()+delimiter2+serviceTag.getAR_ID()+delimiter2+serviceTag.getQCRCRD_IND());
+        			jsonString.append(delimiter2).append(serviceTag.getBLKMDL_ID()).append(delimiter2).append(serviceTag.getPD_SALE_FTA_CD()).append(delimiter2).append(serviceTag.getACCT_DTL_TYPE()).append(delimiter2).append(serviceTag.getCORPPRVT_FLAG()).append(delimiter2).append(serviceTag.getCMTRST_CST_ACCNO()).append(delimiter2).append(serviceTag.getAR_ID()).append(delimiter2).append(serviceTag.getQCRCRD_IND());
         	}
             dataTypeInt = 1;
         }
         else {
         	dataType = Model.INDEX_TYPE;
         	dataTypeInt = 0;
-        	jsonString = key + Model.INDEX_TYPE_DELIMITER + value;
+        	//jsonString = key + Model.INDEX_TYPE_DELIMITER + value;
+        	jsonString.append(key).append(Model.INDEX_TYPE_DELIMITER).append(value);
         }
-		return unDataFormatCallBack.getDataCallBack( jsonString, dataType, dataTypeInt);
+		return unDataFormatCallBack.getDataCallBack( jsonString.toString(), dataType, dataTypeInt);
 	}
 
 }

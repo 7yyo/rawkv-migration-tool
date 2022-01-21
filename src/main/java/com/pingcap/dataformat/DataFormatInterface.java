@@ -27,6 +27,13 @@ public interface DataFormatInterface {
 			UnDataFormatCallBack unDataFormatCallBack
 			) throws Exception;
 	
+	// filter characters \\ in configuration
+	public static String delimiterMatcher(String source) {
+		if(source.startsWith("\\"))
+			return source.substring(1);
+		return source;
+	}
+	
 	public static int findMatcher(String source,String find) {
 		Pattern pattern = Pattern.compile(find);
 		Matcher matcher = pattern.matcher(source);

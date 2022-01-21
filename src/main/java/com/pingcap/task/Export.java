@@ -140,7 +140,7 @@ public class Export implements TaskInterface {
 		Object[] vec = getWriteFileChannel(channelName);
 		int num = (int)vec[2];
 		num ++;
-		if(num >= batchSize){
+		if(num > batchSize){
 			closeWriteFileChannel(channelName,vec);
 			vec = getWriteFileChannel(channelName);
 			num = 1;
