@@ -76,6 +76,9 @@ public class OSUtils {
         else if(osName.contains("linux")) { 
         	cpuRatio = getCpuRateForLinux(); 
         }
+        else if(osName.contains("mac")) {
+        	cpuRatio = getCpuRateForMac();
+        }
         return cpuRatio;
 	}
 	private static double getCpuRateForLinux(){ 
@@ -139,6 +142,72 @@ public class OSUtils {
                 Float usage = new Float(cpuUsage);
                 return (1-usage.floatValue()/100);
             } 
+        } catch(IOException ioe){
+        	ioe.printStackTrace();
+            freeResource(is, isr, brStat); 
+            return 1; 
+        } finally{
+        	try {
+				cleanInputStream(is);
+			} catch (IOException e) {
+			}
+            freeResource(is, isr, brStat); 
+            if(null != process){
+            	try {
+            		is = process.getErrorStream();
+    				cleanInputStream(is);
+    			} catch (IOException e1) {
+    			}
+            	finally{
+            		IOUtils.closeQuietly(is);
+            	}
+            	process.destroy();
+            }
+        } 
+    }
+	
+	private static double getCpuRateForMac(){ 
+        InputStream is = null; 
+        InputStreamReader isr = null; 
+        BufferedReader brStat = null; 
+        StringTokenizer tokenStat = null;
+        Process process = null;
+        final int checkCount = 3;
+
+        try{
+            process = Runtime.getRuntime().exec("top -l "+checkCount); 
+            is = process.getInputStream();
+            isr = new InputStreamReader(is);
+            brStat = new BufferedReader(isr);
+
+            //Skip the previous n times of information
+            String cpuLine;
+            int num = 1;
+            while(true) {
+            	cpuLine = brStat.readLine();
+            	if(null == cpuLine)
+            		break;
+            	if(cpuLine.startsWith("CPU usage")) {
+            		if(checkCount == num)
+            			break;
+            		else
+            			++num;
+            	}
+            }
+            if(StringUtils.isEmpty(cpuLine))
+            	return 0;
+            tokenStat = new StringTokenizer(cpuLine); 
+            tokenStat.nextToken(); 
+            tokenStat.nextToken(); 
+            tokenStat.nextToken(); //user
+            tokenStat.nextToken(); 
+            tokenStat.nextToken(); //system
+            tokenStat.nextToken(); 
+            String idle = tokenStat.nextToken(); 
+            idle = idle.substring(0,idle.indexOf("%")); 
+                
+            float idleUsage = new Float(idle).floatValue();
+            return (1-idleUsage/100);
         } catch(IOException ioe){
         	ioe.printStackTrace();
             freeResource(is, isr, brStat); 
