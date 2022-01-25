@@ -70,7 +70,7 @@
         </encoder>
         <file>./checkSumFail/checkSumFail.json</file>
         <rollingPolicy class="ch.qos.logback.core.rolling.FixedWindowRollingPolicy">
-            <fileNamePattern>./checkSumFail.json.%i</fileNamePattern>
+            <fileNamePattern>./checkSumFail/checkSumFail.json.%i</fileNamePattern>
         </rollingPolicy>
         <triggeringPolicy class="ch.qos.logback.core.rolling.SizeBasedTriggeringPolicy">
             <MaxFileSize>300MB</MaxFileSize>
@@ -84,7 +84,7 @@
         </encoder>
         <file>./batchPutFail/batchPutFail.json</file>
         <rollingPolicy class="ch.qos.logback.core.rolling.FixedWindowRollingPolicy">
-            <fileNamePattern>./batchPutFail.json.%i</fileNamePattern>
+            <fileNamePattern>./batchPutFail/batchPutFail.json.%i</fileNamePattern>
         </rollingPolicy>
         <triggeringPolicy class="ch.qos.logback.core.rolling.SizeBasedTriggeringPolicy">
             <MaxFileSize>300MB</MaxFileSize>
@@ -98,7 +98,7 @@
         </encoder>
         <file>./redoFail/redoFail.json</file>
         <rollingPolicy class="ch.qos.logback.core.rolling.FixedWindowRollingPolicy">
-            <fileNamePattern>./redoFail.json.%i</fileNamePattern>
+            <fileNamePattern>./redoFail/redoFail.json.%i</fileNamePattern>
         </rollingPolicy>
         <triggeringPolicy class="ch.qos.logback.core.rolling.SizeBasedTriggeringPolicy">
             <MaxFileSize>300MB</MaxFileSize>
