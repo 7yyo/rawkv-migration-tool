@@ -76,6 +76,8 @@ public class DataFormatForCsv implements DataFormatInterface {
 	        String k = String.format(IndexInfo.KET_FORMAT, keyDelimiter, envId, keyDelimiter, type, keyDelimiter, id);
 	        // CSV has no timestamp, so don't consider.
 	        String extArr[] = arr[2].split(delimiter2);
+	        if(8 < extArr.length)
+	        	throw new Exception("indexInfo format error");        
 	        indexInfoTiKV.setTargetId(extArr[0]);
 	        indexInfoTiKV.setAppId(appId);
 	

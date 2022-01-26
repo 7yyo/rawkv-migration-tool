@@ -1,7 +1,6 @@
 package com.pingcap.task;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -16,6 +15,7 @@ import org.tikv.shade.com.google.protobuf.ByteString;
 import com.pingcap.controller.FileScanner;
 import com.pingcap.controller.ScannerInterface;
 import com.pingcap.enums.Model;
+import com.pingcap.pojo.LineDataText;
 import com.pingcap.rawkv.LimitSpeedkv;
 import com.pingcap.util.JavaUtil;
 import com.pingcap.util.PropertiesUtil;
@@ -66,23 +66,27 @@ public class UnImport implements TaskInterface {
         PropertiesUtil.checkConfig(properties, Model.APP_ID);
         PropertiesUtil.checkConfig(properties, Model.UPDATE_TIME);
         
-        PropertiesUtil.checkNaturalNumber( properties, Model.BATCHS_PACKAGE_SIZE, false);
         PropertiesUtil.checkNaturalNumber( properties, Model.TTL, false);
-        PropertiesUtil.checkNumberFromTo( properties, Model.TASKSPEEDLIMIT, false,20,1000);
 	}
 
 	@Override
-	public HashMap<ByteString, ByteString> executeTikv(Map<String, Object> propParameters, RawKVClient rawKvClient, HashMap<ByteString, ByteString> pairs,
-			HashMap<ByteString, String> pairs_lines, boolean hasTtl,String filePath,final Map<String, String> lineBlock,int dataSize) {
+	public int executeTikv(Map<String, Object> propParameters, RawKVClient rawKvClient, LinkedHashMap<ByteString, LineDataText> pairs,
+			LinkedHashMap<ByteString, LineDataText> pairs_jmp, boolean hasTtl,String filePath,int dataSize) {
 		List<Kvrpcpb.KvPair> kvHaveList = null;
+		List<ByteString> kvList = null;
+		int ret = 0;
         if (Model.ON.equals(properties.get(Model.CHECK_EXISTS_KEY))) {
             // skip not exists key.
             // For batch get to check exists kv
-        	List<ByteString> kvList = new ArrayList<>(pairs.keySet());
+        	kvList = new ArrayList<>(pairs.keySet());
 	        Histogram.Timer batchGetTimer = REQUEST_LATENCY.labels("batch get").startTimer();
 	        try {
 	            // Batch get from raw kv.
-	            kvHaveList = LimitSpeedkv.batchGet(rawKvClient,kvList,dataSize);
+	        	if(0<kvList.size()){
+	        		//approximate value
+	        		ret = (kvList.get(0).size()*kvList.size());
+	        	}
+	            kvHaveList = LimitSpeedkv.batchGet(rawKvClient,kvList,ret);
 	        } catch (Exception e) {
 	        	TaskInterface.BATCH_PUT_FAIL_COUNTER.labels("batch put fail").inc();
 	            throw e;
@@ -91,9 +95,12 @@ public class UnImport implements TaskInterface {
 	        	batchGetTimer.observeDuration();
 	        }
 	        if(kvList.size() != kvHaveList.size()){
+	        	ByteString  curKey;
 	            for (int i=0;i<kvList.size();i++) {
-	            	if(!pairs.containsKey(kvList.get(i))){
-		            	auditLog.info("Skip not exists key={}, file={}, almost line={}", kvList.get(i).toStringUtf8(), filePath, lineBlock.get(pairs_lines.get(kvList.get(i))));
+	            	curKey = kvList.get(i);
+	            	if(!pairs.containsKey(curKey)){
+	            		pairs_jmp.put(curKey,pairs.get(curKey));
+		            	auditLog.info("Skip not exists key={}, file={}, almost line={}", curKey.toStringUtf8(), filePath, pairs.get(curKey).getLineData());
 		            	pairs.remove(kvList.get(i));
 	            	}
 	            } 	
@@ -102,9 +109,15 @@ public class UnImport implements TaskInterface {
         	kvList = null;
         }
         Histogram.Timer batchDeleteTimer = REQUEST_LATENCY.labels("batch delete").startTimer();
-        LimitSpeedkv.batchDelete(rawKvClient,new ArrayList<>(pairs.keySet()),dataSize);
+        kvList = new ArrayList<>(pairs.keySet());
+    	if(0<kvList.size()){
+    		//approximate value
+    		ret += (kvList.get(0).size()*kvList.size());
+    	}
+        LimitSpeedkv.batchDelete(rawKvClient,kvList,ret);
+        ret += ret;
 		batchDeleteTimer.observeDuration();
-		return pairs;
+		return ret;
 	}
 
 	@Override
@@ -113,16 +126,16 @@ public class UnImport implements TaskInterface {
 	}
 
 	@Override
-	public void succeedWriteRowsLogger(String filePath, HashMap<ByteString, ByteString> pairs) {
-		for(Entry<ByteString, ByteString> obj:pairs.entrySet()){
-			logger.debug("File={}, key={}, value={}", filePath, obj.getKey().toStringUtf8(), obj.getValue().toStringUtf8());
+	public void succeedWriteRowsLogger(String filePath, LinkedHashMap<ByteString, LineDataText> pairs) {
+		for(Entry<ByteString, LineDataText> obj:pairs.entrySet()){
+			logger.debug("File={}, key={}, value={}", filePath, obj.getKey().toStringUtf8(), obj.getValue().getValue().toStringUtf8());
 		}
 	}
 
 	@Override
-	public void faildWriteRowsLogger(HashMap<ByteString, ByteString> pairs) {
-		for(Entry<ByteString, ByteString> obj:pairs.entrySet()){
-			loggerFail.info(obj.getValue().toStringUtf8());
+	public void faildWriteRowsLogger(LinkedHashMap<ByteString, LineDataText> pairs_lines) {
+		for(Entry<ByteString, LineDataText> obj:pairs_lines.entrySet()){
+			loggerFail.info(obj.getValue().getLineData());
 		}
 	}
 	

@@ -33,6 +33,7 @@ import com.pingcap.util.FileUtil;
 import com.pingcap.util.PropertiesUtil;
 import com.pingcap.pojo.IndexInfo;
 import com.pingcap.pojo.InfoInterface;
+import com.pingcap.pojo.LineDataText;
 import com.pingcap.pojo.TempIndexInfo;
 import com.pingcap.rawkv.LimitSpeedkv;
 
@@ -76,24 +77,22 @@ public class CheckSum implements TaskInterface {
         PropertiesUtil.checkConfig(properties, Model.CHECK_SUM_MOVE_PATH);
         PropertiesUtil.checkConfig(properties, MODE);
         PropertiesUtil.checkConfig(properties, SCENES);
-        PropertiesUtil.checkNaturalNumber( properties, Model.BATCHS_PACKAGE_SIZE, false);
 
         // Skip ttl type when check sum.
         PropertiesUtil.checkConfig(properties, TTL_SKIP_TYPE);
         // Skip ttl put when check sum.
         PropertiesUtil.checkConfig(properties, Model.TTL_PUT_TYPE);
-        PropertiesUtil.checkNumberFromTo( properties, Model.TASKSPEEDLIMIT, false,20,1000);
         String moveFilePath = properties.get(Model.CHECK_SUM_MOVE_PATH);
         // MoveFilePath
         FileUtil.createFolder(moveFilePath);
 	}
 
 	@Override
-	public HashMap<ByteString, ByteString> executeTikv(Map<String, Object> propParameters,RawKVClient rawKvClient, HashMap<ByteString, ByteString> pairs,
-			HashMap<ByteString, String> pairs_lines, boolean hasTtl,String filePath,final Map<String, String> lineBlock,int dataSize) {
+	public int executeTikv(Map<String, Object> propParameters,RawKVClient rawKvClient, LinkedHashMap<ByteString, LineDataText> pairs,
+			LinkedHashMap<ByteString, LineDataText> pairs_jmp, boolean hasTtl,String filePath,int dataSize) {
 		Histogram.Timer batchGetTimer = CHECK_SUM_DURATION.labels("batch_get").startTimer();
 		List<Kvrpcpb.KvPair> kvList = null;
-
+		int ret = 0;
 		List<ByteString> keyList = new ArrayList<>(pairs.keySet());
 		InfoInterface infoRawKV,tmpRawKV;
 		Object clazz = new TempIndexInfo();
@@ -101,10 +100,14 @@ public class CheckSum implements TaskInterface {
 			clazz = new IndexInfo();
 		try {
 			// Batch get keys which to check sum
-			kvList = LimitSpeedkv.batchGet(rawKvClient,keyList,dataSize);
+        	if(0<keyList.size()){
+        		//approximate value
+        		ret = (keyList.get(0).size()*keyList.size());
+        	}
+			kvList = LimitSpeedkv.batchGet(rawKvClient,keyList,ret);
 		} catch (Exception e) {
-            for (Entry<ByteString, ByteString> originalKv : pairs.entrySet()) {
-            	logger.error("Batch get failed.Key={}, file={}, almost line={}", originalKv.getKey().toStringUtf8(), filePath, lineBlock.get(pairs_lines.get(originalKv.getKey())));
+            for (Entry<ByteString, LineDataText> originalKv : pairs.entrySet()) {
+            	logger.error("Batch get failed.Key={}, file={}, almost line={}", originalKv.getKey().toStringUtf8(), filePath, originalKv.getValue().getLineData());
             }
             throw e;
         }
@@ -126,20 +129,20 @@ public class CheckSum implements TaskInterface {
         	curKey = keyList.get(i);
         	infoRawKV = rawKvResultMap.get(curKey);
             if (null != infoRawKV) {
-            	tmpRawKV = (InfoInterface)JSONObject.parseObject(pairs.get(curKey).toStringUtf8(), clazz.getClass());
+            	tmpRawKV = (InfoInterface)JSONObject.parseObject(pairs.get(curKey).getLineData(), clazz.getClass());
                 if (!infoRawKV.equalsValue(tmpRawKV)) {
                     checkSumLog.error("Check sum failed. Key={}", curKey.toStringUtf8());
-                    csFailLog.info(lineBlock.get(pairs_lines.get(curKey)));
+                    csFailLog.info(pairs.get(curKey).getLineData());
                     pairs.remove(curKey);
-                    pairs_lines.remove(curKey);
+                    //pairs_lines.remove(curKey);
                     ++iCheckSumFail;
                 }
             } else {
                 checkSumLog.error("Key={} is not exists.", curKey.toStringUtf8());
-                infoRawKV = (InfoInterface)JSONObject.parseObject(pairs.get(curKey).toStringUtf8(), clazz.getClass());
-                csFailLog.info(lineBlock.get(pairs_lines.get(curKey)));
+                infoRawKV = (InfoInterface)JSONObject.parseObject(pairs.get(curKey).getLineData(), clazz.getClass());
+                csFailLog.info(pairs.get(curKey).getLineData());
                 pairs.remove(curKey);
-                pairs_lines.remove(curKey);
+                //pairs_lines.remove(curKey);
                 ++iNotInsert;
             }
         }
@@ -154,7 +157,7 @@ public class CheckSum implements TaskInterface {
         	((AtomicInteger)propParameters.get(AtomicInteger_notInsert)).addAndGet(iNotInsert);
         }
         csTimer.observeDuration();
-		return pairs;
+		return ret;
 	}
 
 	@Override
@@ -163,7 +166,7 @@ public class CheckSum implements TaskInterface {
 	}
 
 	@Override
-	public void succeedWriteRowsLogger(String filePath, HashMap<ByteString, ByteString> pairs) {
+	public void succeedWriteRowsLogger(String filePath, LinkedHashMap<ByteString, LineDataText> pairs) {
 	/*	//CheckSum not record sucess log
 	for(Entry<ByteString, ByteString> obj:pairs.entrySet()){
 			getLogger().debug("File={}, key={}, value={}", filePath, obj.getKey().toStringUtf8(), obj.getValue().toStringUtf8());
@@ -172,9 +175,9 @@ public class CheckSum implements TaskInterface {
 	}
 
 	@Override
-	public void faildWriteRowsLogger(HashMap<ByteString, ByteString> pairs) {
-		for(Entry<ByteString, ByteString> obj:pairs.entrySet()){
-			csFailLog.info(obj.getValue().toStringUtf8());
+	public void faildWriteRowsLogger(LinkedHashMap<ByteString, LineDataText> pairs_lines) {
+		for(Entry<ByteString, LineDataText> obj:pairs_lines.entrySet()){
+			csFailLog.info(obj.getValue().getLineData());
 		}
 	}
 	
@@ -225,6 +228,7 @@ public class CheckSum implements TaskInterface {
                         "skip=" + totalSkipCount + ", " +
                         "parseErr=" + totalParseErrorCount + ", " +
                         "notExits=" + iNotInsert + ", " +
+                        "duplicate=" + totalDuplicateCount + ", " +
                         "checkSumFail=" + iCheckSumFail + ", " +
                         "duration=" + duration / 1000 + "s, ");
         result.append("Skip type[");

@@ -1,6 +1,7 @@
 package com.pingcap.controller;
 
 import com.pingcap.enums.Model;
+import com.pingcap.pojo.LineDataText;
 import com.pingcap.task.TaskInterface;
 import com.pingcap.timer.SystemMonitorTimer;
 import com.pingcap.timer.TaskTimer;
@@ -93,7 +94,10 @@ public class LineLoadingJob implements Runnable {
 
         int fileSplitSize = Integer.parseInt(properties.get(Model.BATCHS_PACKAGE_SIZE));
         if(importFileLineNum <= fileSplitSize){
-        	fileSplitSize = (importFileLineNum+internalThreadNum-1) / internalThreadNum;
+        	if(100 < importFileLineNum)
+        		fileSplitSize = (importFileLineNum+internalThreadNum-1) / internalThreadNum;
+        	else
+        		fileSplitSize = importFileLineNum;
         }
         int splitLimit = fileSplitSize;
         final int countDownNum = (importFileLineNum+fileSplitSize-1)/fileSplitSize;
@@ -101,7 +105,7 @@ public class LineLoadingJob implements Runnable {
         CountDownLatch countDownLatch = new CountDownLatch(countDownNum);
         LineIterator lineIterator = null;
  
-        Map<String, String> container = new HashMap<String, String>(fileSplitSize+1);
+        List<LineDataText> blockCache = new ArrayList<>(fileSplitSize+1);
         Histogram.Timer fileBlockTimer = cmdInterFace.getHistogram().labels("split file").startTimer();
         try {
 			lineIterator = FileUtils.lineIterator(importFile, "UTF-8");
@@ -112,7 +116,7 @@ public class LineLoadingJob implements Runnable {
             		PropertiesUtil.reloadConfiguration(threadPoolFileScanner,cmdInterFace);
             	}
             	try {
-            		container.put(""+ m, lineIterator.nextLine());
+            		blockCache.add(new LineDataText(m,lineIterator.nextLine()));
                 } catch (Exception e) {
                 	--splitLimit;
                 	cmdInterFace.getLoggerFail().error("LineIterator error, file = {} ,error={}", absolutePath, e);
@@ -120,12 +124,12 @@ public class LineLoadingJob implements Runnable {
                     processFileLines.incrementAndGet();
                     continue;
                 }
-                if(splitLimit <= container.size()) {
+            	if(splitLimit <= blockCache.size()) {
                 	splitLimit = fileSplitSize;
+                	processFileLines.addAndGet(blockCache.size());
                 	threadPoolFileLoading.execute(
 							new BatchJob(
 	                			tiSession,
-	                			processFileLines,
 	                            totalImportCount,
 	                            totalEmptyCount,
 	                            totalSkipCount,
@@ -134,20 +138,21 @@ public class LineLoadingJob implements Runnable {
 	                            absolutePath,
 	                            ttlSkipTypeList,
 	                            ttlSkipTypeMap,
-	                            container,
+	                            blockCache,
 	                            countDownLatch,
 	                            totalDuplicateCount,
 	                            ttlPutList,
 	                            cmdInterFace,
 	                            propParameters));
-                	container.clear();
+                	//container.clear();
+                	blockCache.clear();
                 }
-            }
-            if(0 < container.size()) {	
+            }	
+            if(0 < blockCache.size()) {
+            	processFileLines.addAndGet(blockCache.size());
             	threadPoolFileLoading.execute(
 						new BatchJob(
 	                        tiSession,
-	                        processFileLines,
 	                        totalImportCount,
 	                        totalEmptyCount,
 	                        totalSkipCount,
@@ -156,13 +161,13 @@ public class LineLoadingJob implements Runnable {
 	                        absolutePath,
 	                        ttlSkipTypeList,
 	                        ttlSkipTypeMap,
-	                        container,
+	                        blockCache,
 	                        countDownLatch,
 	                        totalDuplicateCount,
 	                        ttlPutList,
 	                        cmdInterFace,
 	                        propParameters));
-            	container.clear();
+            	blockCache.clear();
             }
         	fileBlockTimer.observeDuration();
 		}
@@ -188,8 +193,9 @@ public class LineLoadingJob implements Runnable {
 	        	lineIterator = null;
     		}
         	fileBlockTimer.close();
-        	container.clear();
-        	container = null;
+
+        	blockCache.clear();
+        	blockCache = null;
         }
         //cmdInterFace.getLogger().info("file={}, line={}, each processes={}, countDownNum={},threadsNumber={}", absolutePath, importFileLineNum, fileSplitSize, countDownNum, threadsNumber);
         try {

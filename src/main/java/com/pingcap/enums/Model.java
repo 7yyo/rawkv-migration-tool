@@ -81,6 +81,5 @@ public class Model {
     public static final String EXPORT_THREAD = "exporter.tikv.exportThread";
 
     public static final String REDO_MOVE_PATH = "redo.movePath";
-    public static final String REDO_FILE_ORDER = "redo.order";
 
 }

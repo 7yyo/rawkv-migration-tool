@@ -12,7 +12,6 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.slf4j.Logger;
@@ -26,8 +25,8 @@ import com.pingcap.controller.TikvScanner;
 import com.pingcap.dataformat.DataFactory;
 import com.pingcap.dataformat.DataFormatInterface;
 import com.pingcap.enums.Model;
+import com.pingcap.pojo.LineDataText;
 import com.pingcap.util.FileUtil;
-import com.pingcap.util.JavaUtil;
 import com.pingcap.util.PropertiesUtil;
 
 import io.prometheus.client.Histogram;
@@ -35,12 +34,11 @@ import io.prometheus.client.Histogram;
 public class Export implements TaskInterface {
     private static final Logger logger = LoggerFactory.getLogger(Model.LOG);
     private Map<String, String> properties = null;
-    private String pid = JavaUtil.getPid();
+    //private String pid = JavaUtil.getPid();
     private String exportFilePath;
-    private int batchSize = 0;
-    private int startLine=0;
-    private static final String EXPORT_FILE_PATH = "/export_%s_%d_%d-%d.txt";
-    private Histogram EXPORT_DURATION = Histogram.build().name("Export_duration_"+pid).help("export duration").labelNames("type").register();
+    private int packgeSize = 0;
+    private static final String EXPORT_FILE_PATH = "/export_%s_%d-%d.txt";
+    private Histogram EXPORT_DURATION = Histogram.build().name("Export_duration_").help("export duration").labelNames("type").register();
     private final AtomicInteger totalExportCount = new AtomicInteger(0);
     private final AtomicInteger totalExportIndexType = new AtomicInteger(0);
     private final AtomicInteger totalExportIndexInfo = new AtomicInteger(0);
@@ -75,13 +73,14 @@ public class Export implements TaskInterface {
 		PropertiesUtil.checkNaturalNumber(properties, Model.EXPORT_THREAD, false);
 		PropertiesUtil.checkConfig(properties, Model.EXPORT_FILE_PATH);
         exportFilePath = properties.get(Model.EXPORT_FILE_PATH);
-        batchSize = Integer.parseInt(properties.get(Model.BATCH_SIZE));
+        PropertiesUtil.checkNaturalNumber( properties, Model.BATCHS_PACKAGE_SIZE, false);
+        packgeSize = Integer.parseInt(properties.get(Model.BATCHS_PACKAGE_SIZE));
 	}
 
 	@Override
-	public HashMap<ByteString, ByteString> executeTikv(Map<String, Object> propParameters, RawKVClient rawKvClient, HashMap<ByteString, ByteString> pairs,
-			HashMap<ByteString, String> pairs_lines, boolean hasTtl,String filePath,final Map<String, String> lineBlock,int dataSize) {
-    	return pairs;
+	public int executeTikv(Map<String, Object> propParameters, RawKVClient rawKvClient, LinkedHashMap<ByteString, LineDataText> pairs,
+			LinkedHashMap<ByteString, LineDataText> pairs_jmp, boolean hasTtl,String filePath,int dataSize) {
+    	return 0;
 	}
 	
 	public Object[] getWriteFileChannel(String channelName){
@@ -91,7 +90,7 @@ public class Export implements TaskInterface {
 		if(null == vec){
 			int filenum = filesNum.incrementAndGet();
 			vec = new Object[3];
-            File file = FileUtil.createFile(String.format(exportFilePath + EXPORT_FILE_PATH, channelName,filenum,startLine,batchSize));
+            File file = FileUtil.createFile(String.format(exportFilePath + EXPORT_FILE_PATH, channelName,filenum,packgeSize));
             try {
             	@SuppressWarnings("resource")
 				FileOutputStream fileOutputStream = new FileOutputStream(file);
@@ -140,7 +139,7 @@ public class Export implements TaskInterface {
 		Object[] vec = getWriteFileChannel(channelName);
 		int num = (int)vec[2];
 		num ++;
-		if(num > batchSize){
+		if(num > packgeSize){
 			closeWriteFileChannel(channelName,vec);
 			vec = getWriteFileChannel(channelName);
 			num = 1;
@@ -221,17 +220,12 @@ public class Export implements TaskInterface {
 	}
 
 	@Override
-	public void succeedWriteRowsLogger(String filePath, HashMap<ByteString, ByteString> pairs) {
-		for(Entry<ByteString, ByteString> obj:pairs.entrySet()){
-			getLogger().debug("File={}, key={}, value={}", filePath, obj.getKey().toStringUtf8(), obj.getValue().toStringUtf8());
-		}
+	public void succeedWriteRowsLogger(String filePath, LinkedHashMap<ByteString, LineDataText> pairs) {
 	}
 
 	@Override
-	public void faildWriteRowsLogger(HashMap<ByteString, ByteString> pairs) {
-		for(Entry<ByteString, ByteString> obj:pairs.entrySet()){
-			logger.info(obj.getValue().toStringUtf8());
-		}
+	public void faildWriteRowsLogger(LinkedHashMap<ByteString, LineDataText> pairs_lines) {
+
 	}
 	
 	@Override
@@ -278,8 +272,6 @@ public class Export implements TaskInterface {
                         "empty=" + totalEmptyCount + ", " +
                         "skip=" + totalSkipCount + ", " +
                         "parseErr=" + totalParseErrorCount + ", " +
-                        //"putErr=" + totalBatchPutFailCount + ", " +
-                        //"duplicate=" + totalDuplicateCount + ", " +
                         "duration=" + duration / 1000 + "s, ");
         result.append("Skip type[");
         for (Map.Entry<String, Long> item : ttlSkipTypeMap.entrySet()) {

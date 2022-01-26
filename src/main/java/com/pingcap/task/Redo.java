@@ -29,6 +29,7 @@ import com.pingcap.controller.ScannerInterface;
 import com.pingcap.enums.Model;
 import com.pingcap.pojo.IndexInfo;
 import com.pingcap.pojo.InfoInterface;
+import com.pingcap.pojo.LineDataText;
 import com.pingcap.pojo.TempIndexInfo;
 import com.pingcap.rawkv.LimitSpeedkv;
 import com.pingcap.util.CountUtil;
@@ -80,24 +81,32 @@ public class Redo implements TaskInterface {
 	}
 
 	@Override
-	public HashMap<ByteString, ByteString> executeTikv(Map<String, Object> propParameters, RawKVClient rawKvClient,
-			HashMap<ByteString, ByteString> pairs, HashMap<ByteString, String> pairs_lines, boolean hasTtl,
-			String filePath, Map<String, String> lineBlock, int dataSize) {
+	public int executeTikv(Map<String, Object> propParameters, RawKVClient rawKvClient,
+			LinkedHashMap<ByteString, LineDataText> pairs, LinkedHashMap<ByteString, LineDataText> pairs_jmp, boolean hasTtl,
+			String filePath, int dataSize) {
 		Histogram.Timer batchGetTimer = DURATION.labels("batch_get").startTimer();
 		List<Kvrpcpb.KvPair> kvList = null;
-
+		int ret = dataSize;
+		int startLineNo = 0;
 		List<ByteString> keyList = new ArrayList<>(pairs.keySet());
 		InfoInterface infoRawKV,tmpRawKV;
+		LineDataText lineData;
 		Object clazz = new TempIndexInfo();
 		if(Model.INDEX_INFO.equals(properties.get(SCENES)))
 			clazz = new IndexInfo();
 		try {
 			// Batch get keys which to check sum
-			kvList = LimitSpeedkv.batchGet(rawKvClient,keyList,dataSize);
+        	if(0<keyList.size()){
+        		//approximate value
+        		ret = (keyList.get(0).size()*keyList.size());
+        		startLineNo = pairs.get(keyList.get(0)).getLineNo();
+        	}
+			kvList = LimitSpeedkv.batchGet(rawKvClient,keyList,ret);
 		} catch (Exception e) {
-            for (Entry<ByteString, ByteString> originalKv : pairs.entrySet()) {
-            	logger.error("Batch get failed.Key={}, file={}, almost line={}", originalKv.getKey().toStringUtf8(), filePath, lineBlock.get(pairs_lines.get(originalKv.getKey())));
-            }
+            //for (Entry<ByteString, LineDataText> originalKv : pairs.entrySet()) {
+            //	logger.error("Batch get failed.Key={}, file={}, almost line={}", originalKv.getKey().toStringUtf8(), filePath, dataSource.getLineDataString(pairs_lines.get(originalKv.getKey())));
+            //}
+			logger.error("Batch get failed. file={}, almost line={},{}", filePath, startLineNo, pairs.size());
             throw e;
         }
 		finally{
@@ -116,9 +125,10 @@ public class Redo implements TaskInterface {
         ByteString curKey;
         for (int i=0;i<keyList.size();i++) {
         	curKey = keyList.get(i);
-        	tmpRawKV = (InfoInterface)JSONObject.parseObject(pairs.get(curKey).toStringUtf8(), clazz.getClass());
+        	tmpRawKV = (InfoInterface)JSONObject.parseObject(pairs.get(curKey).getLineData(), clazz.getClass());
         	if (tmpRawKV.getOpType() == null) {
-                redoLog.error("Redo data opType must not be null. File={}, data={}, line={}", filePath, lineBlock.get(pairs_lines.get(curKey)), pairs_lines.get(curKey));
+        		lineData = pairs.get(curKey);
+                redoLog.error("Redo data opType must not be null. File={}, data={}, line={}", filePath, lineData.getLineData(), lineData.getLineNo());
                 System.exit(0);
             }
         	infoRawKV = rawKvResultMap.get(curKey);
@@ -130,32 +140,33 @@ public class Redo implements TaskInterface {
 	                        // Redo > RawKV
 	                        if (CountUtil.compareTime( tmpRawKV.getUpdateTime(), infoRawKV.getUpdateTime()) >= 0) {
 	                            // if duration == 0, D
-	                            if(!put( rawKvClient, curKey, pairs.get(curKey), Long.parseLong(tmpRawKV.getDuration()), lineBlock.get(pairs_lines.get(curKey)), pairs_lines.get(curKey))){
+	                            if(!put( rawKvClient, curKey, pairs, Long.parseLong(tmpRawKV.getDuration()))){
 		                        	++iCheckSumFail;
 		                            pairs.remove(curKey);
-		                            pairs_lines.remove(curKey);
+		                            //pairs_lines.remove(curKey);
 	                            }
 	                        } else {
-	                        	redoLog.error("times waitting. Key={}, redoTso={} < rawkvTso={}, line={}, so skip. OpType={}", curKey.toStringUtf8(),tmpRawKV.getUpdateTime(), infoRawKV.getUpdateTime(), pairs_lines.get(curKey),tmpRawKV.getOpType());
-	                            redoFailLog.info(lineBlock.get(pairs_lines.get(curKey)));
+	                        	lineData = pairs.get(curKey);
+	                        	redoLog.error("times waitting. Key={}, redoTso={} < rawkvTso={}, line={}, so skip. OpType={}", curKey.toStringUtf8(),tmpRawKV.getUpdateTime(), infoRawKV.getUpdateTime(), lineData.getLineNo(),tmpRawKV.getOpType());
+	                            redoFailLog.info(lineData.getLineData());
 	                            pairs.remove(curKey);
-	                            pairs_lines.remove(curKey);
+	                            //pairs_lines.remove(curKey);
 	                            ++iCheckSumFail;
 	                        }
 	                    } else {
 	                        // If timeStamp is null, put
-                            if(!put( rawKvClient, curKey, pairs.get(curKey), Long.parseLong(tmpRawKV.getDuration()), lineBlock.get(pairs_lines.get(curKey)), pairs_lines.get(curKey))){
+                            if(!put( rawKvClient, curKey, pairs, Long.parseLong(tmpRawKV.getDuration()))){
 	                        	++iCheckSumFail;
 	                            pairs.remove(curKey);
-	                            pairs_lines.remove(curKey);
+	                            //pairs_lines.remove(curKey);
                             }
 	                    }
 	                } else {
 	                    // If raw kv is not exists, put.
-                        if(!put( rawKvClient, curKey, pairs.get(curKey), Long.parseLong(tmpRawKV.getDuration()), lineBlock.get(pairs_lines.get(curKey)), pairs_lines.get(curKey))){
+                        if(!put( rawKvClient, curKey, pairs, Long.parseLong(tmpRawKV.getDuration()))){
                         	++iCheckSumFail;
                             pairs.remove(curKey);
-                            pairs_lines.remove(curKey);
+                            //pairs_lines.remove(curKey);
                         }
 	                }
 	                break;
@@ -163,36 +174,38 @@ public class Redo implements TaskInterface {
 	                if (null != infoRawKV) {
 	                    if (tmpRawKV.getUpdateTime() != null && infoRawKV.getUpdateTime() != null) {
 	                        if (CountUtil.compareTime(tmpRawKV.getUpdateTime(), infoRawKV.getUpdateTime()) >= 0) {
-		                        if(!delete( rawKvClient, curKey, lineBlock.get(pairs_lines.get(curKey)), pairs_lines.get(curKey))){
+		                        if(!delete( rawKvClient, curKey, pairs)){
 		                        	++iCheckSumFail;
 		                            pairs.remove(curKey);
-		                            pairs_lines.remove(curKey);
+		                            //pairs_lines.remove(curKey);
 		                        }
-	                        } else {         
-	                        	redoLog.error("times waitting. Key={}, redoTso={} < rawkvTso={}, line={}, so skip. OpType=delete", curKey.toStringUtf8(),tmpRawKV.getUpdateTime(), infoRawKV.getUpdateTime(), pairs_lines.get(curKey));
-	                            redoFailLog.info(lineBlock.get(pairs_lines.get(curKey)));
+	                        } else {
+	                        	lineData = pairs.get(curKey);
+	                        	redoLog.error("times waitting. Key={}, redoTso={} < rawkvTso={}, line={}, so skip. OpType=delete", curKey.toStringUtf8(),tmpRawKV.getUpdateTime(), infoRawKV.getUpdateTime(), lineData.getLineNo());
+	                            redoFailLog.info(lineData.getLineData());
 	                            pairs.remove(curKey);
-	                            pairs_lines.remove(curKey);
+	                            //pairs_lines.remove(curKey);
 	                            ++iCheckSumFail;
 	                        }
 	                    } else {
-	                        if(!delete( rawKvClient, curKey, lineBlock.get(pairs_lines.get(curKey)), pairs_lines.get(curKey))){
+	                        if(!delete( rawKvClient, curKey, pairs)){
 	                        	++iCheckSumFail;
 	                            pairs.remove(curKey);
-	                            pairs_lines.remove(curKey);
+	                            //pairs_lines.remove(curKey);
 	                        }
 	                    }
-	                } else {    
-	                    redoLog.error("raw KV not exists. Key={}, file={}, line={}, so skip. OpType=delete", curKey.toStringUtf8(),filePath, pairs_lines.get(curKey));
-	                    infoRawKV = (InfoInterface)JSONObject.parseObject(pairs.get(curKey).toStringUtf8(), clazz.getClass());
-	                    redoFailLog.info(lineBlock.get(pairs_lines.get(curKey)));
+	                } else {
+	                	lineData = pairs.get(curKey);
+	                    redoLog.error("raw KV not exists. Key={}, file={}, line={}, so skip. OpType=delete", curKey.toStringUtf8(),filePath, lineData.getLineData());
+	                    ////infoRawKV = (InfoInterface)JSONObject.parseObject(lineData.getLineData(), clazz.getClass());
+	                    redoFailLog.info(lineData.getLineData());
 	                    pairs.remove(curKey);
-	                    pairs_lines.remove(curKey);
+	                    //pairs_lines.remove(curKey);
 	                    ++iNotInsert;
 	                }
 	                break;
 	            default:
-	            	redoLog.error("Redo data opType occurred IllegalStateException. File={}, data={}, line={}", filePath, lineBlock.get(pairs_lines.get(curKey)), pairs_lines.get(curKey));
+	            	redoLog.error("Redo data opType occurred IllegalStateException. File={}, data={}, line={}", filePath, pairs.get(curKey).getLineData(), pairs.get(curKey).getLineNo());
 	                throw new IllegalStateException(infoRawKV.getOpType());
             }
         }
@@ -207,40 +220,42 @@ public class Redo implements TaskInterface {
         	((AtomicInteger)propParameters.get(AtomicInteger_notInsert)).addAndGet(iNotInsert);
         }
         csTimer.observeDuration();
-		return pairs;
+		return ret;
 	}
 	
-    public static boolean put(RawKVClient rawKVClient, ByteString key, ByteString value, long ttl, String lineData, String lineNo) {
+    public static boolean put(RawKVClient rawKVClient, ByteString key, LinkedHashMap<ByteString, LineDataText> pairs, long ttl) {
+    	LineDataText lineData = pairs.get(key);
         try {
-            rawKVClient.put(key, value, ttl);
+            rawKVClient.put(key, lineData.getValue(), ttl);
         } catch (Exception e) {
-            redoLog.error("Redo put failed. key={}, line={}, lineNum={}", key.toStringUtf8(), lineData, lineNo, e);
-            redoFailLog.info(lineData);
+            redoLog.error("Redo put failed. key={}, line={}, lineNum={}", key.toStringUtf8(), lineData.getLineData(), lineData.getLineNo(), e);
+            redoFailLog.info(lineData.getLineData());
             return false;
         }
         return true;
     }
     
-    public static boolean delete(RawKVClient rawKVClient, ByteString key, String lineData, String lineNo) {
+    public static boolean delete(RawKVClient rawKVClient, ByteString key, LinkedHashMap<ByteString, LineDataText> lineDatas) {
         try {
             rawKVClient.delete(key);
         } catch (Exception e) {
-            redoLog.error("Redo delete failed. key={}, line={}, lineNum={}", key.toStringUtf8(), lineData, lineNo, e);
-            redoFailLog.info(lineData);
+        	LineDataText data = lineDatas.get(key);
+            redoLog.error("Redo delete failed. key={}, line={}, lineNum={}", key.toStringUtf8(), data.getLineData(), data.getLineNo(), e);
+            redoFailLog.info(data.getLineData());
             return false;
         }
         return true;
     }
     
 	@Override
-	public void succeedWriteRowsLogger(String filePath, HashMap<ByteString, ByteString> pairs) {
+	public void succeedWriteRowsLogger(String filePath, LinkedHashMap<ByteString, LineDataText> pairs) {
 
 	}
 
 	@Override
-	public void faildWriteRowsLogger(HashMap<ByteString, ByteString> pairs) {
-		for(Entry<ByteString, ByteString> obj:pairs.entrySet()){
-			redoFailLog.info(obj.getValue().toStringUtf8());
+	public void faildWriteRowsLogger(LinkedHashMap<ByteString, LineDataText> pairs_lines) {
+		for(Entry<ByteString, LineDataText> obj:pairs_lines.entrySet()){
+			redoFailLog.info(obj.getValue().getLineData());
 		}
 	}
 
@@ -297,16 +312,13 @@ public class Redo implements TaskInterface {
         PropertiesUtil.checkConfig(properties, Model.CHECK_SUM_MOVE_PATH);
         PropertiesUtil.checkConfig(properties, MODE);
         PropertiesUtil.checkConfig(properties, SCENES);
-        PropertiesUtil.checkNaturalNumber( properties, Model.BATCHS_PACKAGE_SIZE, false);
 
         // Skip ttl type when check sum.
         PropertiesUtil.checkConfig(properties, TTL_SKIP_TYPE);
         // Skip ttl put when check sum.
         PropertiesUtil.checkConfig(properties, Model.TTL_PUT_TYPE);
-        PropertiesUtil.checkNumberFromTo( properties, Model.TASKSPEEDLIMIT, false,20,1000);
         
         PropertiesUtil.checkConfig(properties, Model.REDO_MOVE_PATH);
-        PropertiesUtil.checkConfig(properties, Model.REDO_FILE_ORDER);
         String moveFilePath = properties.get(Model.REDO_MOVE_PATH);
         // MoveFilePath
         FileUtil.createFolder(moveFilePath);

@@ -4,7 +4,6 @@ import static com.pingcap.enums.Model.DELIMITER_1;
 import static com.pingcap.enums.Model.DELIMITER_2;
 import static com.pingcap.enums.Model.KEY_DELIMITER;
 
-import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -15,6 +14,7 @@ import org.tikv.shade.com.google.protobuf.ByteString;
 
 import com.pingcap.controller.ScannerInterface;
 import com.pingcap.enums.Model;
+import com.pingcap.pojo.LineDataText;
 import com.pingcap.util.PropertiesUtil;
 import io.prometheus.client.Histogram;
 import io.prometheus.client.Counter;
@@ -32,9 +32,9 @@ public interface TaskInterface {
 	public Map<String, String> getProperties();
 	public void setProperties(Map<String, String> properties);
 	public void installPrivateParamters(Map<String, Object> propParameters);
-	public HashMap<ByteString, ByteString> executeTikv(Map<String, Object> propParameters, RawKVClient rawKvClient, HashMap<ByteString, ByteString> pairs, HashMap<ByteString, String> pairs_lines, boolean hasTtl,String filePath ,final Map<String, String> lineBlock,int dataSize);
-	public void  succeedWriteRowsLogger(String filePath, HashMap<ByteString, ByteString> pairs);
-	public void  faildWriteRowsLogger(HashMap<ByteString, ByteString> pairs);
+	public int executeTikv(Map<String, Object> propParameters, RawKVClient rawKvClient, LinkedHashMap<ByteString, LineDataText> pairs, LinkedHashMap<ByteString, LineDataText> pairs_jmp, boolean hasTtl,String filePath ,int dataSize);
+	public void  succeedWriteRowsLogger(String filePath, LinkedHashMap<ByteString, LineDataText> pairs);
+	public void  faildWriteRowsLogger(LinkedHashMap<ByteString, LineDataText> pairs);
 	public ScannerInterface getInitScanner();
 	public void finishedReport(String filePath,
 			int importFileLineNum,
@@ -62,6 +62,8 @@ public interface TaskInterface {
         // For CSV format, There may be have two delimiter, if CSV has only one delimiter, delimiter2 is invalid.
         PropertiesUtil.checkConfig(properties, DELIMITER_1);
         PropertiesUtil.checkConfig(properties, DELIMITER_2);
+        PropertiesUtil.checkNaturalNumber( properties, Model.BATCHS_PACKAGE_SIZE, false);
+        PropertiesUtil.checkNumberFromTo( properties, Model.TASKSPEEDLIMIT, false,20,1000);
 	}
 	
 }
