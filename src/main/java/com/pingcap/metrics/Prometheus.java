@@ -22,7 +22,7 @@ public class Prometheus {
             logger.info("Run prometheus success. Port={}", prometheusPort);
         } catch (IOException e) {
             logger.error("Run prometheus failed. Port={}", prometheusPort, e);
-            System.exit(0);
+            System.exit(1);
         }
     }
 

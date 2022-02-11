@@ -14,16 +14,19 @@ public class TiSessionUtil {
 
     public static TiSession getTiSession(Map<String, String> properties) {
         String pd = properties.get(Model.PD);
+        if (System.getProperty("pd") != null || !"".equals(System.getProperty("pd"))) {
+            pd = System.getProperty("pd");
+        }
         TiConfiguration conf;
         TiSession tiSession = null;
-        
-        PropertiesUtil.checkNaturalNumber(properties,Model.WRITE_TIMEOUT,false);
-        PropertiesUtil.checkNaturalNumber(properties,Model.READ_TIMEOUT,false);
-        PropertiesUtil.checkNaturalNumber(properties,Model.BATCH_WRITE_TIMEOUT,false);
-        PropertiesUtil.checkNaturalNumber(properties,Model.BATCH_READ_TIMEOUT,false);
-        PropertiesUtil.checkNaturalNumber(properties,Model.SCAN_TIMEOUT,false);
-        PropertiesUtil.checkNaturalNumber(properties,Model.CLEAN_TIMEOUT,false);
-        
+
+        PropertiesUtil.checkNaturalNumber(properties, Model.WRITE_TIMEOUT, false);
+        PropertiesUtil.checkNaturalNumber(properties, Model.READ_TIMEOUT, false);
+        PropertiesUtil.checkNaturalNumber(properties, Model.BATCH_WRITE_TIMEOUT, false);
+        PropertiesUtil.checkNaturalNumber(properties, Model.BATCH_READ_TIMEOUT, false);
+        PropertiesUtil.checkNaturalNumber(properties, Model.SCAN_TIMEOUT, false);
+        PropertiesUtil.checkNaturalNumber(properties, Model.CLEAN_TIMEOUT, false);
+
         try {
             conf = TiConfiguration.createRawDefault(pd);
             conf.setRawKVWriteTimeoutInMS(Integer.parseInt(properties.get(Model.WRITE_TIMEOUT)));
@@ -36,7 +39,7 @@ public class TiSessionUtil {
             logger.info("Create TiSession success.");
         } catch (Exception e) {
             logger.error("Create TiSession failed! Error: ", e);
-            System.exit(0);
+            System.exit(1);
         }
         return tiSession;
     }

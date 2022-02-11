@@ -167,7 +167,7 @@ public class Redo {
                             }
                             if (indexInfoRedo.getOpType() == null) {
                                 redoLog.error("Redo data opType must not be null. File={}, data={}, line={}", redoFile, redoLine, totalCount);
-                                System.exit(0);
+                                System.exit(1);
                             }
                             switch (indexInfoRedo.getOpType()) {
                                 case ADD:
@@ -226,7 +226,7 @@ public class Redo {
                             k = String.format(TempIndexInfo.KEY_FORMAT, keyDelimiter, tempIndexInfoRedo.getEnvId(), keyDelimiter, tempIndexInfoRedo.getId());
                             if (tempIndexInfoRedo.getOpType() == null) {
                                 redoLog.error("Redo data opType must not be null. File={}, data={}, line={}", redoFile, redoLine, totalCount);
-                                System.exit(0);
+                                System.exit(1);
                             }
                             switch (tempIndexInfoRedo.getOpType()) {
                                 case ADD:
@@ -243,7 +243,7 @@ public class Redo {
                             break;
                         default:
                             redoLog.error("Redo error type={}", type);
-                            System.exit(0);
+                            System.exit(1);
                     }
 
                 }

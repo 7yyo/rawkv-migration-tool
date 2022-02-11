@@ -18,7 +18,7 @@ public class FileUtil {
         List<File> fileList = loadDirectory(new File(filePath), totalFileList, sort);
         if (fileList == null) {
             logger.warn("Path={} has no file.", filePath);
-            System.exit(0);
+            System.exit(1);
         } else {
             for (int i = 0; i < fileList.size(); i++) {
                 logger.info("No.{}={}", i + 1, fileList.get(i).getAbsolutePath());

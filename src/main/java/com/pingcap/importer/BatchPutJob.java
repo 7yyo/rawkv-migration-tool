@@ -263,7 +263,7 @@ public class BatchPutJob extends Thread {
 
                             default:
                                 logger.error("Illegal format={}", Model.MODE);
-                                System.exit(0);
+                                System.exit(1);
 
                         }
                         break;
@@ -297,7 +297,7 @@ public class BatchPutJob extends Thread {
                             } else {
                                 k = null;
                                 logger.error("Must be set envId for CSV");
-                                System.exit(0);
+                                System.exit(1);
                             }
 
                             // CSV has no timestamp, so don't consider.
@@ -305,7 +305,7 @@ public class BatchPutJob extends Thread {
                             indexInfoTiKV.setTargetId(targetId);
                             if (StringUtils.isEmpty(appId.trim())) {
                                 logger.error("CSV must be set appId");
-                                System.exit(0);
+                                System.exit(1);
                             }
                             indexInfoTiKV.setAppId(appId);
                             String v = line.split(delimiter1)[2];
@@ -371,7 +371,7 @@ public class BatchPutJob extends Thread {
 
                     default:
                         logger.error("Illegal format={}", importMode);
-                        System.exit(0);
+                        System.exit(1);
                 }
 
                 // for duplicate

@@ -241,7 +241,7 @@ public class CheckSumJsonJob implements Runnable {
                         }
                         if (StringUtils.isEmpty(properties.get(ENV_ID))) {
                             logger.error("Must be set [importer.out.envId] for csv check sum.");
-                            System.exit(0);
+                            System.exit(1);
                         }
                         key = String.format(IndexInfo.KET_FORMAT, keyDelimiter, properties.get(ENV_ID), keyDelimiter, indexInfoOriginal.getType(), keyDelimiter, indexInfoOriginal.getId());
                         originalIndexInfoMap.put(key, indexInfoOriginal);
@@ -349,7 +349,7 @@ public class CheckSumJsonJob implements Runnable {
                                     csFailLog.info(originalIndexInfoMapL.get(originalIndexInfoKv.getKey()).getOptype());
                                 } else {
                                     logger.error("Error check format:" + properties.get(MODE));
-                                    System.exit(0);
+                                    System.exit(1);
                                 }
                                 checkSumFail.addAndGet(1);
                             }
@@ -361,7 +361,7 @@ public class CheckSumJsonJob implements Runnable {
                                 csFailLog.info(originalIndexInfoMapL.get(originalIndexInfoKv.getKey()).getOptype());
                             } else {
                                 logger.error("Error check format:" + properties.get(MODE));
-                                System.exit(0);
+                                System.exit(1);
                             }
                             notInsert.addAndGet(1);
                         }

@@ -35,7 +35,7 @@ public class PropertiesUtil {
     public static void checkConfig(Map<String, String> properties, String configName) {
         if (properties.get(configName) == null) {
             logger.error("Configuration item must be added={}", configName);
-            System.exit(0);
+            System.exit(1);
         }
     }
     
@@ -48,17 +48,17 @@ public class PropertiesUtil {
     		}
     		else {
                 logger.error("Configuration {} of item must exist", paramName);
-                System.exit(0);    			
+                System.exit(1);
     		}
     	}
     	rollbackMode = rollbackMode.trim();
         if("".equals(rollbackMode)) {
             logger.error("Configuration {} of item don't is blank character", paramName);
-            System.exit(0);
+            System.exit(1);
         }
         if(0 >= Integer.parseInt(rollbackMode)) {
             logger.error("Configuration {} of item must be greater than 0", paramName);
-            System.exit(0);        	
+            System.exit(1);
         }
         return;
     }
