@@ -47,8 +47,6 @@ public class Model {
     public static final String TASKSPEEDLIMIT = "tikv.task.speedLimit";
     public static final String PD = "importer.tikv.pd";
 
-    //public static final String CHECK_SUM_THREAD_NUM = "importer.checkSum.checkSumThreadNum";
-    //public static final String CHECK_SUM_LIMIT = "importer.checkSum.limit";
     public static final String CHECK_SUM_MOVE_PATH = "importer.checkSum.movePath";
 
     public static final String IMPORT_FILE_PATH = "importer.in.filePath";
@@ -61,7 +59,7 @@ public class Model {
     public static final String MAX_POOL_SIZE = "importer.tikv.maxPoolSize";
     public static final String BATCHS_PACKAGE_SIZE = "importer.in.BatchsPackageSize";
     public static final String BATCH_SIZE = "importer.tikv.batchSize";
-//    public static final String BATCH_PUT_ERR_FILE_PATH = "importer.in.batchPutErrFilePath";
+
     public static final String DELIMITER_1 = "importer.in.delimiter_1";
     public static final String DELIMITER_2 = "importer.in.delimiter_2";
     public static final String KEY_DELIMITER = "importer.in.keyDelimiter";
@@ -77,8 +75,6 @@ public class Model {
     public static final String UPDATE_TIME = "importer.in.updateTime";
 
     public static final String EXPORT_FILE_PATH = "exporter.out.filePath";
-    public static final String EXPORT_LIMIT = "exporter.tikv.exportLimit";
-    public static final String EXPORT_THREAD = "exporter.tikv.exportThread";
 
     public static final String REDO_MOVE_PATH = "redo.movePath";
 
