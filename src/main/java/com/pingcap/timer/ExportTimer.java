@@ -1,24 +1,30 @@
 package com.pingcap.timer;
 
 import com.pingcap.enums.Model;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import com.pingcap.task.TaskInterface;
 
-import java.util.TimerTask;
+import java.util.Map;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.atomic.AtomicInteger;
 
-public class ExportTimer extends TimerTask {
+public class ExportTimer extends TimerTaskBase {
+    private final long startTime = System.currentTimeMillis();
 
-    private static final Logger logger = LoggerFactory.getLogger(Model.LOG);
-    private final AtomicInteger totalExportNum;
-
-    public ExportTimer(AtomicInteger totalExportNum) {
-        this.totalExportNum = totalExportNum;
+    public ExportTimer(ThreadPoolExecutor threadPoolFileLoading,TaskInterface cmdInterFace,AtomicInteger exportTotalCounter) {
+        this.cmdInterFace = cmdInterFace;
+        this.processFileLines = exportTotalCounter;
+        //this.totalLines = totalLines;
+        //this.filePath = filePath;
+        this.threadPoolFileLoading = threadPoolFileLoading;
+        Map<String, String> properties = cmdInterFace.getProperties();
+        this.internalThreadPool = Integer.parseInt(properties.get(Model.INTERNAL_THREAD_POOL));
+        this.internalMaxThreadPool = Integer.parseInt(properties.get(Model.INTERNAL_MAXTHREAD_POOL));
     }
 
     @Override
     public void run() {
-        logger.info("Total exportNum={}", totalExportNum.get());
+        cmpConfingUpdate();
+		cmdInterFace.getLogger().info("Total exportNum={} and used time={}s", processFileLines.get(),String.format("%.2f", (float)(System.currentTimeMillis()-startTime)/1000));
     }
 
 }
