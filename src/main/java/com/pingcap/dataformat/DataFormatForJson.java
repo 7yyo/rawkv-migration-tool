@@ -8,6 +8,8 @@ import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONObject;
 import com.pingcap.enums.Model;
 import com.pingcap.pojo.IndexInfo;
+import com.pingcap.pojo.IndexType;
+import com.pingcap.pojo.InfoInterface;
 import com.pingcap.pojo.TempIndexInfo;
 
 public class DataFormatForJson implements DataFormatInterface {
@@ -17,10 +19,6 @@ public class DataFormatForJson implements DataFormatInterface {
 	private String keyDelimiter;
     
     // Cassandra is from original data file, TiKV is will be put raw kv.
-    IndexInfo indexInfoCassandra = null;
-    IndexInfo indexInfoTiKV = new IndexInfo();
-    TempIndexInfo tempIndexInfoCassandra = null;
-    TempIndexInfo tempIndexInfoTiKV = new TempIndexInfo();
     
 	public DataFormatForJson(Map<String, String> properties) {
 		this.updateTime = properties.get(Model.UPDATE_TIME);
@@ -36,7 +34,7 @@ public class DataFormatForJson implements DataFormatInterface {
         } catch (Exception e) {
         	throw e;
         }
-        IndexInfo indexInfoCassandra;
+	    
         // The string type of the key.
         String k;
         // the ttl type
@@ -47,7 +45,8 @@ public class DataFormatForJson implements DataFormatInterface {
         switch (scenes) {
             case Model.INDEX_INFO:
                 // Cassandra IndexInfo
-                indexInfoCassandra = JSON.toJavaObject(jsonObject, IndexInfo.class);
+            	IndexInfo indexInfoTiKV = new IndexInfo();
+            	IndexInfo indexInfoCassandra = JSON.toJavaObject(jsonObject, IndexInfo.class);
                 if (indexInfoCassandra.getUpdateTime() != null) {
                     indexInfoCassandra.setUpdateTime(indexInfoCassandra.getUpdateTime().replaceAll("T", " ").replaceAll("Z", ""));
                 } else {
@@ -72,7 +71,8 @@ public class DataFormatForJson implements DataFormatInterface {
                 break;
 
             case Model.TEMP_INDEX_INFO:
-                tempIndexInfoCassandra = JSON.toJavaObject(jsonObject, TempIndexInfo.class);
+        	    TempIndexInfo tempIndexInfoTiKV = new TempIndexInfo();
+        	    TempIndexInfo tempIndexInfoCassandra = JSON.toJavaObject(jsonObject, TempIndexInfo.class);
                 // TiKV tempIndexInfo
                 TempIndexInfo.initValueTempIndexInfo(tempIndexInfoTiKV, tempIndexInfoCassandra);
                 if (!StringUtils.isEmpty(envId)) {
@@ -122,6 +122,33 @@ public class DataFormatForJson implements DataFormatInterface {
         	jsonString = key + Model.INDEX_TYPE_DELIMITER + value;
         }
 		return unDataFormatCallBack.getDataCallBack( jsonString, dataType, dataTypeInt);
+	}
+
+	@Override
+	public InfoInterface packageToObject(String scenes, String key, String value, DataFormatCallBack dataFormatCallBack)
+			throws Exception {
+	        JSONObject jsonObject = null;
+	        if (key.startsWith(Model.INDEX_INFO)) {
+	            jsonObject = JSONObject.parseObject(value);
+	            IndexInfo indexInfo = JSON.toJavaObject(jsonObject, IndexInfo.class);
+	            // key = indexInfo_:_{envid}_:_{type}_:_{id}
+	            ////String keyArr[] = key.split(keyDelimiter);
+	            ////indexInfo.setEnvId(keyArr[1]);
+	            ////indexInfo.setType(keyArr[2]);
+	            ////indexInfo.setId(keyArr[3]);
+	            return indexInfo;
+	        } else if (key.startsWith(Model.TEMP_INDEX_INFO)) {
+	            jsonObject = JSONObject.parseObject(value);
+	            TempIndexInfo tempIndexInfo = JSON.toJavaObject(jsonObject, TempIndexInfo.class);
+	            // key = tempIndex_:_{envid}_:_{id}
+	            ////String keyArr[] = key.split(keyDelimiter);
+	            ////tempIndexInfo.setEnvId(keyArr[1]);
+	            ////tempIndexInfo.setId(keyArr[2]);
+	            return tempIndexInfo;
+	        }
+	        else {
+	        	return (InfoInterface)new IndexType(key + Model.INDEX_TYPE_DELIMITER + value);
+	        }
 	}
 
 }

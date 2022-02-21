@@ -8,7 +8,10 @@ import com.alibaba.fastjson.JSONObject;
 import com.alibaba.fastjson.serializer.PascalNameFilter;
 import com.pingcap.enums.Model;
 import com.pingcap.pojo.IndexInfo;
+import com.pingcap.pojo.IndexType;
+import com.pingcap.pojo.InfoInterface;
 import com.pingcap.pojo.ServiceTag;
+import com.pingcap.pojo.TempIndexInfo;
 
 public class DataFormatForCsv implements DataFormatInterface {
 	private String keyDelimiter;
@@ -17,7 +20,6 @@ public class DataFormatForCsv implements DataFormatInterface {
 	private String envId;
 	private String appId;
 	private String updateTime;
-    PascalNameFilter nameFilter = new PascalNameFilter();
 	
 	public DataFormatForCsv(Map<String, String> properties) {
 		this.keyDelimiter = properties.get(Model.KEY_DELIMITER);
@@ -67,8 +69,9 @@ public class DataFormatForCsv implements DataFormatInterface {
 		else {
 		    IndexInfo indexInfoTiKV = new IndexInfo();
 		    String arr[] = line.split(delimiter1);
-		    if(3 != arr.length)
+		    if(3 != arr.length){
 		    	throw new Exception("indexInfo format error");
+		    }
 	        final String id = arr[0];
 	        if(StringUtils.isEmpty(id))
 	        	throw new Exception("indexInfo format error");
@@ -77,10 +80,10 @@ public class DataFormatForCsv implements DataFormatInterface {
 	        // CSV has no timestamp, so don't consider.
 	        String extArr[] = arr[2].split(delimiter2);
 	        if(8 < extArr.length)
-	        	throw new Exception("indexInfo format error");        
-	        indexInfoTiKV.setTargetId(extArr[0]);
-	        indexInfoTiKV.setAppId(appId);
-	
+	        	throw new Exception("indexInfo format error");
+	        if(0 < extArr.length)
+	        	indexInfoTiKV.setTargetId(extArr[0]);
+		    indexInfoTiKV.setAppId(appId);
 	        // except <id|type|targetId>
 	        if (extArr.length > 1) {
 	            ServiceTag serviceTag = new ServiceTag();
@@ -97,7 +100,8 @@ public class DataFormatForCsv implements DataFormatInterface {
 	                serviceTag.setAR_ID(extArr[6]);
 	                serviceTag.setQCRCRD_IND(extArr[7]);
 	            }
-	            indexInfoTiKV.setServiceTag(JSON.toJSONString(serviceTag, nameFilter));
+
+	            indexInfoTiKV.setServiceTag(JSON.toJSONString(serviceTag, new PascalNameFilter()));
 	        }
 	
 	        indexInfoTiKV.setUpdateTime(updateTime);
@@ -150,6 +154,34 @@ public class DataFormatForCsv implements DataFormatInterface {
         	jsonString.append(key).append(Model.INDEX_TYPE_DELIMITER).append(value);
         }
 		return unDataFormatCallBack.getDataCallBack( jsonString.toString(), dataType, dataTypeInt);
+	}
+
+	@Override
+	public InfoInterface packageToObject(String scenes, String key, String value, DataFormatCallBack dataFormatCallBack)
+			throws Exception {
+	        JSONObject jsonObject = null;
+	        if (key.startsWith(Model.INDEX_INFO)) {
+	            jsonObject = JSONObject.parseObject(value);
+	            IndexInfo indexInfo = JSON.toJavaObject(jsonObject, IndexInfo.class);
+	            // key = indexInfo_:_{envid}_:_{type}_:_{id}
+	            ////String keyArr[] = key.split(keyDelimiter);
+	            ////indexInfo.setEnvId(keyArr[1]);
+	            ////indexInfo.setType(keyArr[2]);
+	            ////indexInfo.setId(keyArr[3]);
+	            return indexInfo;
+	        } else if (key.startsWith(Model.TEMP_INDEX_INFO)) {
+	            jsonObject = JSONObject.parseObject(value);
+	            TempIndexInfo tempIndexInfo = JSON.toJavaObject(jsonObject, TempIndexInfo.class);
+	            // key = tempIndex_:_{envid}_:_{id}
+	            ////String keyArr[] = key.split(keyDelimiter);
+	            ////tempIndexInfo.setEnvId(keyArr[1]);
+	            ////tempIndexInfo.setId(keyArr[2]);
+	            return tempIndexInfo;
+	        }
+	        else {
+	        	return (InfoInterface)new IndexType(key + Model.INDEX_TYPE_DELIMITER + value);
+	        }
+			//return unDataFormatCallBack.getDataCallBack( jsonString, dataType, dataTypeInt);
 	}
 
 }

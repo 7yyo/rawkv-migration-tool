@@ -5,6 +5,8 @@ import java.util.regex.Pattern;
 
 import org.tikv.shade.com.google.protobuf.ByteString;
 
+import com.pingcap.pojo.InfoInterface;
+
 public interface DataFormatInterface {
 	public static final String DATA_LINENO = "LINENO";
 	public static final String DATA_LINEDATA = "LINEDATA";
@@ -19,6 +21,8 @@ public interface DataFormatInterface {
 	}
 
 	public boolean formatToKeyValue( String scenes, String line, DataFormatCallBack dataFormatCallBack) throws Exception;
+	
+	public InfoInterface packageToObject(String scenes, String key, String value, DataFormatCallBack dataFormatCallBack) throws Exception;
 	
 	public boolean unFormatToKeyValue(
 			String scenes,
