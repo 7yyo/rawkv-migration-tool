@@ -31,6 +31,7 @@ public class DataFormatForCsv implements DataFormatInterface {
 	}
 
     /**
+     * CSV files have two types: indexInfo and indexType. Indexinfo has the following three formats
      * 1. id|type|targetId
      * 2. id|type|targetId##BLKMDL_ID
      * 3. id|type|targetId##BLKMDL_ID##PD_SALE_FTA_CD##ACCT_DTL_TYPE##CORPPRVT_FLAG##CMTRST_CST_ACCNO##AR_ID##QCRCRD_IND
@@ -44,18 +45,9 @@ public class DataFormatForCsv implements DataFormatInterface {
 		if(Model.INDEX_TYPE.equals(scenes)) {
 			if(Model.INDEX_TYPE_DELIMITER.equals(line))
 				throw new Exception("IndexType format error");
-			String arr[] = line.split(Model.INDEX_TYPE_DELIMITER);
+			String arr[] = line.split(Model.INDEX_TYPE_DELIMITER,-1);
 			if(2 != arr.length){
-				//key@ value is null allowed 
-				if(1 == arr.length && line.endsWith(Model.INDEX_TYPE_DELIMITER)){
-					String temp = arr[0];
-					arr = new String[2];
-					arr[0] = temp;
-					arr[1] = "";
-				}
-				else{
-					throw new Exception("IndexType format error");
-				}
+				throw new Exception("IndexType format error");
 			}
 			if(StringUtils.isBlank(arr[0]))
 				throw new Exception("IndexType key is empty");
@@ -64,11 +56,12 @@ public class DataFormatForCsv implements DataFormatInterface {
             if (StringUtils.isEmpty(key.toStringUtf8())) {
                 throw new Exception("IndexType key is empty");
             }
-            value = ByteString.copyFromUtf8(arr[1]);
+			if(null != arr[1])
+				value = ByteString.copyFromUtf8(arr[1]);
 		}
 		else {
 		    IndexInfo indexInfoTiKV = new IndexInfo();
-		    String arr[] = line.split(delimiter1);
+		    String arr[] = line.split(delimiter1,-1);
 		    if(3 != arr.length){
 		    	throw new Exception("indexInfo format error");
 		    }
@@ -163,25 +156,15 @@ public class DataFormatForCsv implements DataFormatInterface {
 	        if (key.startsWith(Model.INDEX_INFO)) {
 	            jsonObject = JSONObject.parseObject(value);
 	            IndexInfo indexInfo = JSON.toJavaObject(jsonObject, IndexInfo.class);
-	            // key = indexInfo_:_{envid}_:_{type}_:_{id}
-	            ////String keyArr[] = key.split(keyDelimiter);
-	            ////indexInfo.setEnvId(keyArr[1]);
-	            ////indexInfo.setType(keyArr[2]);
-	            ////indexInfo.setId(keyArr[3]);
 	            return indexInfo;
 	        } else if (key.startsWith(Model.TEMP_INDEX_INFO)) {
 	            jsonObject = JSONObject.parseObject(value);
 	            TempIndexInfo tempIndexInfo = JSON.toJavaObject(jsonObject, TempIndexInfo.class);
-	            // key = tempIndex_:_{envid}_:_{id}
-	            ////String keyArr[] = key.split(keyDelimiter);
-	            ////tempIndexInfo.setEnvId(keyArr[1]);
-	            ////tempIndexInfo.setId(keyArr[2]);
 	            return tempIndexInfo;
 	        }
 	        else {
 	        	return (InfoInterface)new IndexType(key + Model.INDEX_TYPE_DELIMITER + value);
 	        }
-			//return unDataFormatCallBack.getDataCallBack( jsonString, dataType, dataTypeInt);
 	}
 
 }
