@@ -5,6 +5,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -54,7 +55,6 @@ public class Import implements TaskInterface {
 	public void checkAllParameters(Map<String, String> properties) {
 		TaskInterface.checkShareParameters(properties);
 
-		PropertiesUtil.checkConfig(properties, Model.CHECK_EXISTS_KEY);
         PropertiesUtil.checkConfig(properties, Model.IMPORT_FILE_PATH);
         PropertiesUtil.checkConfig(properties, Model.TTL_SKIP_TYPE);
         PropertiesUtil.checkConfig(properties, Model.TTL_PUT_TYPE);
@@ -66,10 +66,20 @@ public class Import implements TaskInterface {
         
         PropertiesUtil.checkNaturalNumber( properties, Model.TTL, false);
         ttl = Integer.parseInt(properties.get(Model.TTL));
+        if(Model.JSON_FORMAT.equals(properties.get(Model.MODE))&&Model.INDEX_TYPE.equals(properties.get(Model.SCENES))){
+            logger.error("Configuration json format not support indexType of scense");
+            System.exit(0);  
+        }
+        else{
+            if(Model.TEMP_INDEX_INFO.equals(properties.get(Model.SCENES))){
+                logger.error("Configuration csv format not support tempIndexInfo of scense");
+                System.exit(0);  
+            }
+        }
 	}
 
 	@Override
-	public int executeTikv(Map<String, Object> propParameters, RawKVClient rawKvClient, LinkedHashMap<ByteString, LineDataText> pairs,
+	public int executeTikv(Map<String, Object> propParameters, RawKVClient rawKvClient, AtomicInteger totalParseErrorCount, LinkedHashMap<ByteString, LineDataText> pairs,
 			LinkedHashMap<ByteString, LineDataText> pairs_jmp, boolean hasTtl,String filePath,int dataSize) {
         List<Kvrpcpb.KvPair> kvHaveList = null;
         int ret = dataSize;

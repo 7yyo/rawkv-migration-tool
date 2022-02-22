@@ -23,14 +23,12 @@ import org.tikv.kvproto.Kvrpcpb;
 import org.tikv.raw.RawKVClient;
 import org.tikv.shade.com.google.protobuf.ByteString;
 
-import com.alibaba.fastjson.JSONObject;
 import com.pingcap.controller.FileScanner;
 import com.pingcap.controller.ScannerInterface;
+import com.pingcap.dataformat.DataFactory;
 import com.pingcap.enums.Model;
-import com.pingcap.pojo.IndexInfo;
 import com.pingcap.pojo.InfoInterface;
 import com.pingcap.pojo.LineDataText;
-import com.pingcap.pojo.TempIndexInfo;
 import com.pingcap.rawkv.LimitSpeedkv;
 import com.pingcap.util.CountUtil;
 import com.pingcap.util.FileUtil;
@@ -45,8 +43,9 @@ public class Redo implements TaskInterface {
     private static final String AtomicInteger_checkSumFail = "_checkSumFail";
     private static final String AtomicInteger_notInsert = "_notInsert";
     
-    private Histogram DURATION = Histogram.build().name("redo duration").help("redo duration").labelNames("type").register();
+    private Histogram DURATION = Histogram.build().name("redoduration").help("redo duration").labelNames("type").register();
     private Map<String, String> properties = null;
+    private DataFactory dataFactory;
     
 	@Override
 	public Logger getLogger() {
@@ -81,7 +80,7 @@ public class Redo implements TaskInterface {
 	}
 
 	@Override
-	public int executeTikv(Map<String, Object> propParameters, RawKVClient rawKvClient,
+	public int executeTikv(Map<String, Object> propParameters, RawKVClient rawKvClient, AtomicInteger totalParseErrorCount,
 			LinkedHashMap<ByteString, LineDataText> pairs, LinkedHashMap<ByteString, LineDataText> pairs_jmp, boolean hasTtl,
 			String filePath, int dataSize) {
 		Histogram.Timer batchGetTimer = DURATION.labels("batch_get").startTimer();
@@ -89,11 +88,9 @@ public class Redo implements TaskInterface {
 		int ret = dataSize;
 		int startLineNo = 0;
 		List<ByteString> keyList = new ArrayList<>(pairs.keySet());
-		InfoInterface infoRawKV,tmpRawKV;
+		InfoInterface infoRawKV,tmpRawKV = null;
 		LineDataText lineData;
-		Object clazz = new TempIndexInfo();
-		if(Model.INDEX_INFO.equals(properties.get(SCENES)))
-			clazz = new IndexInfo();
+		final String scenes = properties.get(SCENES);
 		try {
 			// Batch get keys which to check sum
         	if(0<keyList.size()){
@@ -103,9 +100,6 @@ public class Redo implements TaskInterface {
         	}
 			kvList = LimitSpeedkv.batchGet(rawKvClient,keyList,ret);
 		} catch (Exception e) {
-            //for (Entry<ByteString, LineDataText> originalKv : pairs.entrySet()) {
-            //	logger.error("Batch get failed.Key={}, file={}, almost line={}", originalKv.getKey().toStringUtf8(), filePath, dataSource.getLineDataString(pairs_lines.get(originalKv.getKey())));
-            //}
 			logger.error("Batch get failed. file={}, almost line={},{}", filePath, startLineNo, pairs.size());
             throw e;
         }
@@ -115,8 +109,12 @@ public class Redo implements TaskInterface {
 
 		Map<ByteString, InfoInterface> rawKvResultMap = new HashMap<>(kvList.size());
         for (Kvrpcpb.KvPair kvPair : kvList) {
-        	infoRawKV = (InfoInterface)JSONObject.parseObject(kvPair.getValue().toStringUtf8(), clazz.getClass());
-        	rawKvResultMap.put(kvPair.getKey(), infoRawKV);
+        	try {
+				infoRawKV = dataFactory.packageToObject(scenes, kvPair.getKey().toStringUtf8(), kvPair.getValue().toStringUtf8(), null);
+	        	rawKvResultMap.put(kvPair.getKey(), infoRawKV);
+			} catch (Exception e) {
+				e.printStackTrace();
+			}
         }
         kvList.clear();
         kvList = null;
@@ -125,7 +123,14 @@ public class Redo implements TaskInterface {
         ByteString curKey;
         for (int i=0;i<keyList.size();i++) {
         	curKey = keyList.get(i);
-        	tmpRawKV = (InfoInterface)JSONObject.parseObject(pairs.get(curKey).getLineData(), clazz.getClass());
+        	try {
+				tmpRawKV = dataFactory.packageToObject(scenes, curKey.toStringUtf8(), pairs.get(curKey).getValue().toStringUtf8(), null);
+			} catch (Exception e) {
+				e.printStackTrace();
+				lineData = pairs.get(curKey);
+                redoLog.error("Redo packageToObject exception. File={}, data={}, line={}", filePath, lineData.getLineData(), lineData.getLineNo());
+                System.exit(0);
+			}
         	if (tmpRawKV.getOpType() == null) {
         		lineData = pairs.get(curKey);
                 redoLog.error("Redo data opType must not be null. File={}, data={}, line={}", filePath, lineData.getLineData(), lineData.getLineNo());
@@ -275,13 +280,13 @@ public class Redo implements TaskInterface {
         int iCheckSumFail = ((AtomicInteger)propParameters.get(AtomicInteger_checkSumFail)).get();
         int iNotInsert = ((AtomicInteger)propParameters.get(AtomicInteger_notInsert)).get();
 
-        File checkSumFile = new File(filePath);
+        File redoFile = new File(filePath);
         File moveFile = new File(moveFilePath);
         try {
         	int total = filesNum.incrementAndGet();
-        	if(!checkSumFile.getParentFile().getAbsolutePath().equals(moveFile.getAbsolutePath())){
-        		moveFile = new File(moveFilePath + "/" + now + "/" + checkSumFile.getName() + "." + total);
-        		FileUtils.moveFile(checkSumFile, moveFile);
+        	if(!redoFile.getParentFile().getAbsolutePath().equals(moveFile.getAbsolutePath())){
+        		moveFile = new File(moveFilePath + "/" + now + "/" + redoFile.getName() + "." + total);
+        		FileUtils.moveFile(redoFile, moveFile);
         	}
         } catch (IOException e) {
             e.printStackTrace();
@@ -322,6 +327,22 @@ public class Redo implements TaskInterface {
         String moveFilePath = properties.get(Model.REDO_MOVE_PATH);
         // MoveFilePath
         FileUtil.createFolder(moveFilePath);
+        if(!Model.JSON_FORMAT.equals(properties.get(Model.MODE))){
+            logger.error("The redo function does not support non JSON format data");
+            System.exit(0);  
+        }
+        else{
+	        if(Model.INDEX_TYPE.equals(properties.get(Model.SCENES))){
+	            logger.error("Configuration json format not support indexType of scense");
+	            System.exit(0);  
+	        }
+        }
+        try {
+			dataFactory = DataFactory.getInstance(properties.get(Model.MODE),properties);
+		} catch (Exception e) {
+            logger.error("illegal file format");
+            System.exit(0);
+		}
 	}
 
 	@Override

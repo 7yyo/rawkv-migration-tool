@@ -86,11 +86,9 @@ public class LineLoadingJob implements Runnable {
         cmdInterFace.installPrivateParamters(propParameters);
 
         final int internalThreadNum = Integer.parseInt(properties.get(Model.INTERNAL_THREAD_NUM));
-        ////List<String> threadPerLineList = CountUtil.getPerThreadFileLines(importFileLineNum, internalThreadNum, importFile.getAbsolutePath());
 
-        Timer timer = new Timer();
         TaskTimer importTimer = new TaskTimer(threadPoolFileLoading,cmdInterFace, processFileLines, importFileLineNum, importFilePath);
-        timer.schedule(importTimer, 5000, Long.parseLong(properties.get(Model.TIMER_INTERVAL)));
+        FileScanner.scannerTimer.schedule(importTimer, 5000, Long.parseLong(properties.get(Model.TIMER_INTERVAL)));
 
         int fileSplitSize = Integer.parseInt(properties.get(Model.BATCHS_PACKAGE_SIZE));
         if(importFileLineNum <= fileSplitSize){
@@ -197,7 +195,7 @@ public class LineLoadingJob implements Runnable {
         	blockCache.clear();
         	blockCache = null;
         }
-        //cmdInterFace.getLogger().info("file={}, line={}, each processes={}, countDownNum={},threadsNumber={}", absolutePath, importFileLineNum, fileSplitSize, countDownNum, threadsNumber);
+
         try {
             countDownLatch.await();
         } catch (InterruptedException e) {
@@ -207,7 +205,7 @@ public class LineLoadingJob implements Runnable {
 
         ttlPutList.clear();
         ttlPutList = null;
-        timer.cancel();
+        importTimer.cancel();
 
         long duration = System.currentTimeMillis() - startTime;
         cmdInterFace.finishedReport(importFile.getAbsolutePath(),

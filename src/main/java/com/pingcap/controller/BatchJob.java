@@ -92,7 +92,12 @@ public class BatchJob implements Runnable {
         // The kv pair to be inserted into the raw kv.
 
         boolean notData;
-        DataFactory dataFactory = DataFactory.getInstance(importMode,properties);
+        DataFactory dataFactory = null;
+		try {
+			dataFactory = DataFactory.getInstance(importMode,properties);
+		} catch (Exception e1) {
+			e1.printStackTrace();
+		}
         LineDataText dataSource;
         List<LineDataText> lineDataSourceList = lineBlock.getLineDataSourceList();
         for(int row=0;row<lineDataSourceList.size();row++) {
@@ -152,8 +157,15 @@ public class BatchJob implements Runnable {
 					}
 				});
             } catch (Exception e) {
-            	totalParseErrorCount.getAndIncrement();
             	cmdInterFace.getLoggerAudit().error("Parse failed, file={}, data={}, line={}", absolutePath, line, lineNo);
+            	int err = totalParseErrorCount.getAndIncrement();
+            	//If there is no success and 10 consecutive errors, exit the program
+            	if(0 == totalImportCount.get()){
+	            	if(err >= 10 && 0 == (kvPairs.size()+kvPairsTtl.size())){
+	            		cmdInterFace.getLogger().error("If there are many parsing errors in succession, exit the program.");
+	            		System.exit(0);
+	            	}
+            	}
             	continue;
             }
             finally{
@@ -208,7 +220,7 @@ public class BatchJob implements Runnable {
     	int ret = 0;
     	LinkedHashMap<ByteString, LineDataText> kvPairs_Jump = new LinkedHashMap<>(1024);
 		try {
-			ret = cmdInterFace.executeTikv(propParameters, rawKvClient, pairs, kvPairs_Jump, hasTtl, absolutePath, dataSize);
+			ret = cmdInterFace.executeTikv(propParameters, rawKvClient, totalParseErrorCount,pairs, kvPairs_Jump, hasTtl, absolutePath, dataSize);
 		 	totalImportCount.addAndGet(pairs.size());
 			cmdInterFace.succeedWriteRowsLogger(absolutePath, pairs);
 		}

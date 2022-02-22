@@ -79,8 +79,8 @@ public class SystemMonitorTimer extends TimerTask {
 
 	private synchronized List<double[]> putData(){
 		double curData[] = new double[2];
-		curData[0] = System.currentTimeMillis();				// time
 		curData[1] = TaskInterface.totalDataBytes.getAndSet(0);	// bytes
+		curData[0] = System.currentTimeMillis();				// time
 		traffic.add(curData);
 		if(5 < traffic.size())
 			traffic.remove(0);
@@ -101,7 +101,7 @@ public class SystemMonitorTimer extends TimerTask {
 		}
 		if(0 == timeValue)
 			return "0,0byte";
-		return byteTo((dataValue*1000)/timeValue);
+		return byteTo(dataValue/timeValue*1000);
 	}
 	
 	public static String byteTo(double value){

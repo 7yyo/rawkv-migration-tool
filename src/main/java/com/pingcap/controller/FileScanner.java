@@ -26,10 +26,10 @@ public class FileScanner implements ScannerInterface {
         
         // Start the Main thread for each file.showFileList.
         final ThreadPoolExecutor threadPoolFileScanner = ThreadPoolUtil.startJob( Integer.parseInt(properties.get(Model.CORE_POOL_SIZE)), Integer.parseInt(properties.get(Model.MAX_POOL_SIZE)));
-        Timer timer = new Timer();
+
         SystemMonitorTimer taskTimer = new SystemMonitorTimer(cmdInterFace);
         taskTimer.getDateAndUpdate(FileUtil.getFileLastTime(properties.get(Model.SYS_CFG_PATH)), true);
-        timer.schedule(taskTimer, 5000, Long.parseLong(properties.get(Model.TIMER_INTERVAL)));
+        scannerTimer.schedule(taskTimer, 5000, Long.parseLong(properties.get(Model.TIMER_INTERVAL)));
         
         for (File importFile : importFileList) {
             if(taskTimer.useCPURatio < 0.8){
@@ -50,7 +50,7 @@ public class FileScanner implements ScannerInterface {
             e.printStackTrace();
         }
         finally{
-        	timer.cancel();
+        	scannerTimer.cancel();
         }
         return;
     }

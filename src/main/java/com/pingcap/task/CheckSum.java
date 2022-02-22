@@ -25,16 +25,14 @@ import org.tikv.kvproto.Kvrpcpb;
 import org.tikv.raw.RawKVClient;
 import org.tikv.shade.com.google.protobuf.ByteString;
 
-import com.alibaba.fastjson.JSONObject;
 import com.pingcap.controller.FileScanner;
 import com.pingcap.controller.ScannerInterface;
+import com.pingcap.dataformat.DataFactory;
 import com.pingcap.enums.Model;
 import com.pingcap.util.FileUtil;
 import com.pingcap.util.PropertiesUtil;
-import com.pingcap.pojo.IndexInfo;
 import com.pingcap.pojo.InfoInterface;
 import com.pingcap.pojo.LineDataText;
-import com.pingcap.pojo.TempIndexInfo;
 import com.pingcap.rawkv.LimitSpeedkv;
 
 import io.prometheus.client.Histogram;
@@ -49,7 +47,7 @@ public class CheckSum implements TaskInterface {
 
     //private String pid = JavaUtil.getPid();
     private Histogram CHECK_SUM_DURATION = Histogram.build().name("checksum_duration").help("Check sum duration").labelNames("type").register();
-    
+    private DataFactory dataFactory;
 	public CheckSum() {
 		// TODO Auto-generated constructor stub
 	}
@@ -85,19 +83,33 @@ public class CheckSum implements TaskInterface {
         String moveFilePath = properties.get(Model.CHECK_SUM_MOVE_PATH);
         // MoveFilePath
         FileUtil.createFolder(moveFilePath);
+        if(Model.JSON_FORMAT.equals(properties.get(Model.MODE))&&Model.INDEX_TYPE.equals(properties.get(Model.SCENES))){
+            logger.error("Configuration json format not support indexType of scense");
+            System.exit(0);  
+        }
+        else{
+            if(Model.TEMP_INDEX_INFO.equals(properties.get(Model.SCENES))){
+                logger.error("Configuration csv format not support tempIndexInfo of scense");
+                System.exit(0);  
+            }
+        }
+        try {
+			dataFactory = DataFactory.getInstance(properties.get(Model.MODE),properties);
+		} catch (Exception e) {
+            logger.error("illegal file format");
+            System.exit(0);
+		}
 	}
 
 	@Override
-	public int executeTikv(Map<String, Object> propParameters,RawKVClient rawKvClient, LinkedHashMap<ByteString, LineDataText> pairs,
+	public int executeTikv(Map<String, Object> propParameters,RawKVClient rawKvClient, AtomicInteger totalParseErrorCount, LinkedHashMap<ByteString, LineDataText> pairs,
 			LinkedHashMap<ByteString, LineDataText> pairs_jmp, boolean hasTtl,String filePath,int dataSize) {
 		Histogram.Timer batchGetTimer = CHECK_SUM_DURATION.labels("batch_get").startTimer();
 		List<Kvrpcpb.KvPair> kvList = null;
-		int ret = 0;
+		int ret = 0,ret_rx = 0;
 		List<ByteString> keyList = new ArrayList<>(pairs.keySet());
 		InfoInterface infoRawKV,tmpRawKV;
-		Object clazz = new TempIndexInfo();
-		if(Model.INDEX_INFO.equals(properties.get(SCENES)))
-			clazz = new IndexInfo();
+		final String scenes = properties.get(SCENES);
 		try {
 			// Batch get keys which to check sum
         	if(0<keyList.size()){
@@ -117,8 +129,17 @@ public class CheckSum implements TaskInterface {
 
 		Map<ByteString, InfoInterface> rawKvResultMap = new HashMap<>(kvList.size());
         for (Kvrpcpb.KvPair kvPair : kvList) {
-        	infoRawKV = (InfoInterface)JSONObject.parseObject(kvPair.getValue().toStringUtf8(), clazz.getClass());
-        	rawKvResultMap.put(kvPair.getKey(), infoRawKV);
+        	try {
+        		ret_rx += (kvPair.getKey().size() + kvPair.getValue().size());
+				infoRawKV = dataFactory.packageToObject(scenes, kvPair.getKey().toStringUtf8(), kvPair.getValue().toStringUtf8(), null);
+	        	rawKvResultMap.put(kvPair.getKey(), infoRawKV);
+			} catch (Exception e) {
+				e.printStackTrace();
+			}
+        }
+        if(0 < ret_rx){
+	        LimitSpeedkv.testTraffic(ret_rx);
+	        ret += ret_rx;
         }
         kvList.clear();
         kvList = null;
@@ -129,21 +150,31 @@ public class CheckSum implements TaskInterface {
         	curKey = keyList.get(i);
         	infoRawKV = rawKvResultMap.get(curKey);
             if (null != infoRawKV) {
-            	tmpRawKV = (InfoInterface)JSONObject.parseObject(pairs.get(curKey).getLineData(), clazz.getClass());
-                if (!infoRawKV.equalsValue(tmpRawKV)) {
-                    checkSumLog.error("Check sum failed. Key={}", curKey.toStringUtf8());
-                    csFailLog.info(pairs.get(curKey).getLineData());
-                    pairs.remove(curKey);
-                    //pairs_lines.remove(curKey);
-                    ++iCheckSumFail;
-                }
+            	try {
+					tmpRawKV = dataFactory.packageToObject(scenes, curKey.toStringUtf8(),pairs.get(curKey).getValue().toStringUtf8(),null);
+	                if (!infoRawKV.equalsValue(tmpRawKV)) {
+	                    checkSumLog.error("Check sum failed. Key={}", curKey.toStringUtf8());
+	                    csFailLog.info(pairs.get(curKey).getLineData());
+	                    pairs.remove(curKey);
+	                    //pairs_lines.remove(curKey);
+	                    ++iCheckSumFail;
+	                }
+				} catch (Exception e) {
+					e.printStackTrace();
+					totalParseErrorCount.incrementAndGet();
+				}
             } else {
                 checkSumLog.error("Key={} is not exists.", curKey.toStringUtf8());
-                infoRawKV = (InfoInterface)JSONObject.parseObject(pairs.get(curKey).getLineData(), clazz.getClass());
-                csFailLog.info(pairs.get(curKey).getLineData());
-                pairs.remove(curKey);
-                //pairs_lines.remove(curKey);
-                ++iNotInsert;
+                try {
+					infoRawKV = dataFactory.packageToObject(scenes,curKey.toString(),pairs.get(curKey).getValue().toStringUtf8(),null);
+	                csFailLog.info(pairs.get(curKey).getLineData());
+	                pairs.remove(curKey);
+	                //pairs_lines.remove(curKey);
+	                ++iNotInsert;
+				} catch (Exception e) {
+					e.printStackTrace();
+					totalParseErrorCount.incrementAndGet();
+				}
             }
         }
         keyList.clear();

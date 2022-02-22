@@ -5,6 +5,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -30,9 +31,6 @@ public class UnImport implements TaskInterface {
     private String pid = JavaUtil.getPid();
     private Histogram UNIMPORT_DURATION = Histogram.build().name("unimport_duration_"+pid).help("unimport duration").labelNames("type").register();
     
-    @SuppressWarnings("unused")
-	private long ttl = 0;
-    
 	public UnImport() {
 		// TODO Auto-generated constructor stub
 	}
@@ -56,7 +54,6 @@ public class UnImport implements TaskInterface {
 	public void checkAllParameters(Map<String, String> properties) {
 		TaskInterface.checkShareParameters(properties);
 
-		PropertiesUtil.checkConfig(properties, Model.CHECK_EXISTS_KEY);
         PropertiesUtil.checkConfig(properties, Model.IMPORT_FILE_PATH);
         PropertiesUtil.checkConfig(properties, Model.TTL_SKIP_TYPE);
         PropertiesUtil.checkConfig(properties, Model.TTL_PUT_TYPE);
@@ -70,7 +67,7 @@ public class UnImport implements TaskInterface {
 	}
 
 	@Override
-	public int executeTikv(Map<String, Object> propParameters, RawKVClient rawKvClient, LinkedHashMap<ByteString, LineDataText> pairs,
+	public int executeTikv(Map<String, Object> propParameters, RawKVClient rawKvClient, AtomicInteger totalParseErrorCount, LinkedHashMap<ByteString, LineDataText> pairs,
 			LinkedHashMap<ByteString, LineDataText> pairs_jmp, boolean hasTtl,String filePath,int dataSize) {
 		List<Kvrpcpb.KvPair> kvHaveList = null;
 		List<ByteString> kvList = null;
