@@ -140,6 +140,18 @@ public class DataFormatForCsv implements DataFormatInterface {
         	}
             dataTypeInt = 1;
         }
+        else if (key.startsWith(Model.TEMP_INDEX_INFO)) {
+        	//CSV format don't support tempIndexInfo scense,so transfer to json format
+        	dataType = Model.TEMP_INDEX_INFO;
+        	dataTypeInt = 2;
+        	JSONObject jsonObject = JSONObject.parseObject(value);
+            TempIndexInfo tempIndexInfo = JSON.toJavaObject(jsonObject, TempIndexInfo.class);
+            // key = tempIndex_:_{envid}_:_{id}
+            String keyArr[] = key.split(keyDelimiter);
+            tempIndexInfo.setEnvId(keyArr[1]);
+            tempIndexInfo.setId(keyArr[2]);
+            jsonString.append(JSON.toJSONString(tempIndexInfo));
+        }
         else {
         	dataType = Model.INDEX_TYPE;
         	dataTypeInt = 0;
