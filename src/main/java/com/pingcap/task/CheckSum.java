@@ -83,9 +83,11 @@ public class CheckSum implements TaskInterface {
         String moveFilePath = properties.get(Model.CHECK_SUM_MOVE_PATH);
         // MoveFilePath
         FileUtil.createFolder(moveFilePath);
-        if(Model.JSON_FORMAT.equals(properties.get(Model.MODE))&&Model.INDEX_TYPE.equals(properties.get(Model.SCENES))){
-            logger.error("Configuration json format not support indexType of scense");
-            System.exit(0);  
+        if(Model.JSON_FORMAT.equals(properties.get(Model.MODE))){
+        	if(Model.INDEX_TYPE.equals(properties.get(Model.SCENES))){
+        		logger.error("Configuration json format not support indexType of scense");
+        		System.exit(0); 
+        	}
         }
         else{
             if(Model.TEMP_INDEX_INFO.equals(properties.get(Model.SCENES))){

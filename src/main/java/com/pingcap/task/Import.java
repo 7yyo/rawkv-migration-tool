@@ -66,9 +66,11 @@ public class Import implements TaskInterface {
         
         PropertiesUtil.checkNaturalNumber( properties, Model.TTL, false);
         ttl = Integer.parseInt(properties.get(Model.TTL));
-        if(Model.JSON_FORMAT.equals(properties.get(Model.MODE))&&Model.INDEX_TYPE.equals(properties.get(Model.SCENES))){
-            logger.error("Configuration json format not support indexType of scense");
-            System.exit(0);  
+        if(Model.JSON_FORMAT.equals(properties.get(Model.MODE))){
+        	if(Model.INDEX_TYPE.equals(properties.get(Model.SCENES))){
+        		logger.error("Configuration json format not support indexType of scense");
+        		System.exit(0); 
+        	}
         }
         else{
             if(Model.TEMP_INDEX_INFO.equals(properties.get(Model.SCENES))){

@@ -64,6 +64,18 @@ public class UnImport implements TaskInterface {
         PropertiesUtil.checkConfig(properties, Model.UPDATE_TIME);
         
         PropertiesUtil.checkNaturalNumber( properties, Model.TTL, false);
+        if(Model.JSON_FORMAT.equals(properties.get(Model.MODE))){
+        	if(Model.INDEX_TYPE.equals(properties.get(Model.SCENES))){
+        		logger.error("Configuration json format not support indexType of scense");
+        		System.exit(0); 
+        	}
+        }
+        else{
+            if(Model.TEMP_INDEX_INFO.equals(properties.get(Model.SCENES))){
+                logger.error("Configuration csv format not support tempIndexInfo of scense");
+                System.exit(0);  
+            }
+        }
 	}
 
 	@Override
