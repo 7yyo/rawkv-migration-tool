@@ -110,7 +110,7 @@ public class Redo implements TaskInterface {
 		Map<ByteString, InfoInterface> rawKvResultMap = new HashMap<>(kvList.size());
         for (Kvrpcpb.KvPair kvPair : kvList) {
         	try {
-				infoRawKV = dataFactory.packageToObject(scenes, kvPair.getKey().toStringUtf8(), kvPair.getValue().toStringUtf8(), null);
+				infoRawKV = dataFactory.packageToObject(scenes, kvPair.getKey(), kvPair.getValue(), null);
 	        	rawKvResultMap.put(kvPair.getKey(), infoRawKV);
 			} catch (Exception e) {
 				e.printStackTrace();
@@ -124,7 +124,7 @@ public class Redo implements TaskInterface {
         for (int i=0;i<keyList.size();i++) {
         	curKey = keyList.get(i);
         	try {
-				tmpRawKV = dataFactory.packageToObject(scenes, curKey.toStringUtf8(), pairs.get(curKey).getValue().toStringUtf8(), null);
+				tmpRawKV = dataFactory.packageToObject(scenes, curKey, pairs.get(curKey).getValue(), null);
 			} catch (Exception e) {
 				e.printStackTrace();
 				lineData = pairs.get(curKey);

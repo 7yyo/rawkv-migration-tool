@@ -90,7 +90,7 @@ public class CheckSum implements TaskInterface {
         	}
         }
         else{
-            if(Model.TEMP_INDEX_INFO.equals(properties.get(Model.SCENES))){
+            if(Model.TEMP_INDEX_INFO.equals(properties.get(Model.SCENES))&& !Model.ROWB64_FORMAT.equals(properties.get(Model.MODE))){
                 logger.error("Configuration csv format not support tempIndexInfo of scense");
                 System.exit(0);  
             }
@@ -133,7 +133,7 @@ public class CheckSum implements TaskInterface {
         for (Kvrpcpb.KvPair kvPair : kvList) {
         	try {
         		ret_rx += (kvPair.getKey().size() + kvPair.getValue().size());
-				infoRawKV = dataFactory.packageToObject(scenes, kvPair.getKey().toStringUtf8(), kvPair.getValue().toStringUtf8(), null);
+				infoRawKV = dataFactory.packageToObject(scenes, kvPair.getKey(), kvPair.getValue(), null);
 	        	rawKvResultMap.put(kvPair.getKey(), infoRawKV);
 			} catch (Exception e) {
 				e.printStackTrace();
@@ -153,7 +153,7 @@ public class CheckSum implements TaskInterface {
         	infoRawKV = rawKvResultMap.get(curKey);
             if (null != infoRawKV) {
             	try {
-					tmpRawKV = dataFactory.packageToObject(scenes, curKey.toStringUtf8(),pairs.get(curKey).getValue().toStringUtf8(),null);
+					tmpRawKV = dataFactory.packageToObject(scenes, curKey,pairs.get(curKey).getValue(),null);
 	                if (!infoRawKV.equalsValue(tmpRawKV)) {
 	                    checkSumLog.error("Check sum failed. Key={}", curKey.toStringUtf8());
 	                    csFailLog.info(pairs.get(curKey).getLineData());
@@ -168,7 +168,7 @@ public class CheckSum implements TaskInterface {
             } else {
                 checkSumLog.error("Key={} is not exists.", curKey.toStringUtf8());
                 try {
-					infoRawKV = dataFactory.packageToObject(scenes,curKey.toString(),pairs.get(curKey).getValue().toStringUtf8(),null);
+					////infoRawKV = dataFactory.packageToObject(scenes,curKey,pairs.get(curKey).getValue(),null);
 	                csFailLog.info(pairs.get(curKey).getLineData());
 	                pairs.remove(curKey);
 	                //pairs_lines.remove(curKey);

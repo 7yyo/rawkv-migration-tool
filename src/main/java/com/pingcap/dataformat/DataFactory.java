@@ -2,6 +2,7 @@ package com.pingcap.dataformat;
 
 import java.util.Map;
 import com.pingcap.enums.Model;
+import org.tikv.shade.com.google.protobuf.ByteString;
 import com.pingcap.pojo.InfoInterface;
 
 public class DataFactory implements DataFormatInterface {
@@ -19,8 +20,11 @@ public class DataFactory implements DataFormatInterface {
 		else if(Model.CSV_FORMAT.equals(importMode)) {
 			formatInterface = new DataFormatForCsv(properties);
 		}
+		else if(Model.ROWB64_FORMAT.equals(importMode)) {
+			formatInterface = new DataFormatForRowB64(properties);
+		}		
 		else{
-			throw new Exception("illegal file format");
+			throw new Exception("illegal file format:["+importMode+"]");
 		}
 	}
 
@@ -36,7 +40,7 @@ public class DataFactory implements DataFormatInterface {
 	}
 
 	@Override
-	public InfoInterface packageToObject(String scenes, String key, String value, DataFormatCallBack dataFormatCallBack)
+	public InfoInterface packageToObject(String scenes, ByteString key, ByteString value, DataFormatCallBack dataFormatCallBack)
 			throws Exception {
 		return formatInterface.packageToObject(scenes, key, value, dataFormatCallBack);
 	}

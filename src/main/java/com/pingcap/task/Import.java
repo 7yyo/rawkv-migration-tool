@@ -73,7 +73,7 @@ public class Import implements TaskInterface {
         	}
         }
         else{
-            if(Model.TEMP_INDEX_INFO.equals(properties.get(Model.SCENES))){
+            if(Model.TEMP_INDEX_INFO.equals(properties.get(Model.SCENES))&& !Model.ROWB64_FORMAT.equals(properties.get(Model.MODE))){
                 logger.error("Configuration csv format not support tempIndexInfo of scense");
                 System.exit(0);  
             }

@@ -5,7 +5,8 @@ import org.apache.commons.lang.StringUtils;
 public class TempIndexInfo implements InfoInterface{
 
     // tempIndex_:_{envid}_:_{id}
-    public static final String KEY_FORMAT = "tempIndex%s%s%s%s";
+	public static final String HEADFORMAT = "tempIndex";
+    public static final String KEY_FORMAT = HEADFORMAT+"%s%s%s%s";
 
     private String envId;
     private String id;

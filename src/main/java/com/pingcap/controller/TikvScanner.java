@@ -59,6 +59,7 @@ public class TikvScanner implements ScannerInterface {
         double traffic = 0;
 
         //Random random = new Random();
+        int debug_count = 0;
         while (true) {
         	if(lastModifiedDate != taskTimer.getDateAndUpdate(0, false)){
         		lastModifiedDate = taskTimer.getDateAndUpdate(0, false);
@@ -69,6 +70,8 @@ public class TikvScanner implements ScannerInterface {
             Histogram.Timer scanDuration = cmdInterFace.getHistogram().labels("scan duration").startTimer();
             try{
             	kvPairList = rawKvClient.scan(startKey, limit);
+            	debug_count ++;
+            	exporter.getLogger().debug("debug_count:{}[startKey={},lastStartKey={}],kvPairList:{}",(++debug_count),startKey,lastStartKey,kvPairList.size());
             }
             catch(Exception e){
             	e.printStackTrace();

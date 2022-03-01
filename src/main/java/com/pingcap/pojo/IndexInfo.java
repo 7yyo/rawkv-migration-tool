@@ -5,7 +5,8 @@ import org.apache.commons.lang.StringUtils;
 public class IndexInfo implements InfoInterface{
 
     // indexInfo_:_{envid}_:_{type}_:_{id}
-    public static final String KET_FORMAT = "indexInfo%s%s%s%s%s%s";
+	public static final String HEADFORMAT = "indexInfo";
+    public static final String KET_FORMAT = HEADFORMAT+"%s%s%s%s%s%s";
     //private static final PascalNameFilter nameFilter = new PascalNameFilter();
 
     private String envId;

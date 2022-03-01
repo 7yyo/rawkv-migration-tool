@@ -17,6 +17,7 @@ public class Model {
 
     public static final String JSON_FORMAT = "json";
     public static final String CSV_FORMAT = "csv";
+    public static final String ROWB64_FORMAT = "rowb64";
 
     public static final String ON = "true";
 
