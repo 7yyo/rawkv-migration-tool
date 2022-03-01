@@ -8,6 +8,7 @@ import java.nio.CharBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -54,6 +55,7 @@ public class Export implements TaskInterface {
     private static ArrayList<StringBuilder> wrtBufferIndexType = new ArrayList<StringBuilder>(LISTBUFFSIZE);
     private static ArrayList<StringBuilder> wrtBufferIndexInfo = new ArrayList<StringBuilder>(LISTBUFFSIZE);
     private static ArrayList<StringBuilder> wrtBufferIndexTemp = new ArrayList<StringBuilder>(LISTBUFFSIZE);
+    private final boolean wrtTypes[] = {false,false,false};
     private ThreadPoolExecutor threadPoolFileWriter = ThreadPoolUtil.startJob(1, 1);
     private DataFactory dataFactory;
     
@@ -199,6 +201,21 @@ public class Export implements TaskInterface {
             logger.error("illegal file format");
             System.exit(0);
 		}
+        PropertiesUtil.checkConfig(properties, Model.EXPORT_SCENES_TYPE);
+        List<String> outScenesTypeList = new ArrayList<>(Arrays.asList(properties.get(Model.EXPORT_SCENES_TYPE).split(",")));
+		if(outScenesTypeList.contains(Model.INDEX_TYPE)){
+			wrtTypes[0] = true;
+		}
+		if(outScenesTypeList.contains(Model.INDEX_INFO)){
+			wrtTypes[1] = true;
+		}
+		if(outScenesTypeList.contains(Model.TEMP_INDEX_INFO)){
+			wrtTypes[2] = true;
+		}
+        if(!wrtTypes[0] && !wrtTypes[1] && !wrtTypes[2]){
+            logger.error("Configuration {} of item illegal",Model.EXPORT_SCENES_TYPE);
+            System.exit(0);
+        }
 	}
 
 	@Override
@@ -223,16 +240,22 @@ public class Export implements TaskInterface {
 						kvPair.append("\n");
 						switch(typeInt){
 						case 0:
-					    	totalExportIndexType.incrementAndGet();
-							fastWriteIndexType(kvPair,packgeSize);
+							if(wrtTypes[0]){
+						    	totalExportIndexType.incrementAndGet();
+								fastWriteIndexType(kvPair,packgeSize);
+							}
 							break;
 						case 1:
-							totalExportIndexInfo.incrementAndGet();
-							fastWriteIndexInfo(kvPair,packgeSize);
+							if(wrtTypes[1]){
+								totalExportIndexInfo.incrementAndGet();
+								fastWriteIndexInfo(kvPair,packgeSize);
+							}
 							break;
 						default:
-							totalExportTempIndex.incrementAndGet();
-							fastWriteIndexTemp(kvPair,packgeSize);	
+							if(wrtTypes[2]){
+								totalExportTempIndex.incrementAndGet();
+								fastWriteIndexTemp(kvPair,packgeSize);
+							}
 						}
 						return true;
 					}

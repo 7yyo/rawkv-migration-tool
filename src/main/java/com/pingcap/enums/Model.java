@@ -76,6 +76,7 @@ public class Model {
     public static final String UPDATE_TIME = "importer.in.updateTime";
 
     public static final String EXPORT_FILE_PATH = "exporter.out.filePath";
+    public static final String EXPORT_SCENES_TYPE = "exporter.out.scenes.type";
 
     public static final String REDO_MOVE_PATH = "redo.movePath";
 
