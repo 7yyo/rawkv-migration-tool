@@ -340,7 +340,7 @@ public class Redo implements TaskInterface {
         try {
 			dataFactory = DataFactory.getInstance(properties.get(Model.MODE),properties);
 		} catch (Exception e) {
-            logger.error("illegal file format");
+            logger.error(e.getMessage());
             System.exit(0);
 		}
 	}

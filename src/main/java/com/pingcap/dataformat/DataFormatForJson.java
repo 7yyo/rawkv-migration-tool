@@ -102,7 +102,7 @@ public class DataFormatForJson implements DataFormatInterface {
                 jsonObject = JSONObject.parseObject(value);
                 IndexInfo indexInfo = JSON.toJavaObject(jsonObject, IndexInfo.class);
                 // key = indexInfo_:_{envid}_:_{type}_:_{id}
-                String keyArr[] = key.split(keyDelimiter);
+                String keyArr[] = key.split(keyDelimiter,-1);
                 indexInfo.setEnvId(keyArr[1]);
                 indexInfo.setType(keyArr[2]);
                 indexInfo.setId(keyArr[3]);

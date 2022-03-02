@@ -60,7 +60,6 @@ public class DataFormatForCsv implements DataFormatInterface {
 				value = ByteString.copyFromUtf8(arr[1]);
 		}
 		else {
-		    IndexInfo indexInfoTiKV = new IndexInfo();
 		    String arr[] = line.split(delimiter1,-1);
 		    if(3 != arr.length){
 		    	throw new Exception("indexInfo format error");
@@ -71,9 +70,10 @@ public class DataFormatForCsv implements DataFormatInterface {
 	        type = arr[1];
 	        String k = String.format(IndexInfo.KET_FORMAT, keyDelimiter, envId, keyDelimiter, type, keyDelimiter, id);
 	        // CSV has no timestamp, so don't consider.
-	        String extArr[] = arr[2].split(delimiter2);
+	        String extArr[] = arr[2].split(delimiter2,-1);
 	        if(8 < extArr.length)
 	        	throw new Exception("indexInfo format error");
+		    IndexInfo indexInfoTiKV = new IndexInfo();
 	        if(0 < extArr.length)
 	        	indexInfoTiKV.setTargetId(extArr[0]);
 		    indexInfoTiKV.setAppId(appId);
@@ -113,11 +113,11 @@ public class DataFormatForCsv implements DataFormatInterface {
 		String dataType;
 		int dataTypeInt;
         if (key.startsWith(IndexInfo.HEADFORMAT)) {
-        	if(DataFormatInterface.isJsonString(value)){
-	        	JSONObject jsonObject = JSONObject.parseObject(value);
+        	if(DataFormatInterface.isJsonString(value)){       	
 	        	dataType = Model.INDEX_INFO;
+	        	JSONObject jsonObject = JSONObject.parseObject(value);
 	        	IndexInfo indexInfoTiKV = JSON.toJavaObject(jsonObject, IndexInfo.class);
-	        	String keyArr[] = key.split(keyDelimiter);
+	        	String keyArr[] = key.split(keyDelimiter,-1);
 	        	// key = indexInfo_:_{envid}_:_{type}_:_{id}
 	        	// id|type|targetId##BLKMDL_ID
 	        	// id|type|targetId##BLKMDL_ID##PD_SALE_FTA_CD##ACCT_DTL_TYPE##CORPPRVT_FLAG##CMTRST_CST_ACCNO##AR_ID##QCRCRD_IND

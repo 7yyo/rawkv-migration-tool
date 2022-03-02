@@ -15,7 +15,9 @@ import com.pingcap.pojo.TempIndexInfo;
 
 public class DataFormatForRowB64 implements DataFormatInterface {
 
+	private String keyDelimiter;
 	public DataFormatForRowB64(Map<String, String> properties) {
+		this.keyDelimiter = properties.get(Model.KEY_DELIMITER);
 	}
 
 	@Override
@@ -27,21 +29,27 @@ public class DataFormatForRowB64 implements DataFormatInterface {
 		if(2 != arr.length){
 			throw new Exception("rowb64 format error");
 		}
-		String tmpKey = arr[0];
-		if(StringUtils.isBlank(tmpKey))
+		String ttlType="";
+		if(StringUtils.isBlank(arr[0]))
 			throw new Exception("rowb64 source key is empty");	
-		tmpKey = new String(DatatypeConverter.parseBase64Binary(tmpKey),"utf8");
-		if(StringUtils.isBlank(tmpKey))
+		final String strKey = new String(DatatypeConverter.parseBase64Binary(arr[0]),"utf8");
+		if(StringUtils.isBlank(strKey))
 			throw new Exception("rowb64 key is empty");
         // Key@Value
-        key = ByteString.copyFromUtf8(tmpKey);
-        if (StringUtils.isEmpty(key.toStringUtf8())) {
-            throw new Exception("rowb64 key is empty");
-        }
+        key = ByteString.copyFromUtf8(strKey);
 		if(null != arr[1]){
 			value = ByteString.copyFromUtf8(new String(DatatypeConverter.parseBase64Binary(arr[1]),"utf8"));
 		}
-		return dataFormatCallBack.putDataCallBack( "", key, value);
+		if (strKey.startsWith(IndexInfo.HEADFORMAT)) {
+			if(DataFormatInterface.isJsonString(value.toStringUtf8())){
+				String keyArr[] = strKey.split(keyDelimiter,-1);
+				ttlType = keyArr[2];
+			}
+			else{
+				throw new Exception("rowb64 value not json error");
+			}
+		}
+		return dataFormatCallBack.putDataCallBack( ttlType, key, value);
 	}
 
 	@Override

@@ -81,7 +81,6 @@ public class BatchJob implements Runnable {
     	Map<String, String> properties = cmdInterFace.getProperties();
         String scenes = properties.get(Model.SCENES);
         String importMode = properties.get(Model.MODE);
-        boolean isRowB64 = "rowb64".equals(importMode);
 
         final int batchSize = Integer.parseInt(properties.get(Model.BATCH_SIZE));
         kvPairs = new LinkedHashMap<>(batchSize);
@@ -121,31 +120,30 @@ public class BatchJob implements Runnable {
 					public boolean putDataCallBack( String ttlType, ByteString key, ByteString value) {
 						// If importer.ttl.put.type exists, put with ttl, then continue.
 						LineDataText du = null;
-						if(!isRowB64){
-							if(null != ttlType) {
-				                if (ttlPutList.contains(ttlType)) {
-				                	du = kvPairsTtl.put(key, new LineDataText(lineNo,line,value));
-					                if (du != null) {
-					                    totalDuplicateCount.incrementAndGet();
-					                    cmdInterFace.getLoggerAudit().debug("File={}, key={}, value={}", absolutePath, key.toStringUtf8(), value.toStringUtf8());
-					                    return false;
-					                }
-					                else {
-					                	dataTtlSize += (key.size()+value.size());
-					                	return true;
-					                }
+						if(null != ttlType) {
+			                if (ttlPutList.contains(ttlType)) {
+			                	du = kvPairsTtl.put(key, new LineDataText(lineNo,line,value));
+				                if (du != null) {
+				                    totalDuplicateCount.incrementAndGet();
+				                    cmdInterFace.getLoggerAudit().debug("File={}, key={}, value={}", absolutePath, key.toStringUtf8(), value.toStringUtf8());
+				                    return false;
 				                }
 				                else {
-				                    // If it exists in the ttl type map, skip.
-				                    if (ttlSkipTypeList.contains(ttlType)) {
-				                        ttlSkipTypeMap.put(ttlType, ttlSkipTypeMap.get(ttlType) + 1);
-				                        cmdInterFace.getLoggerAudit().info("Skip key={}, file={}, line={}", key.toStringUtf8(), absolutePath, lineNo);
-				                        totalSkipCount.incrementAndGet();
-				                        return false;
-				                    }
-				                }							
-							}
+				                	dataTtlSize += (key.size()+value.size());
+				                	return true;
+				                }
+			                }
+			                else {
+			                    // If it exists in the ttl type map, skip.
+			                    if (ttlSkipTypeList.contains(ttlType)) {
+			                        ttlSkipTypeMap.put(ttlType, ttlSkipTypeMap.get(ttlType) + 1);
+			                        cmdInterFace.getLoggerAudit().info("Skip key={}, file={}, line={}", key.toStringUtf8(), absolutePath, lineNo);
+			                        totalSkipCount.incrementAndGet();
+			                        return false;
+			                    }
+			                }							
 						}
+
 						du = kvPairs.put(key, new LineDataText(lineNo,line,value));
 			            if (du != null) {
 			                totalDuplicateCount.incrementAndGet();

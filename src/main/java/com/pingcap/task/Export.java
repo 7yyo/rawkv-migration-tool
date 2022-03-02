@@ -198,7 +198,7 @@ public class Export implements TaskInterface {
         try {
 			dataFactory = DataFactory.getInstance(exportType,properties);
 		} catch (Exception e) {
-            logger.error("illegal file format");
+            logger.error(e.getMessage());
             System.exit(0);
 		}
         PropertiesUtil.checkConfig(properties, Model.EXPORT_SCENES_TYPE);
@@ -237,7 +237,7 @@ public class Export implements TaskInterface {
 					@Override
 					public boolean getDataCallBack( String jsonData, String type, int typeInt) {
 				        StringBuilder kvPair = new StringBuilder(jsonData);
-						kvPair.append("\n");
+						kvPair.append("\r\n");
 						switch(typeInt){
 						case 0:
 							if(wrtTypes[0]){

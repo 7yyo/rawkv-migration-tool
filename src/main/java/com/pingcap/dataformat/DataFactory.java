@@ -24,7 +24,7 @@ public class DataFactory implements DataFormatInterface {
 			formatInterface = new DataFormatForRowB64(properties);
 		}		
 		else{
-			throw new Exception("illegal file format:["+importMode+"]");
+			throw new Exception("importer.in.mode in configration illegal:["+importMode+"]");
 		}
 	}
 
