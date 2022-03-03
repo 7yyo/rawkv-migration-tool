@@ -117,11 +117,18 @@ public class BatchJob implements Runnable {
             try {
             	notData = dataFactory.formatToKeyValue( scenes, line,new DataFormatInterface.DataFormatCallBack() {
 					@Override
-					public boolean putDataCallBack( String ttlType, ByteString key, ByteString value) {
-						// If importer.ttl.put.type exists, put with ttl, then continue.
+					public boolean putDataCallBack( String ttlType, ByteString key, ByteString value) {					
 						LineDataText du = null;
-						if(null != ttlType) {
-			                if (ttlPutList.contains(ttlType)) {
+						if(!StringUtils.isEmpty(ttlType)) {
+		                    // If it exists in the ttl type map, skip.
+		                    if (ttlSkipTypeList.contains(ttlType)) {
+		                        ttlSkipTypeMap.put(ttlType, ttlSkipTypeMap.get(ttlType) + 1);
+		                        cmdInterFace.getLoggerAudit().info("Skip key={}, file={}, line={}", key.toStringUtf8(), absolutePath, lineNo);
+		                        totalSkipCount.incrementAndGet();
+		                        return false;
+		                    }
+		                    else if (ttlPutList.contains(ttlType)) {
+			                	// If importer.ttl.put.type exists, put with ttl, then continue.
 			                	du = kvPairsTtl.put(key, new LineDataText(lineNo,line,value));
 				                if (du != null) {
 				                    totalDuplicateCount.incrementAndGet();
@@ -132,16 +139,7 @@ public class BatchJob implements Runnable {
 				                	dataTtlSize += (key.size()+value.size());
 				                	return true;
 				                }
-			                }
-			                else {
-			                    // If it exists in the ttl type map, skip.
-			                    if (ttlSkipTypeList.contains(ttlType)) {
-			                        ttlSkipTypeMap.put(ttlType, ttlSkipTypeMap.get(ttlType) + 1);
-			                        cmdInterFace.getLoggerAudit().info("Skip key={}, file={}, line={}", key.toStringUtf8(), absolutePath, lineNo);
-			                        totalSkipCount.incrementAndGet();
-			                        return false;
-			                    }
-			                }							
+			                }						
 						}
 
 						du = kvPairs.put(key, new LineDataText(lineNo,line,value));
