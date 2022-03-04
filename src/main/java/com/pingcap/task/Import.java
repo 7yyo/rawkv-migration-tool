@@ -95,7 +95,7 @@ public class Import implements TaskInterface {
                 		//approximate value
                 		ret += (kvList.get(0).size()*kvList.size());
                 	}
-                    kvHaveList = LimitSpeedkv.batchGet(rawKvClient,kvList,dataSize);
+                    kvHaveList = LimitSpeedkv.batchGet(rawKvClient,kvList,0==ret?1:ret);
                 } catch (Exception e) {
                 	TaskInterface.BATCH_PUT_FAIL_COUNTER.labels("batch put fail").inc();
                     throw e;

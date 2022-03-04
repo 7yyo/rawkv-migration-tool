@@ -118,7 +118,7 @@ public class CheckSum implements TaskInterface {
         		//approximate value
         		ret = (keyList.get(0).size()*keyList.size());
         	}
-			kvList = LimitSpeedkv.batchGet(rawKvClient,keyList,ret);
+			kvList = LimitSpeedkv.batchGet(rawKvClient,keyList,0==ret?1:ret);
 		} catch (Exception e) {
             for (Entry<ByteString, LineDataText> originalKv : pairs.entrySet()) {
             	logger.error("Batch get failed.Key={}, file={}, almost line={}", originalKv.getKey().toStringUtf8(), filePath, originalKv.getValue().getLineData());

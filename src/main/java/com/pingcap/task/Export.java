@@ -16,6 +16,7 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.tikv.kvproto.Kvrpcpb;
@@ -51,6 +52,7 @@ public class Export implements TaskInterface {
     private final AtomicInteger totalExportIndexInfo = new AtomicInteger(0);
     private final AtomicInteger totalExportTempIndex = new AtomicInteger(0);
     private final AtomicInteger totalParserError = new AtomicInteger(0);
+	private final AtomicInteger totalSkipCount = new AtomicInteger(0);
     private final AtomicInteger totalIOError = new AtomicInteger(0);
     private static ArrayList<StringBuilder> wrtBufferIndexType = new ArrayList<StringBuilder>(LISTBUFFSIZE);
     private static ArrayList<StringBuilder> wrtBufferIndexInfo = new ArrayList<StringBuilder>(LISTBUFFSIZE);
@@ -230,10 +232,17 @@ public class Export implements TaskInterface {
         boolean ret;
         
         int total = 0;
+        String key,value;
         for (int i = 0; i < kvPairList.size(); i++) {
+        	key = kvPairList.get(i).getKey().toStringUtf8();
+        	value = kvPairList.get(i).getValue().toStringUtf8();
+        	if(StringUtils.isEmpty(key)&&StringUtils.isEmpty(value)){
+        		totalSkipCount.incrementAndGet();
+        		continue;
+        	}
             transformDuration = EXPORT_DURATION.labels("transform duration").startTimer();
             try {
-				ret = dataFactory.unFormatToKeyValue( properties.get(Model.SCENES), kvPairList.get(i).getKey().toStringUtf8(),kvPairList.get(i).getValue().toStringUtf8(),new DataFormatInterface.UnDataFormatCallBack() {					
+				ret = dataFactory.unFormatToKeyValue( properties.get(Model.SCENES), key, value,new DataFormatInterface.UnDataFormatCallBack() {					
 					@Override
 					public boolean getDataCallBack( String jsonData, String type, int typeInt) {
 				        StringBuilder kvPair = new StringBuilder(jsonData);
@@ -314,6 +323,7 @@ public class Export implements TaskInterface {
                         "exported=" + totalExportCount + ", " +
                         "indexType=" + totalExportIndexType + ", " +
                         "indexInfo=" + totalExportIndexInfo + ", " +
+                        "empty=" + totalSkipCount  + ", " +
                         "tempIndex=" + totalExportTempIndex + ", " +
                         "parseErr=" + totalParserError + ", " +
                         "IoErr=" + totalIOError + ", " +

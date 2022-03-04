@@ -98,7 +98,7 @@ public class Redo implements TaskInterface {
         		ret = (keyList.get(0).size()*keyList.size());
         		startLineNo = pairs.get(keyList.get(0)).getLineNo();
         	}
-			kvList = LimitSpeedkv.batchGet(rawKvClient,keyList,ret);
+			kvList = LimitSpeedkv.batchGet(rawKvClient,keyList,0==ret?1:ret);
 		} catch (Exception e) {
 			logger.error("Batch get failed. file={}, almost line={},{}", filePath, startLineNo, pairs.size());
             throw e;

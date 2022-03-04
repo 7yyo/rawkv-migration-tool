@@ -9,6 +9,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.charset.StandardCharsets;
+import java.util.UUID;
 
 import org.apache.commons.lang.StringUtils;
 
@@ -47,7 +48,12 @@ public class InitCsv {
     	if (!StringUtils.isEmpty(System.getProperty(Model.K))){
     		headStr = System.getProperty(Model.K);
     	}
+    	boolean isUUID = false;
+		if("uuid".equalsIgnoreCase(headStr))
+			isUUID = true;
         for (int i = 1; i <= num; i++) {
+    		if(isUUID)
+    			headStr = i+getUUID();
             ByteBuffer byteBuffer1 = StandardCharsets.UTF_8.encode(String.format(headStr+csv1, i) + "\n");
             ByteBuffer byteBuffer2 = StandardCharsets.UTF_8.encode(String.format(headStr+csv2, i++) + "\n");
             ByteBuffer byteBuffer3 = StandardCharsets.UTF_8.encode(String.format(headStr+csv3, i++) + "\n");
@@ -63,4 +69,10 @@ public class InitCsv {
         fileOutputStream.close();
     }
 
+
+    public static String getUUID() {
+	    UUID uuid = UUID.randomUUID();
+	    String str = uuid.toString();
+	    return str.substring(0, 8) + str.substring(9, 13) + str.substring(14, 18) + str.substring(19, 23) + str.substring(24);
+    }
 }

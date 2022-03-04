@@ -95,7 +95,7 @@ public class UnImport implements TaskInterface {
 	        		//approximate value
 	        		ret = (kvList.get(0).size()*kvList.size());
 	        	}
-	            kvHaveList = LimitSpeedkv.batchGet(rawKvClient,kvList,ret);
+	            kvHaveList = LimitSpeedkv.batchGet(rawKvClient,kvList,0==ret?1:ret);
 	        } catch (Exception e) {
 	        	TaskInterface.BATCH_PUT_FAIL_COUNTER.labels("batch put fail").inc();
 	            throw e;
@@ -123,7 +123,7 @@ public class UnImport implements TaskInterface {
     		//approximate value
     		ret += (kvList.get(0).size()*kvList.size());
     	}
-        LimitSpeedkv.batchDelete(rawKvClient,kvList,ret);
+        LimitSpeedkv.batchDelete(rawKvClient,kvList,0==ret?1:ret);
         ret += ret;
 		batchDeleteTimer.observeDuration();
 		return ret;

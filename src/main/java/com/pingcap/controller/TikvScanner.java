@@ -24,6 +24,7 @@ import io.prometheus.client.Histogram;
 
 public class TikvScanner implements ScannerInterface {
     private static final AtomicInteger exportTotalCounter = new AtomicInteger(0);
+    
     private long lastModifiedDate = 0;
     
 	@Override
@@ -93,7 +94,8 @@ public class TikvScanner implements ScannerInterface {
             		lastStartKey = kvPairList.get(kvPairList.size() - 1).getKey();
             }
             if(0 < kvPairList.size()){
-            	traffic = 0;
+            	//If it is 0, it may cause LimitSpeedkv.testTraffic execution error 
+            	traffic = 1;
             	for(int i=0;i<kvPairList.size();i++){
             		traffic += (kvPairList.get(i).getKey().toStringUtf8().length() + kvPairList.get(i).getValue().toStringUtf8().length());
             	}
