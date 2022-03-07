@@ -3,12 +3,17 @@ package com.pingcap.dataformat;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.apache.commons.lang3.StringUtils;
 import org.tikv.shade.com.google.protobuf.ByteString;
+
+import com.pingcap.pojo.InfoInterface;
 
 public interface DataFormatInterface {
 	public static final String DATA_LINENO = "LINENO";
 	public static final String DATA_LINEDATA = "LINEDATA";
 	public static final String SPLITERSET = "|_:@#$%^&*-+=<>;[]?";
+	public static final char JSON_BODY_PRE= '{';
+	public static final char JSON_BODY_TAL= '}';
 	
 	public interface DataFormatCallBack {
 		public boolean putDataCallBack(String ttlType, ByteString key,ByteString value);
@@ -19,6 +24,8 @@ public interface DataFormatInterface {
 	}
 
 	public boolean formatToKeyValue( String scenes, String line, DataFormatCallBack dataFormatCallBack) throws Exception;
+	
+	public InfoInterface packageToObject(String scenes, ByteString key, ByteString value, DataFormatCallBack dataFormatCallBack) throws Exception;
 	
 	public boolean unFormatToKeyValue(
 			String scenes,
@@ -32,6 +39,15 @@ public interface DataFormatInterface {
 		if(source.startsWith("\\"))
 			return source.substring(1);
 		return source;
+	}
+	
+	//Simply determine whether it is a JSON string 
+	public static boolean isJsonString(String source){
+		if(StringUtils.isEmpty(source)|| 2 >= source.length())
+			return false;
+		if(JSON_BODY_PRE == source.charAt(0)&& JSON_BODY_TAL == source.charAt(source.length()-1))
+			return true;
+		return false;
 	}
 	
 	public static int findMatcher(String source,String find) {

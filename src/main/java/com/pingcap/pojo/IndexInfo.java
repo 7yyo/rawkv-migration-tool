@@ -1,14 +1,13 @@
 package com.pingcap.pojo;
 
-import com.alibaba.fastjson.JSON;
-import com.alibaba.fastjson.serializer.PascalNameFilter;
 import org.apache.commons.lang.StringUtils;
 
 public class IndexInfo implements InfoInterface{
 
     // indexInfo_:_{envid}_:_{type}_:_{id}
-    public static final String KET_FORMAT = "indexInfo%s%s%s%s%s%s";
-    private static final PascalNameFilter nameFilter = new PascalNameFilter();
+	public static final String HEADFORMAT = "indexInfo";
+    public static final String KET_FORMAT = HEADFORMAT+"%s%s%s%s%s%s";
+    //private static final PascalNameFilter nameFilter = new PascalNameFilter();
 
     private String envId;
     private String type;
@@ -128,24 +127,7 @@ public class IndexInfo implements InfoInterface{
      * @param delimiter1   :   First delimiter
      * @param delimiter2   :   Second separator
      */
-    public static void csv2IndexInfo(IndexInfo indexInfo, String originalLine, String delimiter1, String delimiter2) {
-
-//        String targetId = originalLine.split(delimiter1)[2].split(delimiter2)[0];
-//        indexInfo.setTargetId(targetId);
-//        // Means 1|2|3##4##5##6##7##8
-//        String v = originalLine.split(delimiter1)[2];
-//        if (v.split(delimiter2).length > 1) {
-//            ServiceTag serviceTag = new ServiceTag();
-//            serviceTag.setBLKMDL_ID(v.split(delimiter2)[0]);
-//            serviceTag.setPD_SALE_FTA_CD(v.split(delimiter2)[1]);
-//            serviceTag.setACCT_DTL_TYPE(v.split(delimiter2)[2]);
-//            serviceTag.setCORPPRVT_FLAG(v.split(delimiter2)[3]);
-//            serviceTag.setCMTRST_CST_ACCNO(v.split(delimiter2)[4]);
-//            serviceTag.setAR_ID(v.split(delimiter2)[5]);
-//            serviceTag.setQCRCRD_IND(v.split(delimiter2)[6]);
-//            indexInfo.setServiceTag(JSON.toJSONString(serviceTag));
-//        }
-
+/*    public static void csv2IndexInfo(IndexInfo indexInfo, String originalLine, String delimiter1, String delimiter2) {
         String id = originalLine.split(delimiter1)[0];
         String type = originalLine.split(delimiter1)[1];
         indexInfo.setId(id);
@@ -173,8 +155,7 @@ public class IndexInfo implements InfoInterface{
             }
             indexInfo.setServiceTag(JSON.toJSONString(serviceTag, nameFilter));
         }
-
-    }
+    }*/
 
     public static void initValueIndexInfoTiKV(IndexInfo indexInfoTiKV, IndexInfo indexInfoCassandra) {
         // appId

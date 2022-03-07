@@ -77,6 +77,7 @@ public class FileUtil {
 
     public static synchronized void createFolder(String folderPath) {
         File checkSumFolder = new File(folderPath);
+        logger.debug("move folder={}",checkSumFolder.getAbsolutePath());
         if (checkSumFolder.exists()) {
             logger.warn("Folder={} has been created, skip.", folderPath);
             return;

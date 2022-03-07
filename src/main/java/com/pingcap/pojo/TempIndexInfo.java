@@ -5,7 +5,8 @@ import org.apache.commons.lang.StringUtils;
 public class TempIndexInfo implements InfoInterface{
 
     // tempIndex_:_{envid}_:_{id}
-    public static final String KEY_FORMAT = "tempIndex%s%s%s%s";
+	public static final String HEADFORMAT = "tempIndex";
+    public static final String KEY_FORMAT = HEADFORMAT+"%s%s%s%s";
 
     private String envId;
     private String id;
@@ -81,16 +82,15 @@ public class TempIndexInfo implements InfoInterface{
 //        boolean envIdC = this.envId.equals(tmpIndexInfo.getEnvId());
 //        boolean appIdC = this.appId.equals(tempIndexInfo.getId());
 //        boolean idC = this.id.equals(tempIndexInfo.getId());
-        boolean targetIdC;
+
         if (("".equals(this.targetId) && "".equals(tempIndexInfo.getTargetId())) || (this.targetId == null && tempIndexInfo.getTargetId() == null)) {
             return true;
         } else if (!StringUtils.isEmpty(this.targetId) && !StringUtils.isEmpty(tempIndexInfo.getTargetId())) {
-            targetIdC = this.targetId.equals(tempIndexInfo.getTargetId());
+            return this.targetId.equals(tempIndexInfo.getTargetId());
         } else {
             // This means that one is empty and the other is not empty, return false
             return false;
         }
-        return targetIdC;
     }
 
     public static void initValueTempIndexInfo(TempIndexInfo tempIndexInfoTiKV, TempIndexInfo tempIndexInfoCassandra) {

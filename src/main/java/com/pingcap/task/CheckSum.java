@@ -25,15 +25,14 @@ import org.tikv.kvproto.Kvrpcpb;
 import org.tikv.raw.RawKVClient;
 import org.tikv.shade.com.google.protobuf.ByteString;
 
-import com.alibaba.fastjson.JSONObject;
 import com.pingcap.controller.FileScanner;
 import com.pingcap.controller.ScannerInterface;
+import com.pingcap.dataformat.DataFactory;
 import com.pingcap.enums.Model;
 import com.pingcap.util.FileUtil;
 import com.pingcap.util.PropertiesUtil;
-import com.pingcap.pojo.IndexInfo;
 import com.pingcap.pojo.InfoInterface;
-import com.pingcap.pojo.TempIndexInfo;
+import com.pingcap.pojo.LineDataText;
 import com.pingcap.rawkv.LimitSpeedkv;
 
 import io.prometheus.client.Histogram;
@@ -48,7 +47,7 @@ public class CheckSum implements TaskInterface {
 
     //private String pid = JavaUtil.getPid();
     private Histogram CHECK_SUM_DURATION = Histogram.build().name("checksum_duration").help("Check sum duration").labelNames("type").register();
-    
+    private DataFactory dataFactory;
 	public CheckSum() {
 		// TODO Auto-generated constructor stub
 	}
@@ -76,35 +75,53 @@ public class CheckSum implements TaskInterface {
         PropertiesUtil.checkConfig(properties, Model.CHECK_SUM_MOVE_PATH);
         PropertiesUtil.checkConfig(properties, MODE);
         PropertiesUtil.checkConfig(properties, SCENES);
-        PropertiesUtil.checkNaturalNumber( properties, Model.BATCHS_PACKAGE_SIZE, false);
 
         // Skip ttl type when check sum.
         PropertiesUtil.checkConfig(properties, TTL_SKIP_TYPE);
         // Skip ttl put when check sum.
         PropertiesUtil.checkConfig(properties, Model.TTL_PUT_TYPE);
-        PropertiesUtil.checkNumberFromTo( properties, Model.TASKSPEEDLIMIT, false,20,1000);
         String moveFilePath = properties.get(Model.CHECK_SUM_MOVE_PATH);
         // MoveFilePath
         FileUtil.createFolder(moveFilePath);
+        if(Model.JSON_FORMAT.equals(properties.get(Model.MODE))){
+        	if(Model.INDEX_TYPE.equals(properties.get(Model.SCENES))){
+        		logger.error("Configuration json format not support indexType of scense");
+        		System.exit(0); 
+        	}
+        }
+        else{
+            if(Model.TEMP_INDEX_INFO.equals(properties.get(Model.SCENES))&& !Model.ROWB64_FORMAT.equals(properties.get(Model.MODE))){
+                logger.error("Configuration csv format not support tempIndexInfo of scense");
+                System.exit(0);  
+            }
+        }
+        try {
+			dataFactory = DataFactory.getInstance(properties.get(Model.MODE),properties);
+		} catch (Exception e) {
+            logger.error(e.getMessage());
+            System.exit(0);
+		}
 	}
 
 	@Override
-	public HashMap<ByteString, ByteString> executeTikv(Map<String, Object> propParameters,RawKVClient rawKvClient, HashMap<ByteString, ByteString> pairs,
-			HashMap<ByteString, String> pairs_lines, boolean hasTtl,String filePath,final Map<String, String> lineBlock,int dataSize) {
+	public int executeTikv(Map<String, Object> propParameters,RawKVClient rawKvClient, AtomicInteger totalParseErrorCount, LinkedHashMap<ByteString, LineDataText> pairs,
+			LinkedHashMap<ByteString, LineDataText> pairs_jmp, boolean hasTtl,String filePath,int dataSize) {
 		Histogram.Timer batchGetTimer = CHECK_SUM_DURATION.labels("batch_get").startTimer();
 		List<Kvrpcpb.KvPair> kvList = null;
-
+		int ret = 0,ret_rx = 0;
 		List<ByteString> keyList = new ArrayList<>(pairs.keySet());
 		InfoInterface infoRawKV,tmpRawKV;
-		Object clazz = new TempIndexInfo();
-		if(Model.INDEX_INFO.equals(properties.get(SCENES)))
-			clazz = new IndexInfo();
+		final String scenes = properties.get(SCENES);
 		try {
 			// Batch get keys which to check sum
-			kvList = LimitSpeedkv.batchGet(rawKvClient,keyList,dataSize);
+        	if(0<keyList.size()){
+        		//approximate value
+        		ret = (keyList.get(0).size()*keyList.size());
+        	}
+			kvList = LimitSpeedkv.batchGet(rawKvClient,keyList,0==ret?1:ret);
 		} catch (Exception e) {
-            for (Entry<ByteString, ByteString> originalKv : pairs.entrySet()) {
-            	logger.error("Batch get failed.Key={}, file={}, almost line={}", originalKv.getKey().toStringUtf8(), filePath, lineBlock.get(pairs_lines.get(originalKv.getKey())));
+            for (Entry<ByteString, LineDataText> originalKv : pairs.entrySet()) {
+            	logger.error("Batch get failed.Key={}, file={}, almost line={}", originalKv.getKey().toStringUtf8(), filePath, originalKv.getValue().getLineData());
             }
             throw e;
         }
@@ -114,8 +131,17 @@ public class CheckSum implements TaskInterface {
 
 		Map<ByteString, InfoInterface> rawKvResultMap = new HashMap<>(kvList.size());
         for (Kvrpcpb.KvPair kvPair : kvList) {
-        	infoRawKV = (InfoInterface)JSONObject.parseObject(kvPair.getValue().toStringUtf8(), clazz.getClass());
-        	rawKvResultMap.put(kvPair.getKey(), infoRawKV);
+        	try {
+        		ret_rx += (kvPair.getKey().size() + kvPair.getValue().size());
+				infoRawKV = dataFactory.packageToObject(scenes, kvPair.getKey(), kvPair.getValue(), null);
+	        	rawKvResultMap.put(kvPair.getKey(), infoRawKV);
+			} catch (Exception e) {
+				e.printStackTrace();
+			}
+        }
+        if(0 < ret_rx){
+	        LimitSpeedkv.testTraffic(ret_rx);
+	        ret += ret_rx;
         }
         kvList.clear();
         kvList = null;
@@ -126,21 +152,31 @@ public class CheckSum implements TaskInterface {
         	curKey = keyList.get(i);
         	infoRawKV = rawKvResultMap.get(curKey);
             if (null != infoRawKV) {
-            	tmpRawKV = (InfoInterface)JSONObject.parseObject(pairs.get(curKey).toStringUtf8(), clazz.getClass());
-                if (!infoRawKV.equalsValue(tmpRawKV)) {
-                    checkSumLog.error("Check sum failed. Key={}", curKey.toStringUtf8());
-                    csFailLog.info(lineBlock.get(pairs_lines.get(curKey)));
-                    pairs.remove(curKey);
-                    pairs_lines.remove(curKey);
-                    ++iCheckSumFail;
-                }
+            	try {
+					tmpRawKV = dataFactory.packageToObject(scenes, curKey,pairs.get(curKey).getValue(),null);
+	                if (!infoRawKV.equalsValue(tmpRawKV)) {
+	                    checkSumLog.error("Check sum failed. Key={}", curKey.toStringUtf8());
+	                    csFailLog.info(pairs.get(curKey).getLineData());
+	                    pairs.remove(curKey);
+	                    //pairs_lines.remove(curKey);
+	                    ++iCheckSumFail;
+	                }
+				} catch (Exception e) {
+					e.printStackTrace();
+					totalParseErrorCount.incrementAndGet();
+				}
             } else {
                 checkSumLog.error("Key={} is not exists.", curKey.toStringUtf8());
-                infoRawKV = (InfoInterface)JSONObject.parseObject(pairs.get(curKey).toStringUtf8(), clazz.getClass());
-                csFailLog.info(lineBlock.get(pairs_lines.get(curKey)));
-                pairs.remove(curKey);
-                pairs_lines.remove(curKey);
-                ++iNotInsert;
+                try {
+					////infoRawKV = dataFactory.packageToObject(scenes,curKey,pairs.get(curKey).getValue(),null);
+	                csFailLog.info(pairs.get(curKey).getLineData());
+	                pairs.remove(curKey);
+	                //pairs_lines.remove(curKey);
+	                ++iNotInsert;
+				} catch (Exception e) {
+					e.printStackTrace();
+					totalParseErrorCount.incrementAndGet();
+				}
             }
         }
         keyList.clear();
@@ -154,7 +190,7 @@ public class CheckSum implements TaskInterface {
         	((AtomicInteger)propParameters.get(AtomicInteger_notInsert)).addAndGet(iNotInsert);
         }
         csTimer.observeDuration();
-		return pairs;
+		return ret;
 	}
 
 	@Override
@@ -163,7 +199,7 @@ public class CheckSum implements TaskInterface {
 	}
 
 	@Override
-	public void succeedWriteRowsLogger(String filePath, HashMap<ByteString, ByteString> pairs) {
+	public void succeedWriteRowsLogger(String filePath, LinkedHashMap<ByteString, LineDataText> pairs) {
 	/*	//CheckSum not record sucess log
 	for(Entry<ByteString, ByteString> obj:pairs.entrySet()){
 			getLogger().debug("File={}, key={}, value={}", filePath, obj.getKey().toStringUtf8(), obj.getValue().toStringUtf8());
@@ -172,9 +208,9 @@ public class CheckSum implements TaskInterface {
 	}
 
 	@Override
-	public void faildWriteRowsLogger(HashMap<ByteString, ByteString> pairs) {
-		for(Entry<ByteString, ByteString> obj:pairs.entrySet()){
-			csFailLog.info(obj.getValue().toStringUtf8());
+	public void faildWriteRowsLogger(LinkedHashMap<ByteString, LineDataText> pairs_lines) {
+		for(Entry<ByteString, LineDataText> obj:pairs_lines.entrySet()){
+			csFailLog.info(obj.getValue().getLineData());
 		}
 	}
 	
@@ -225,6 +261,7 @@ public class CheckSum implements TaskInterface {
                         "skip=" + totalSkipCount + ", " +
                         "parseErr=" + totalParseErrorCount + ", " +
                         "notExits=" + iNotInsert + ", " +
+                        "duplicate=" + totalDuplicateCount + ", " +
                         "checkSumFail=" + iCheckSumFail + ", " +
                         "duration=" + duration / 1000 + "s, ");
         result.append("Skip type[");
