@@ -35,6 +35,7 @@ public class DataFormatForJson implements DataFormatInterface {
         	throw e;
         }
 	    
+		int dataTypeInt = DATATYPE_INDEXTYPE;
         // The string type of the key.
         String k;
         // the ttl type
@@ -45,6 +46,7 @@ public class DataFormatForJson implements DataFormatInterface {
         switch (scenes) {
             case Model.INDEX_INFO:
                 // Cassandra IndexInfo
+            	dataTypeInt = DATATYPE_INDEXINFO;
             	IndexInfo indexInfoTiKV = new IndexInfo();
             	IndexInfo indexInfoCassandra = JSON.toJavaObject(jsonObject, IndexInfo.class);
                 if (indexInfoCassandra.getUpdateTime() != null) {
@@ -65,12 +67,10 @@ public class DataFormatForJson implements DataFormatInterface {
                 key = ByteString.copyFromUtf8(k);
                 value = ByteString.copyFromUtf8(JSONObject.toJSONString(indexInfoTiKV));
                 ttlType = indexInfoCassandra.getType();
-                //No ttlType = null
-                if(null == ttlType)
-                	ttlType = "";
                 break;
 
             case Model.TEMP_INDEX_INFO:
+            	dataTypeInt = DATATYPE_TEMPINDEX;
         	    TempIndexInfo tempIndexInfoTiKV = new TempIndexInfo();
         	    TempIndexInfo tempIndexInfoCassandra = JSON.toJavaObject(jsonObject, TempIndexInfo.class);
                 // TiKV tempIndexInfo
@@ -84,7 +84,7 @@ public class DataFormatForJson implements DataFormatInterface {
                 value = ByteString.copyFromUtf8(JSONObject.toJSONString(tempIndexInfoTiKV));
                 break;
         }
-        return dataFormatCallBack.putDataCallBack( ttlType, key, value);
+        return dataFormatCallBack.putDataCallBack( ttlType, dataTypeInt, key, value);
 	}
 
 	@Override
@@ -95,45 +95,31 @@ public class DataFormatForJson implements DataFormatInterface {
         JSONObject jsonObject = null;
         int dataTypeInt;
         String dataType;
-        if (key.startsWith(IndexInfo.HEADFORMAT)) {
-        	if(DataFormatInterface.isJsonString(value)){
-            	dataType = Model.INDEX_INFO;
-            	dataTypeInt = 1;
-                jsonObject = JSONObject.parseObject(value);
-                IndexInfo indexInfo = JSON.toJavaObject(jsonObject, IndexInfo.class);
-                // key = indexInfo_:_{envid}_:_{type}_:_{id}
-                String keyArr[] = key.split(keyDelimiter,-1);
-                indexInfo.setEnvId(keyArr[1]);
-                indexInfo.setType(keyArr[2]);
-                indexInfo.setId(keyArr[3]);
-                jsonString = JSON.toJSONString(indexInfo);   		
-        	}
-        	else{
-            	dataType = Model.INDEX_TYPE;
-            	dataTypeInt = 0;
-            	jsonString = key + Model.INDEX_TYPE_DELIMITER + value;
-        	}
-        } else if (key.startsWith(TempIndexInfo.HEADFORMAT)) {
-        	if(DataFormatInterface.isJsonString(value)){
-	        	dataType = Model.TEMP_INDEX_INFO;
-	        	dataTypeInt = 2;
-	            jsonObject = JSONObject.parseObject(value);
-	            TempIndexInfo tempIndexInfo = JSON.toJavaObject(jsonObject, TempIndexInfo.class);
-	            // key = tempIndex_:_{envid}_:_{id}
-	            String keyArr[] = key.split(keyDelimiter);
-	            tempIndexInfo.setEnvId(keyArr[1]);
-	            tempIndexInfo.setId(keyArr[2]);
-	            jsonString = JSON.toJSONString(tempIndexInfo);
-        	}
-        	else{
-            	dataType = Model.INDEX_TYPE;
-            	dataTypeInt = 0;
-            	jsonString = key + Model.INDEX_TYPE_DELIMITER + value;
-        	}
+        if (key.startsWith(IndexInfo.HEADFORMAT+keyDelimiter)) {
+        	dataType = Model.INDEX_INFO;
+        	dataTypeInt = DATATYPE_INDEXINFO;
+            jsonObject = JSONObject.parseObject(value);
+            IndexInfo indexInfo = JSON.toJavaObject(jsonObject, IndexInfo.class);
+            // key = indexInfo_:_{envid}_:_{type}_:_{id}
+            String keyArr[] = key.split(keyDelimiter,-1);
+            indexInfo.setEnvId(keyArr[1]);
+            indexInfo.setType(keyArr[2]);
+            indexInfo.setId(keyArr[3]);
+            jsonString = JSON.toJSONString(indexInfo);
+        } else if (key.startsWith(TempIndexInfo.HEADFORMAT+keyDelimiter)) {
+        	dataType = Model.TEMP_INDEX_INFO;
+        	dataTypeInt = DATATYPE_TEMPINDEX;
+            jsonObject = JSONObject.parseObject(value);
+            TempIndexInfo tempIndexInfo = JSON.toJavaObject(jsonObject, TempIndexInfo.class);
+            // key = tempIndex_:_{envid}_:_{id}
+            String keyArr[] = key.split(keyDelimiter);
+            tempIndexInfo.setEnvId(keyArr[1]);
+            tempIndexInfo.setId(keyArr[2]);
+            jsonString = JSON.toJSONString(tempIndexInfo);
         }
         else {
         	dataType = Model.INDEX_TYPE;
-        	dataTypeInt = 0;
+        	dataTypeInt = DATATYPE_INDEXTYPE;
         	jsonString = key + Model.INDEX_TYPE_DELIMITER + value;
         }
 		return unDataFormatCallBack.getDataCallBack( jsonString, dataType, dataTypeInt);
@@ -146,33 +132,23 @@ public class DataFormatForJson implements DataFormatInterface {
 	        JSONObject jsonObject = null;
 	        final String strKey = bkey.toStringUtf8();
 	        final String strValue = bvalue.toStringUtf8(); 
-	        if (strKey.startsWith(IndexInfo.HEADFORMAT)) {
-	        	if(DataFormatInterface.isJsonString(strValue)){
-		            jsonObject = JSONObject.parseObject(strValue);
-		            IndexInfo indexInfo = JSON.toJavaObject(jsonObject, IndexInfo.class);
-		            // key = indexInfo_:_{envid}_:_{type}_:_{id}
-		            String keyArr[] = strKey.split(keyDelimiter);
-		            indexInfo.setEnvId(keyArr[1]);
-		            indexInfo.setType(keyArr[2]);
-		            indexInfo.setId(keyArr[3]);
-		            return indexInfo;
-	        	}
-	        	else{
-	        		return (InfoInterface)new IndexType(strKey + Model.INDEX_TYPE_DELIMITER + strValue);
-	        	}
-	        } else if (strKey.startsWith(TempIndexInfo.HEADFORMAT)) {
-		        	if(DataFormatInterface.isJsonString(strValue)){
-			            jsonObject = JSONObject.parseObject(strValue);
-			            TempIndexInfo tempIndexInfo = JSON.toJavaObject(jsonObject, TempIndexInfo.class);
-			            // key = tempIndex_:_{envid}_:_{id}
-			            String keyArr[] = strKey.split(keyDelimiter);
-			            tempIndexInfo.setEnvId(keyArr[1]);
-			            tempIndexInfo.setId(keyArr[2]);
-			            return tempIndexInfo;
-		        	}
-		        	else{
-		        		return (InfoInterface)new IndexType(strKey + Model.INDEX_TYPE_DELIMITER + strValue);
-		        	}
+	        if (strKey.startsWith(IndexInfo.HEADFORMAT+keyDelimiter)) {
+	            jsonObject = JSONObject.parseObject(strValue);
+	            IndexInfo indexInfo = JSON.toJavaObject(jsonObject, IndexInfo.class);
+	            // key = indexInfo_:_{envid}_:_{type}_:_{id}
+	            String keyArr[] = strKey.split(keyDelimiter);
+	            indexInfo.setEnvId(keyArr[1]);
+	            indexInfo.setType(keyArr[2]);
+	            indexInfo.setId(keyArr[3]);
+	            return indexInfo;
+	        } else if (strKey.startsWith(TempIndexInfo.HEADFORMAT+keyDelimiter)) {
+	            jsonObject = JSONObject.parseObject(strValue);
+	            TempIndexInfo tempIndexInfo = JSON.toJavaObject(jsonObject, TempIndexInfo.class);
+	            // key = tempIndex_:_{envid}_:_{id}
+	            String keyArr[] = strKey.split(keyDelimiter);
+	            tempIndexInfo.setEnvId(keyArr[1]);
+	            tempIndexInfo.setId(keyArr[2]);
+	            return tempIndexInfo;
 	        }
 	        else {
 	        	return (InfoInterface)new IndexType(strKey + Model.INDEX_TYPE_DELIMITER + strValue);

@@ -40,16 +40,16 @@ public class DataFormatForRowB64 implements DataFormatInterface {
 		if(null != arr[1]){
 			value = ByteString.copyFromUtf8(new String(DatatypeConverter.parseBase64Binary(arr[1]),"utf8"));
 		}
-		if (strKey.startsWith(IndexInfo.HEADFORMAT)) {
-			if(DataFormatInterface.isJsonString(value.toStringUtf8())){
-				String keyArr[] = strKey.split(keyDelimiter,-1);
-				ttlType = keyArr[2];
-			}
-			else{
-				throw new Exception("rowb64 value not json error");
-			}
+		int dataTypeInt = DATATYPE_INDEXTYPE;
+		if (strKey.startsWith(IndexInfo.HEADFORMAT+keyDelimiter)) {
+			String keyArr[] = strKey.split(keyDelimiter,-1);
+			ttlType = keyArr[2];
+			dataTypeInt = DATATYPE_INDEXINFO;
 		}
-		return dataFormatCallBack.putDataCallBack( ttlType, key, value);
+		else if (strKey.startsWith(TempIndexInfo.HEADFORMAT+keyDelimiter)) {
+        	dataTypeInt = DATATYPE_TEMPINDEX;
+		}
+		return dataFormatCallBack.putDataCallBack( ttlType, dataTypeInt, key, value);
 	}
 
 	@Override
@@ -64,29 +64,17 @@ public class DataFormatForRowB64 implements DataFormatInterface {
 		StringBuffer jsonString = new StringBuffer();
 		String dataType;
 		int dataTypeInt;
-	       if (key.startsWith(IndexInfo.HEADFORMAT)) {
-	        	if(DataFormatInterface.isJsonString(value)){
-		        	dataType = Model.INDEX_INFO;
-		            dataTypeInt = 1;
-	        	}
-	        	else{
-	            	dataType = Model.INDEX_TYPE;
-	            	dataTypeInt = 0;
-	        	}
+	       if (key.startsWith(IndexInfo.HEADFORMAT+keyDelimiter)) {
+	        	dataType = Model.INDEX_INFO;
+	            dataTypeInt = DATATYPE_INDEXINFO;
 	        }
-	        else if (key.startsWith(TempIndexInfo.HEADFORMAT)) {
-	        	if(DataFormatInterface.isJsonString(value)){
-		        	dataType = Model.TEMP_INDEX_INFO;
-		        	dataTypeInt = 2;
-	        	}
-	        	else{
-	            	dataType = Model.INDEX_TYPE;
-	            	dataTypeInt = 0;
-	        	}
+	        else if (key.startsWith(TempIndexInfo.HEADFORMAT+keyDelimiter)) {
+	        	dataType = Model.TEMP_INDEX_INFO;
+	        	dataTypeInt = DATATYPE_TEMPINDEX;
 	        }
 	        else {
 	        	dataType = Model.INDEX_TYPE;
-	        	dataTypeInt = 0;
+	        	dataTypeInt = DATATYPE_INDEXTYPE;
 	        }
 		jsonString.append(DatatypeConverter.printBase64Binary(key.getBytes("utf8"))).append(Model.INDEX_TYPE_DELIMITER).append(DatatypeConverter.printBase64Binary(value.getBytes("utf8")));
 		return unDataFormatCallBack.getDataCallBack( jsonString.toString(), dataType, dataTypeInt);

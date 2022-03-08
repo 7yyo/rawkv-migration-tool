@@ -117,40 +117,52 @@ public class BatchJob implements Runnable {
             try {
             	notData = dataFactory.formatToKeyValue( scenes, line,new DataFormatInterface.DataFormatCallBack() {
 					@Override
-					public boolean putDataCallBack( String ttlType, ByteString key, ByteString value) {					
+					public boolean putDataCallBack( String ttlType, int dataType, ByteString key, ByteString value) {					
 						LineDataText du = null;
-						if(!StringUtils.isEmpty(ttlType)) {
-		                    // If it exists in the ttl type map, skip.
-		                    if (ttlSkipTypeList.contains(ttlType)) {
-		                        ttlSkipTypeMap.put(ttlType, ttlSkipTypeMap.get(ttlType) + 1);
-		                        cmdInterFace.getLoggerAudit().info("Skip key={}, file={}, line={}", key.toStringUtf8(), absolutePath, lineNo);
-		                        totalSkipCount.incrementAndGet();
-		                        return false;
-		                    }
-		                    else if (ttlPutList.contains(ttlType)) {
-			                	// If importer.ttl.put.type exists, put with ttl, then continue.
-			                	du = kvPairsTtl.put(key, new LineDataText(lineNo,line,value));
-				                if (du != null) {
-				                    totalDuplicateCount.incrementAndGet();
-				                    cmdInterFace.getLoggerAudit().debug("File={}, key={}, value={}", absolutePath, key.toStringUtf8(), value.toStringUtf8());
-				                    return false;
-				                }
-				                else {
-				                	dataTtlSize += (key.size()+value.size());
-				                	return true;
-				                }
-			                }						
+						if(DataFormatInterface.DATATYPE_TEMPINDEX != dataType){
+							if(!StringUtils.isEmpty(ttlType)) {
+			                    // If it exists in the ttl type map, skip.
+			                    if (ttlSkipTypeList.contains(ttlType)) {
+			                        ttlSkipTypeMap.put(ttlType, ttlSkipTypeMap.get(ttlType) + 1);
+			                        cmdInterFace.getLoggerAudit().info("Skip key={}, file={}, line={}", key.toStringUtf8(), absolutePath, lineNo);
+			                        totalSkipCount.incrementAndGet();
+			                        return false;
+			                    }
+			                    else if (ttlPutList.contains(ttlType)) {
+				                	// If importer.ttl.put.type exists, put with ttl, then continue.
+				                	du = kvPairsTtl.put(key, new LineDataText(lineNo,line,value));
+					                if (du != null) {
+					                    totalDuplicateCount.incrementAndGet();
+					                    cmdInterFace.getLoggerAudit().debug("File={}, key={}, value={}", absolutePath, key.toStringUtf8(), value.toStringUtf8());
+					                    return false;
+					                }
+					                else {
+					                	dataTtlSize += (key.size()+value.size());
+					                	return true;
+					                }
+				                }						
+							}
+							du = kvPairs.put(key, new LineDataText(lineNo,line,value));
+				            if (du != null) {
+				                totalDuplicateCount.incrementAndGet();
+				                cmdInterFace.getLoggerAudit().debug("File={}, key={}, value={}", absolutePath, key.toStringUtf8(), value.toStringUtf8());
+				            }
+				            else {
+				            	dataSize += (key.size()+value.size());
+				            }		
 						}
-
-						du = kvPairs.put(key, new LineDataText(lineNo,line,value));
-			            if (du != null) {
-			                totalDuplicateCount.incrementAndGet();
-			                cmdInterFace.getLoggerAudit().debug("File={}, key={}, value={}", absolutePath, key.toStringUtf8(), value.toStringUtf8());
-			            }
-			            else {
-			            	dataSize += (key.size()+value.size());
-			            }
-						du = null;
+						else{
+							//The tempindexinfo data type enforces the setting of TTL
+							du = kvPairsTtl.put(key, new LineDataText(lineNo,line,value));
+			                if (du != null) {
+			                	totalDuplicateCount.incrementAndGet();
+			                    cmdInterFace.getLoggerAudit().debug("File={}, key={}, value={}", absolutePath, key.toStringUtf8(), value.toStringUtf8());
+			                }
+			                else {
+			                	dataTtlSize += (key.size()+value.size());
+			                }
+						}
+						du = null;	
 		                return true;
 					}
 				});
