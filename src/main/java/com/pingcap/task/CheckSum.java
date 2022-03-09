@@ -90,6 +90,8 @@ public class CheckSum implements TaskInterface {
         	}
         }
         else{
+        	PropertiesUtil.checkConfig(properties, Model.APP_ID);
+        	PropertiesUtil.checkConfig(properties, Model.ENV_ID);
             if(Model.TEMP_INDEX_INFO.equals(properties.get(Model.SCENES))&& !Model.ROWB64_FORMAT.equals(properties.get(Model.MODE))){
                 logger.error("Configuration csv format not support tempIndexInfo of scense");
                 System.exit(0);  

@@ -45,6 +45,9 @@ public class DataFormatForJson implements DataFormatInterface {
         // IndexInfo or TempIndexInfo
         switch (scenes) {
             case Model.INDEX_INFO:
+            	if(!jsonObject.containsKey(Model.DATA_JSON_TYPE)){
+            		throw new Exception("indexInfo data format must have a type field");
+            	}
                 // Cassandra IndexInfo
             	dataTypeInt = DATATYPE_INDEXINFO;
             	IndexInfo indexInfoTiKV = new IndexInfo();
@@ -70,6 +73,9 @@ public class DataFormatForJson implements DataFormatInterface {
                 break;
 
             case Model.TEMP_INDEX_INFO:
+            	if(jsonObject.containsKey(Model.DATA_JSON_TYPE)){
+            		throw new Exception("tempIndexinfo data format cannot have a type field");
+            	}
             	dataTypeInt = DATATYPE_TEMPINDEX;
         	    TempIndexInfo tempIndexInfoTiKV = new TempIndexInfo();
         	    TempIndexInfo tempIndexInfoCassandra = JSON.toJavaObject(jsonObject, TempIndexInfo.class);

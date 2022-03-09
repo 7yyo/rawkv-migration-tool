@@ -64,7 +64,7 @@ public interface TaskInterface {
         PropertiesUtil.checkConfig(properties, DELIMITER_1);
         PropertiesUtil.checkConfig(properties, DELIMITER_2);
         PropertiesUtil.checkNaturalNumber( properties, Model.BATCHS_PACKAGE_SIZE, false);
-        PropertiesUtil.checkNumberFromTo( properties, Model.TASKSPEEDLIMIT, false,20,1000);
+        PropertiesUtil.checkNumberFromTo( properties, Model.TASKSPEEDLIMIT, false,10,1000);
 		PropertiesUtil.checkConfig(properties, Model.CHECK_EXISTS_KEY);
 	}
 	

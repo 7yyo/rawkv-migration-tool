@@ -18,12 +18,25 @@ public class PropertiesUtil {
 
     public static Map<String, String> getProperties(String filePath) {
         Properties properties = new Properties();
+        FileInputStream fileInputStream = null;
         try {
-            InputStream inputStream = new BufferedInputStream(new FileInputStream(filePath));
+        	fileInputStream = new FileInputStream(filePath);
+            InputStream inputStream = new BufferedInputStream(fileInputStream);
             properties.load(inputStream);
             logger.info(String.valueOf(properties));
         } catch (IOException e) {
             e.printStackTrace();
+            logger.error("Configuration file({}) loading error:{}", filePath,e.getMessage());
+            System.exit(0); 	
+        }
+        finally{
+        	if(null != fileInputStream){
+        		try {
+					fileInputStream.close();
+				} catch (IOException e) {
+					e.printStackTrace();
+				}
+        	}
         }
         Map<String, String> propertiesMap = new HashMap<>();
         for (Map.Entry<Object, Object> entry : properties.entrySet()) {

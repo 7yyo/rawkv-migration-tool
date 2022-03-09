@@ -59,9 +59,7 @@ public class Import implements TaskInterface {
         PropertiesUtil.checkConfig(properties, Model.TTL_SKIP_TYPE);
         PropertiesUtil.checkConfig(properties, Model.TTL_PUT_TYPE);
         PropertiesUtil.checkConfig(properties, Model.SCENES);
-        PropertiesUtil.checkConfig(properties, Model.MODE);
-        PropertiesUtil.checkConfig(properties, Model.ENV_ID);
-        PropertiesUtil.checkConfig(properties, Model.APP_ID);
+        PropertiesUtil.checkConfig(properties, Model.MODE);       
         PropertiesUtil.checkConfig(properties, Model.UPDATE_TIME);
         
         PropertiesUtil.checkNaturalNumber( properties, Model.TTL, false);
@@ -73,6 +71,8 @@ public class Import implements TaskInterface {
         	}
         }
         else{
+        	PropertiesUtil.checkConfig(properties, Model.APP_ID);
+            PropertiesUtil.checkConfig(properties, Model.ENV_ID);
             if(Model.TEMP_INDEX_INFO.equals(properties.get(Model.SCENES))&& !Model.ROWB64_FORMAT.equals(properties.get(Model.MODE))){
                 logger.error("Configuration csv format not support tempIndexInfo of scense");
                 System.exit(0);  
