@@ -30,7 +30,7 @@ public class Import implements TaskInterface {
     //private String pid = JavaUtil.getPid();
     private Histogram DURATION = Histogram.build().name("duration").help("Everything duration").labelNames("type").register();
     
-    private long ttl = 0;
+    private long ttl = 604800;
 
 	public Import() {
 		// TODO Auto-generated constructor stub

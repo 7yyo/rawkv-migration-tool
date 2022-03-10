@@ -248,7 +248,9 @@ public class CheckSum implements TaskInterface {
         try {
         	int total = filesNum.incrementAndGet();
         	if(!checkSumFile.getParentFile().getAbsolutePath().equals(moveFile.getAbsolutePath())){
-        		moveFile = new File(moveFilePath + "/" + now + "/" + checkSumFile.getName() + "." + total);
+        		final String moveToFilePath = moveFilePath + "/" + now + "/";
+        		FileUtil.createFolder(moveToFilePath);
+        		moveFile = new File(moveToFilePath + checkSumFile.getName() + "." + total);
         		FileUtils.moveFile(checkSumFile, moveFile);
         	}
         } catch (IOException e) {
