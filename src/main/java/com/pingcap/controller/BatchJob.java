@@ -234,6 +234,24 @@ public class BatchJob implements Runnable {
 		 	totalImportCount.addAndGet(pairs.size());
 			cmdInterFace.succeedWriteRowsLogger(absolutePath, pairs);
 		}
+		catch(org.tikv.common.exception.GrpcException e){
+			try {
+				Thread.sleep(100);
+			} catch (InterruptedException e1) {
+				e1.printStackTrace();
+			}
+			cmdInterFace.getLogger().error("again Failed batch put{}, file={}, size={}", hasTtl?" TTL":"", absolutePath, pairs.size());
+			try{
+				ret = cmdInterFace.executeTikv(propParameters, rawKvClient, totalParseErrorCount,pairs, kvPairs_Jump, hasTtl, absolutePath, dataSize);
+			 	totalImportCount.addAndGet(pairs.size());
+				cmdInterFace.succeedWriteRowsLogger(absolutePath, pairs);
+			}
+			catch(Exception e1){
+				totalBatchPutFailCount.addAndGet(pairs.size());
+				cmdInterFace.faildWriteRowsLogger(pairs);
+				cmdInterFace.getLogger().error("Failed to batch put{}, file={}, size={}", hasTtl?" TTL":"", absolutePath, pairs.size());
+			}
+		}
 		catch(Exception e){
 			totalBatchPutFailCount.addAndGet(pairs.size());
 			cmdInterFace.faildWriteRowsLogger(pairs);
@@ -249,4 +267,5 @@ public class BatchJob implements Runnable {
 		kvPairs_Jump = null;
 		return ret;
     }
+    
 }

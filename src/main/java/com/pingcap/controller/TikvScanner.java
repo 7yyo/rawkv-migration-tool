@@ -76,6 +76,7 @@ public class TikvScanner implements ScannerInterface {
             }
             catch(Exception e){
             	e.printStackTrace();
+            	exporter.getLogger().error("TiKV scan({}) occured exception: {}", startKey, e.getMessage());
             	continue;
             }
             finally{

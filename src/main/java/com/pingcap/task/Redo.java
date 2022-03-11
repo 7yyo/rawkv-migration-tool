@@ -320,8 +320,14 @@ public class Redo implements TaskInterface {
         	if(!redoFile.getParentFile().getAbsolutePath().equals(moveFile.getAbsolutePath())){
         		final String moveToFilePath = moveFilePath + "/" + now + "/";
         		FileUtil.createFolder(moveToFilePath);
-        		moveFile = new File(moveToFilePath + redoFile.getName() + "." + total);
-        		FileUtils.moveFile(redoFile, moveFile);
+        		moveFile = new File(moveToFilePath);
+        		if(moveFile.exists() && moveFile.canWrite() && moveFile.isDirectory()){
+	        		moveFile = new File(moveToFilePath + redoFile.getName() + "." + total);
+	        		FileUtils.moveFile(redoFile, moveFile);
+        		}
+        		else{
+        			logger.error("Directory({}) occured exception: not access",moveFile.getAbsolutePath());
+        		}
         	}
         } catch (IOException e) {
             e.printStackTrace();

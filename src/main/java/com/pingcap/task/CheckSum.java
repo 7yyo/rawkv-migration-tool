@@ -250,8 +250,14 @@ public class CheckSum implements TaskInterface {
         	if(!checkSumFile.getParentFile().getAbsolutePath().equals(moveFile.getAbsolutePath())){
         		final String moveToFilePath = moveFilePath + "/" + now + "/";
         		FileUtil.createFolder(moveToFilePath);
-        		moveFile = new File(moveToFilePath + checkSumFile.getName() + "." + total);
-        		FileUtils.moveFile(checkSumFile, moveFile);
+        		moveFile = new File(moveToFilePath);
+        		if(moveFile.exists() && moveFile.canWrite() && moveFile.isDirectory()){
+	        		moveFile = new File(moveToFilePath + checkSumFile.getName() + "." + total);
+	        		FileUtils.moveFile(checkSumFile, moveFile);
+        		}
+        		else{
+        			logger.error("Directory({}) occured exception: not access",moveFile.getAbsolutePath());
+        		}
         	}
         } catch (IOException e) {
             e.printStackTrace();
