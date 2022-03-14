@@ -90,6 +90,8 @@ public class CheckSum implements TaskInterface {
         	}
         }
         else{
+        	PropertiesUtil.checkConfig(properties, Model.APP_ID);
+        	PropertiesUtil.checkConfig(properties, Model.ENV_ID);
             if(Model.TEMP_INDEX_INFO.equals(properties.get(Model.SCENES))&& !Model.ROWB64_FORMAT.equals(properties.get(Model.MODE))){
                 logger.error("Configuration csv format not support tempIndexInfo of scense");
                 System.exit(0);  
@@ -246,8 +248,16 @@ public class CheckSum implements TaskInterface {
         try {
         	int total = filesNum.incrementAndGet();
         	if(!checkSumFile.getParentFile().getAbsolutePath().equals(moveFile.getAbsolutePath())){
-        		moveFile = new File(moveFilePath + "/" + now + "/" + checkSumFile.getName() + "." + total);
-        		FileUtils.moveFile(checkSumFile, moveFile);
+        		final String moveToFilePath = moveFilePath + "/" + now + "/";
+        		FileUtil.createFolder(moveToFilePath);
+        		moveFile = new File(moveToFilePath);
+        		if(moveFile.exists() && moveFile.canWrite() && moveFile.isDirectory()){
+	        		moveFile = new File(moveToFilePath + checkSumFile.getName() + "." + total);
+	        		FileUtils.moveFile(checkSumFile, moveFile);
+        		}
+        		else{
+        			logger.error("Directory({}) occured exception: not access",moveFile.getAbsolutePath());
+        		}
         	}
         } catch (IOException e) {
             e.printStackTrace();

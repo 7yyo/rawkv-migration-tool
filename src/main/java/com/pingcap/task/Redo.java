@@ -17,6 +17,7 @@ import java.util.Map.Entry;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.tikv.kvproto.Kvrpcpb;
@@ -46,7 +47,8 @@ public class Redo implements TaskInterface {
     private Histogram DURATION = Histogram.build().name("redoduration").help("redo duration").labelNames("type").register();
     private Map<String, String> properties = null;
     private DataFactory dataFactory;
-    
+    private String redoType;
+    private long ttl = 604800;
 	@Override
 	public Logger getLogger() {
 		return logger;
@@ -121,6 +123,7 @@ public class Redo implements TaskInterface {
         int iCheckSumFail=0,iNotInsert=0;
         Histogram.Timer csTimer = DURATION.labels("redo_sum").startTimer();
         ByteString curKey;
+        String dataType;
         for (int i=0;i<keyList.size();i++) {
         	curKey = keyList.get(i);
         	try {
@@ -137,82 +140,112 @@ public class Redo implements TaskInterface {
                 System.exit(0);
             }
         	infoRawKV = rawKvResultMap.get(curKey);
-            switch (tmpRawKV.getOpType()) {
-	            case com.pingcap.enums.Model.ADD:
-	            case com.pingcap.enums.Model.UPDATE:
-	                if (null != infoRawKV) {
-	                    if (tmpRawKV.getUpdateTime() != null && infoRawKV.getUpdateTime() != null) {
-	                        // Redo > RawKV
-	                        if (CountUtil.compareTime( tmpRawKV.getUpdateTime(), infoRawKV.getUpdateTime()) >= 0) {
-	                            // if duration == 0, D
+        	if(Model.INDEX_INFO.equals(redoType)) {
+	            switch (tmpRawKV.getOpType()) {
+		            case com.pingcap.enums.Model.ADD:
+		            case com.pingcap.enums.Model.UPDATE:
+		                if (null != infoRawKV) {
+		                    if (tmpRawKV.getUpdateTime() != null && infoRawKV.getUpdateTime() != null) {
+		                        // Redo > RawKV
+		                        if (CountUtil.compareTime( tmpRawKV.getUpdateTime(), infoRawKV.getUpdateTime()) >= 0) {
+		                            // if duration == 0, D
+		                            if(!put( rawKvClient, curKey, pairs, Long.parseLong(tmpRawKV.getDuration()))){
+			                        	++iCheckSumFail;
+			                            pairs.remove(curKey);
+			                            //pairs_lines.remove(curKey);
+		                            }
+		                        } else {
+		                        	lineData = pairs.get(curKey);
+		                        	redoLog.error("times waitting. Key={}, redoTso={} < rawkvTso={}, line={}, so skip. OpType={}", curKey.toStringUtf8(),tmpRawKV.getUpdateTime(), infoRawKV.getUpdateTime(), lineData.getLineNo(),tmpRawKV.getOpType());
+		                            redoFailLog.info(lineData.getLineData());
+		                            pairs.remove(curKey);
+		                            //pairs_lines.remove(curKey);
+		                            ++iCheckSumFail;
+		                        }
+		                    } else {
+		                        // If timeStamp is null, put
 	                            if(!put( rawKvClient, curKey, pairs, Long.parseLong(tmpRawKV.getDuration()))){
 		                        	++iCheckSumFail;
 		                            pairs.remove(curKey);
 		                            //pairs_lines.remove(curKey);
 	                            }
-	                        } else {
-	                        	lineData = pairs.get(curKey);
-	                        	redoLog.error("times waitting. Key={}, redoTso={} < rawkvTso={}, line={}, so skip. OpType={}", curKey.toStringUtf8(),tmpRawKV.getUpdateTime(), infoRawKV.getUpdateTime(), lineData.getLineNo(),tmpRawKV.getOpType());
-	                            redoFailLog.info(lineData.getLineData());
-	                            pairs.remove(curKey);
-	                            //pairs_lines.remove(curKey);
-	                            ++iCheckSumFail;
-	                        }
-	                    } else {
-	                        // If timeStamp is null, put
-                            if(!put( rawKvClient, curKey, pairs, Long.parseLong(tmpRawKV.getDuration()))){
+		                    }
+		                } else {
+		                    // If raw kv is not exists, put.
+	                        if(!put( rawKvClient, curKey, pairs, Long.parseLong(tmpRawKV.getDuration()))){
 	                        	++iCheckSumFail;
 	                            pairs.remove(curKey);
 	                            //pairs_lines.remove(curKey);
-                            }
-	                    }
-	                } else {
-	                    // If raw kv is not exists, put.
-                        if(!put( rawKvClient, curKey, pairs, Long.parseLong(tmpRawKV.getDuration()))){
-                        	++iCheckSumFail;
-                            pairs.remove(curKey);
-                            //pairs_lines.remove(curKey);
-                        }
-	                }
-	                break;
-	            case com.pingcap.enums.Model.DELETE:
-	                if (null != infoRawKV) {
-	                    if (tmpRawKV.getUpdateTime() != null && infoRawKV.getUpdateTime() != null) {
-	                        if (CountUtil.compareTime(tmpRawKV.getUpdateTime(), infoRawKV.getUpdateTime()) >= 0) {
+	                        }
+		                }
+		                break;
+		            case com.pingcap.enums.Model.DELETE:
+		                if (null != infoRawKV) {
+		                    if (tmpRawKV.getUpdateTime() != null && infoRawKV.getUpdateTime() != null) {
+		                        if (CountUtil.compareTime(tmpRawKV.getUpdateTime(), infoRawKV.getUpdateTime()) >= 0) {
+			                        if(!delete( rawKvClient, curKey, pairs)){
+			                        	++iCheckSumFail;
+			                            pairs.remove(curKey);
+			                            //pairs_lines.remove(curKey);
+			                        }
+		                        } else {
+		                        	lineData = pairs.get(curKey);
+		                        	redoLog.error("times waitting. Key={}, redoTso={} < rawkvTso={}, line={}, so skip. OpType=delete", curKey.toStringUtf8(),tmpRawKV.getUpdateTime(), infoRawKV.getUpdateTime(), lineData.getLineNo());
+		                            redoFailLog.info(lineData.getLineData());
+		                            pairs.remove(curKey);
+		                            //pairs_lines.remove(curKey);
+		                            ++iCheckSumFail;
+		                        }
+		                    } else {
 		                        if(!delete( rawKvClient, curKey, pairs)){
 		                        	++iCheckSumFail;
 		                            pairs.remove(curKey);
 		                            //pairs_lines.remove(curKey);
 		                        }
-	                        } else {
-	                        	lineData = pairs.get(curKey);
-	                        	redoLog.error("times waitting. Key={}, redoTso={} < rawkvTso={}, line={}, so skip. OpType=delete", curKey.toStringUtf8(),tmpRawKV.getUpdateTime(), infoRawKV.getUpdateTime(), lineData.getLineNo());
-	                            redoFailLog.info(lineData.getLineData());
-	                            pairs.remove(curKey);
-	                            //pairs_lines.remove(curKey);
-	                            ++iCheckSumFail;
-	                        }
-	                    } else {
-	                        if(!delete( rawKvClient, curKey, pairs)){
-	                        	++iCheckSumFail;
-	                            pairs.remove(curKey);
-	                            //pairs_lines.remove(curKey);
-	                        }
-	                    }
-	                } else {
-	                	lineData = pairs.get(curKey);
-	                    redoLog.error("raw KV not exists. Key={}, file={}, line={}, so skip. OpType=delete", curKey.toStringUtf8(),filePath, lineData.getLineData());
-	                    ////infoRawKV = (InfoInterface)JSONObject.parseObject(lineData.getLineData(), clazz.getClass());
-	                    redoFailLog.info(lineData.getLineData());
-	                    pairs.remove(curKey);
-	                    //pairs_lines.remove(curKey);
-	                    ++iNotInsert;
+		                    }
+		                } else {
+		                	lineData = pairs.get(curKey);
+		                    redoLog.error("raw KV not exists. Key={}, file={}, line={}, so skip. OpType=delete", curKey.toStringUtf8(),filePath, lineData.getLineData());
+		                    ////infoRawKV = (InfoInterface)JSONObject.parseObject(lineData.getLineData(), clazz.getClass());
+		                    redoFailLog.info(lineData.getLineData());
+		                    pairs.remove(curKey);
+		                    //pairs_lines.remove(curKey);
+		                    ++iNotInsert;
+		                }
+		                break;
+		            default:
+		            	redoLog.error("Redo data opType occurred IllegalStateException. File={}, data={}, line={}", filePath, pairs.get(curKey).getLineData(), pairs.get(curKey).getLineNo());
+		                throw new IllegalStateException(infoRawKV.getOpType());
+	            }//end switch
+        	}//end if
+        	else if(Model.TEMP_INDEX_INFO.equals(redoType)){
+	        		dataType = tmpRawKV.getOpType();
+	        		if (StringUtils.isEmpty(dataType)) {
+	        			redoLog.error("Redo data opType must not be null. File={}, data={}, line={}", filePath, pairs.get(curKey).getLineData(), pairs.get(curKey).getLineNo());
+	                    System.exit(0);
 	                }
-	                break;
-	            default:
-	            	redoLog.error("Redo data opType occurred IllegalStateException. File={}, data={}, line={}", filePath, pairs.get(curKey).getLineData(), pairs.get(curKey).getLineNo());
-	                throw new IllegalStateException(infoRawKV.getOpType());
-            }
+	                switch (dataType) {
+		                case com.pingcap.enums.Model.ADD:
+		                case com.pingcap.enums.Model.UPDATE:
+		                    if(!put( rawKvClient, curKey, pairs, ttl)){
+		                    	++iCheckSumFail;
+		                        pairs.remove(curKey);
+		                    }
+		                    break;
+		                case com.pingcap.enums.Model.DELETE:
+		                    if(!delete( rawKvClient, curKey, pairs)){
+		                    	++iCheckSumFail;
+		                        pairs.remove(curKey);
+		                    }
+		                    break;
+		                default:
+		                    throw new IllegalStateException(dataType);
+	                }
+        	}
+        	else{
+                redoLog.error("Redo error type={}", redoType);
+                System.exit(0);
+        	}
         }
         keyList.clear();
         keyList = null;
@@ -285,8 +318,16 @@ public class Redo implements TaskInterface {
         try {
         	int total = filesNum.incrementAndGet();
         	if(!redoFile.getParentFile().getAbsolutePath().equals(moveFile.getAbsolutePath())){
-        		moveFile = new File(moveFilePath + "/" + now + "/" + redoFile.getName() + "." + total);
-        		FileUtils.moveFile(redoFile, moveFile);
+        		final String moveToFilePath = moveFilePath + "/" + now + "/";
+        		FileUtil.createFolder(moveToFilePath);
+        		moveFile = new File(moveToFilePath);
+        		if(moveFile.exists() && moveFile.canWrite() && moveFile.isDirectory()){
+	        		moveFile = new File(moveToFilePath + redoFile.getName() + "." + total);
+	        		FileUtils.moveFile(redoFile, moveFile);
+        		}
+        		else{
+        			logger.error("Directory({}) occured exception: not access",moveFile.getAbsolutePath());
+        		}
         	}
         } catch (IOException e) {
             e.printStackTrace();
@@ -327,12 +368,15 @@ public class Redo implements TaskInterface {
         String moveFilePath = properties.get(Model.REDO_MOVE_PATH);
         // MoveFilePath
         FileUtil.createFolder(moveFilePath);
+        PropertiesUtil.checkNaturalNumber( properties, Model.TTL, false);
+        ttl = Integer.parseInt(properties.get(Model.TTL));
+        redoType = properties.get(SCENES);
         if(!Model.JSON_FORMAT.equals(properties.get(Model.MODE))){
             logger.error("The redo function does not support non JSON format data");
             System.exit(0);  
         }
         else{
-	        if(Model.INDEX_TYPE.equals(properties.get(Model.SCENES))){
+	        if(Model.INDEX_TYPE.equals(properties.get(SCENES))){
 	            logger.error("Configuration json format not support indexType of scense");
 	            System.exit(0);  
 	        }

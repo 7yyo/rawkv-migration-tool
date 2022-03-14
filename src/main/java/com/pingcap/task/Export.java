@@ -144,12 +144,14 @@ public class Export implements TaskInterface {
             	for(int i=0;i<wrtBuffer.size();i++){
 	            	fileChannel.write(StandardCharsets.UTF_8.encode(CharBuffer.wrap(wrtBuffer.get(i))));
             	}
+            	fileOutputStream.flush();
             } catch (FileNotFoundException e) {
             	filesNum.decrementAndGet();
                 e.printStackTrace();
             } catch (IOException e) {
 				e.printStackTrace();
 				filesNum.decrementAndGet();
+				logger.error("File({}) write ocurred exception: {}", filePath, e.getMessage());
 			}
             finally{
             	if(null != fileChannel){
@@ -274,7 +276,7 @@ public class Export implements TaskInterface {
 				
 			} catch (Exception e) {
 				totalParserError.incrementAndGet();
-				logger.error("Exception unFormatToKeyValue:key={},value={}",kvPairList.get(i).getKey().toStringUtf8(),kvPairList.get(i).getValue().toStringUtf8());
+				logger.error("unFormatToKeyValue(key={},value={}) ocurred exception: {}", key, value, e.getMessage());
 				e.printStackTrace();
 			}
             finally{
