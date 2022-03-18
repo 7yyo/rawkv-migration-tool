@@ -79,8 +79,8 @@ public class SystemMonitorTimer extends TimerTask {
 
 	private synchronized List<double[]> putData(){
 		double curData[] = new double[2];
-		curData[1] = TaskInterface.totalDataBytes.getAndSet(0);	// bytes
-		curData[0] = System.currentTimeMillis();				// time
+		curData[1] = TaskInterface.totalDataBytes.sumThenReset();// bytes
+		curData[0] = System.currentTimeMillis();				 // time
 		traffic.add(curData);
 		if(5 < traffic.size())
 			traffic.remove(0);

@@ -187,12 +187,12 @@ public class BatchJob implements Runnable {
         	processCounts = kvPairs.size()+kvPairsTtl.size();
         	if(batchSize <= processCounts){
 	            if(0 < kvPairs.size()){
-	            	TaskInterface.totalDataBytes.addAndGet(doWriteTikv( rawKvClient, kvPairs, lineBlock, false,dataSize));
+	            	TaskInterface.totalDataBytes.add(doWriteTikv( rawKvClient, kvPairs, lineBlock, false,dataSize));
 	            	dataSize = 0;
 	            }
 	
 	            if(0 < kvPairsTtl.size()){
-	        		TaskInterface.totalDataBytes.addAndGet(doWriteTikv( rawKvClient, kvPairsTtl, lineBlock, true,dataTtlSize));
+	        		TaskInterface.totalDataBytes.add(doWriteTikv( rawKvClient, kvPairsTtl, lineBlock, true,dataTtlSize));
 	            	dataTtlSize = 0;
 	        	}
 	            lineBlock.reduceLineDataSourceList(row);
@@ -202,10 +202,10 @@ public class BatchJob implements Runnable {
         processCounts = kvPairs.size()+kvPairsTtl.size();
         if(0 < processCounts){
 	    	if(0 < kvPairs.size()){
-	    		TaskInterface.totalDataBytes.addAndGet(doWriteTikv( rawKvClient, kvPairs, lineBlock, false,dataSize));
+	    		TaskInterface.totalDataBytes.add(doWriteTikv( rawKvClient, kvPairs, lineBlock, false,dataSize));
 	    	}
 	    	if(0 < kvPairsTtl.size()){
-	    		TaskInterface.totalDataBytes.addAndGet(doWriteTikv( rawKvClient, kvPairsTtl, lineBlock, true,dataTtlSize));
+	    		TaskInterface.totalDataBytes.add(doWriteTikv( rawKvClient, kvPairsTtl, lineBlock, true,dataTtlSize));
 	    	}
         }
     	properties = null;

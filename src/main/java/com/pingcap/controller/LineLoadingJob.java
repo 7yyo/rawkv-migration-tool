@@ -21,13 +21,14 @@ import java.util.*;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.DoubleAdder;
 
 public class LineLoadingJob implements Runnable {
 	public static final AtomicInteger totalUsedCount = new AtomicInteger(0);
     private final String importFilePath;
     private final TiSession tiSession;
     //processing progress
-    private final AtomicInteger processFileLines = new AtomicInteger(0);
+    private final DoubleAdder processFileLines = new DoubleAdder();
     
     //processing status
     private final AtomicInteger totalImportCount = new AtomicInteger(0);
@@ -119,12 +120,12 @@ public class LineLoadingJob implements Runnable {
                 	--splitLimit;
                 	cmdInterFace.getLoggerFail().error("LineIterator error, file = {} ,error={}", absolutePath, e);
                     totalParseErrorCount.incrementAndGet();
-                    processFileLines.incrementAndGet();
+                    processFileLines.add(1);
                     continue;
                 }
             	if(splitLimit <= blockCache.size()) {
                 	splitLimit = fileSplitSize;
-                	processFileLines.addAndGet(blockCache.size());
+                	processFileLines.add(blockCache.size());
                 	threadPoolFileLoading.execute(
 							new BatchJob(
 	                			tiSession,
@@ -147,7 +148,7 @@ public class LineLoadingJob implements Runnable {
                 }
             }	
             if(0 < blockCache.size()) {
-            	processFileLines.addAndGet(blockCache.size());
+            	processFileLines.add(blockCache.size());
             	threadPoolFileLoading.execute(
 						new BatchJob(
 	                        tiSession,

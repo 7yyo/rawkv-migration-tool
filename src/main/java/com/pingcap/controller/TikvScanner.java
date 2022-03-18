@@ -4,7 +4,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.DoubleAdder;
 
 import org.tikv.common.TiSession;
 import org.tikv.kvproto.Kvrpcpb;
@@ -23,8 +23,8 @@ import org.tikv.shade.com.google.protobuf.ByteString;
 import io.prometheus.client.Histogram;
 
 public class TikvScanner implements ScannerInterface {
-    private static final AtomicInteger exportTotalCounter = new AtomicInteger(0);
-    
+    private static final DoubleAdder exportTotalCounter = new DoubleAdder();
+    public DoubleAdder counter = new DoubleAdder();
     private long lastModifiedDate = 0;
     
 	@Override
@@ -58,7 +58,6 @@ public class TikvScanner implements ScannerInterface {
         RawKVClient rawKvClient = tiSession.createRawClient();
         boolean isReadyEnd = false;
         double traffic = 0;
-
         //Random random = new Random();
         int debug_count = 0;
         while (true) {
@@ -85,7 +84,7 @@ public class TikvScanner implements ScannerInterface {
             if(isReadyEnd){
                 if(1 >= kvPairList.size() && startKey.equals(lastStartKey)){
                     threadPoolExecutor.shutdown();
-                    cmdInterFace.getLogger().info("Complete data export. Total number of exported rows={}", exportTotalCounter);
+                    cmdInterFace.getLogger().info("Complete data export. Total number of exported rows={}", exportTotalCounter.longValue());
                     break;           	
                 }
             }
@@ -96,28 +95,25 @@ public class TikvScanner implements ScannerInterface {
             }
             if(0 < kvPairList.size()){
             	//If it is 0, it may cause LimitSpeedkv.testTraffic execution error 
-            	traffic = 1;
-            	for(int i=0;i<kvPairList.size();i++){
-            		traffic += (kvPairList.get(i).getKey().toStringUtf8().length() + kvPairList.get(i).getValue().toStringUtf8().length());
-            	}
             	startKey = kvPairList.get(kvPairList.size() - 1).getKey();
-	            if(0 != exportTotalCounter.get())
+	            if(0 != exportTotalCounter.longValue())
 	            	kvPairList.remove(0);
-	            exportTotalCounter.addAndGet(kvPairList.size());
-	            threadPoolExecutor.execute(new ExportExecuterJob( kvPairList, exporter, exportFilePath));
+	            exportTotalCounter.add(kvPairList.size());
+	            threadPoolExecutor.execute(new ExportExecuterJob( kvPairList, exporter, exportFilePath, counter));
 	            	
 	            kvPairList.clear();
-            	TaskInterface.totalDataBytes.addAndGet(traffic);
+
+	            traffic = counter.sumThenReset();
             	//The returned data is compressed. 
             	//The rate cannot be accurately obtained. 
-	            LimitSpeedkv.testTraffic(traffic);
+	            LimitSpeedkv.testTraffic(0==traffic?1:traffic);
             }
         }
         threadPoolExecutor.shutdown();
 
         try {
             if (threadPoolExecutor.awaitTermination(Long.MAX_VALUE, TimeUnit.SECONDS)) {
-            	exporter.printFinishedInfo(exportTotalCounter.get(),System.currentTimeMillis() - startTime);
+            	exporter.printFinishedInfo(exportTotalCounter.longValue(),System.currentTimeMillis() - startTime);
             }
         } catch (InterruptedException e) {
             e.printStackTrace();

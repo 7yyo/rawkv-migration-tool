@@ -52,6 +52,9 @@ public class DataFormatForJson implements DataFormatInterface {
             	dataTypeInt = DATATYPE_INDEXINFO;
             	IndexInfo indexInfoTiKV = new IndexInfo();
             	IndexInfo indexInfoCassandra = JSON.toJavaObject(jsonObject, IndexInfo.class);
+            	if(!DataFormatInterface.isJsonString(indexInfoCassandra.getServiceTag())){
+            		throw new Exception("The servicetag field of indexinfo must be in JSON format");
+            	}
                 if (indexInfoCassandra.getUpdateTime() != null) {
                     indexInfoCassandra.setUpdateTime(indexInfoCassandra.getUpdateTime().replaceAll("T", " ").replaceAll("Z", ""));
                 } else {

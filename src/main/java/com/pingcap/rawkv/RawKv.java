@@ -22,7 +22,19 @@ public class RawKv {
             rawKvClient.close();
         }
     }
-
+    
+/*  //Test use  
+ * 	public static void put(TiSession tiSession, String key, String value) {
+        if (StringUtils.isEmpty(key)) {
+            logger.warn("The key cannot be null.");
+        } else {
+            RawKVClient rawKvClient = tiSession.createRawClient();
+            rawKvClient.put(ByteString.copyFromUtf8(key), ByteString.copyFromUtf8(value));
+            logger.info("put Key={}, Value={} success.", key, value);
+            rawKvClient.close();
+        }
+    }*/
+    
     public static void truncateRawKv(TiSession tiSession) {
         logger.info("Start to truncate Raw KV...");
         RawKVClient rawKvClient = tiSession.createRawClient();

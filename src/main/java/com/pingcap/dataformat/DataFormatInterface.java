@@ -4,7 +4,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import org.tikv.shade.com.google.protobuf.ByteString;
-
+import org.apache.commons.lang.StringUtils;
 import com.pingcap.pojo.InfoInterface;
 
 public interface DataFormatInterface {
@@ -44,13 +44,14 @@ public interface DataFormatInterface {
 	}
 	
 	//Simply determine whether it is a JSON string 
-/*	public static boolean isJsonString(String source){
-		if(StringUtils.isEmpty(source)|| 2 >= source.length())
+	public static boolean isJsonString(String source){
+		String str = source.trim();
+		if(StringUtils.isEmpty(str)|| 2 > str.length())
 			return false;
-		if(JSON_BODY_PRE == source.charAt(0)&& JSON_BODY_TAL == source.charAt(source.length()-1))
+		if(JSON_BODY_PRE == str.charAt(0)&& JSON_BODY_TAL == str.charAt(str.length()-1))
 			return true;
 		return false;
-	}*/
+	}
 	
 	public static int findMatcher(String source,String find) {
 		Pattern pattern = Pattern.compile(find);
