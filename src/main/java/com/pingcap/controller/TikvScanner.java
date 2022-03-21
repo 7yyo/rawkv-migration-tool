@@ -94,7 +94,6 @@ public class TikvScanner implements ScannerInterface {
             		lastStartKey = kvPairList.get(kvPairList.size() - 1).getKey();
             }
             if(0 < kvPairList.size()){
-            	//If it is 0, it may cause LimitSpeedkv.testTraffic execution error 
             	startKey = kvPairList.get(kvPairList.size() - 1).getKey();
 	            if(0 != exportTotalCounter.longValue())
 	            	kvPairList.remove(0);
@@ -106,6 +105,7 @@ public class TikvScanner implements ScannerInterface {
 	            traffic = counter.sumThenReset();
             	//The returned data is compressed. 
             	//The rate cannot be accurately obtained. 
+            	//If it is 0, it may cause LimitSpeedkv.testTraffic execution error 
 	            LimitSpeedkv.testTraffic(0==traffic?1:traffic);
             }
         }

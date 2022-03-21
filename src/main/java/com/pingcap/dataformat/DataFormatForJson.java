@@ -104,7 +104,7 @@ public class DataFormatForJson implements DataFormatInterface {
         JSONObject jsonObject = null;
         int dataTypeInt;
         String dataType;
-        if (key.startsWith(IndexInfo.HEADFORMAT+keyDelimiter)) {
+        if (key.startsWith(IndexInfo.HEADFORMAT/*+keyDelimiter*/)) {
         	dataType = Model.INDEX_INFO;
         	dataTypeInt = DATATYPE_INDEXINFO;
             jsonObject = JSONObject.parseObject(value);
@@ -115,7 +115,7 @@ public class DataFormatForJson implements DataFormatInterface {
             indexInfo.setType(keyArr[2]);
             indexInfo.setId(keyArr[3]);
             jsonString = JSON.toJSONString(indexInfo);
-        } else if (key.startsWith(TempIndexInfo.HEADFORMAT+keyDelimiter)) {
+        } else if (key.startsWith(TempIndexInfo.HEADFORMAT/*+keyDelimiter*/)) {
         	dataType = Model.TEMP_INDEX_INFO;
         	dataTypeInt = DATATYPE_TEMPINDEX;
             jsonObject = JSONObject.parseObject(value);
@@ -141,7 +141,7 @@ public class DataFormatForJson implements DataFormatInterface {
 	        JSONObject jsonObject = null;
 	        final String strKey = bkey.toStringUtf8();
 	        final String strValue = bvalue.toStringUtf8(); 
-	        if (strKey.startsWith(IndexInfo.HEADFORMAT+keyDelimiter)) {
+	        if (strKey.startsWith(IndexInfo.HEADFORMAT/*+keyDelimiter*/)) {
 	            jsonObject = JSONObject.parseObject(strValue);
 	            IndexInfo indexInfo = JSON.toJavaObject(jsonObject, IndexInfo.class);
 	            // key = indexInfo_:_{envid}_:_{type}_:_{id}
@@ -150,7 +150,7 @@ public class DataFormatForJson implements DataFormatInterface {
 	            indexInfo.setType(keyArr[2]);
 	            indexInfo.setId(keyArr[3]);
 	            return indexInfo;
-	        } else if (strKey.startsWith(TempIndexInfo.HEADFORMAT+keyDelimiter)) {
+	        } else if (strKey.startsWith(TempIndexInfo.HEADFORMAT/*+keyDelimiter*/)) {
 	            jsonObject = JSONObject.parseObject(strValue);
 	            TempIndexInfo tempIndexInfo = JSON.toJavaObject(jsonObject, TempIndexInfo.class);
 	            // key = tempIndex_:_{envid}_:_{id}
