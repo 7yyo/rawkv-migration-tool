@@ -2,7 +2,7 @@ package com.pingcap.timer;
 
 import java.util.Map;
 import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.DoubleAdder;
 
 import com.pingcap.enums.Model;
 import com.pingcap.task.TaskInterface;
@@ -14,7 +14,7 @@ public class TaskTimer extends TimerTaskBase {
 
     private final long startTime = System.currentTimeMillis();
     
-    public TaskTimer(ThreadPoolExecutor threadPoolFileLoading,TaskInterface cmdInterFace,AtomicInteger processFileLines, int totalLines, String filePath) {
+    public TaskTimer(ThreadPoolExecutor threadPoolFileLoading,TaskInterface cmdInterFace,DoubleAdder processFileLines, int totalLines, String filePath) {
         this.cmdInterFace = cmdInterFace;
         this.processFileLines = processFileLines;
         this.totalLines = totalLines;
@@ -28,7 +28,7 @@ public class TaskTimer extends TimerTaskBase {
 	@Override
 	public void run() {
         cmpConfingUpdate();
-        int curProcessLines = processFileLines.get();
+        int curProcessLines = processFileLines.intValue();
         float remaining = (float)(totalLines - curProcessLines)/((curProcessLines/(System.currentTimeMillis()-startTime))+1)/1000;
 		cmdInterFace.getLogger().info("[{}] [{}/{}],{} ratio {}%,remained {}s", this.filePath, curProcessLines, totalLines,cmdInterFace.getClass().getSimpleName(), CountUtil.getPercentage(curProcessLines, totalLines),String.format("%.2f", remaining));
 	}

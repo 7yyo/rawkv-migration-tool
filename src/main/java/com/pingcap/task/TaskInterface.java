@@ -7,12 +7,11 @@ import static com.pingcap.enums.Model.KEY_DELIMITER;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
-
+import java.util.concurrent.atomic.DoubleAdder;
 import org.slf4j.Logger;
 import org.tikv.raw.RawKVClient;
 import org.tikv.shade.com.google.protobuf.ByteString;
 
-import com.google.common.util.concurrent.AtomicDouble;
 import com.pingcap.controller.ScannerInterface;
 import com.pingcap.enums.Model;
 import com.pingcap.pojo.LineDataText;
@@ -23,7 +22,8 @@ import io.prometheus.client.Counter;
 public interface TaskInterface {
 	static final Counter BATCH_PUT_FAIL_COUNTER = Counter.build().name("batch_put_fail_counter").help("Batch put fail counter.").labelNames("batch_put_fail").register();
     static final Histogram REQUEST_LATENCY = Histogram.build().name("requests_latency_seconds").help("Request latency in seconds.").labelNames("request_latency").register();
-    static public final AtomicDouble totalDataBytes = new AtomicDouble(0);  
+    //static public final AtomicDouble totalDataBytes = new AtomicDouble(0);  
+    static public DoubleAdder totalDataBytes = new DoubleAdder();
     static public final AtomicInteger filesNum = new AtomicInteger(0);
     
 	public Logger getLogger();

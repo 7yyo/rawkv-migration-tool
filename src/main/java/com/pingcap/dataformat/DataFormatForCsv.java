@@ -114,7 +114,7 @@ public class DataFormatForCsv implements DataFormatInterface {
 		StringBuffer jsonString = new StringBuffer();
 		String dataType;
 		int dataTypeInt = DATATYPE_INDEXTYPE;
-        if (key.startsWith(IndexInfo.HEADFORMAT+keyDelimiter)) {     	
+        if (key.startsWith(IndexInfo.HEADFORMAT/*+keyDelimiter*/)) {     	
         	dataType = Model.INDEX_INFO;
         	JSONObject jsonObject = JSONObject.parseObject(value);
         	IndexInfo indexInfoTiKV = JSON.toJavaObject(jsonObject, IndexInfo.class);
@@ -143,7 +143,7 @@ public class DataFormatForCsv implements DataFormatInterface {
         	}
             dataTypeInt = DATATYPE_INDEXINFO;
         }
-        else if (key.startsWith(TempIndexInfo.HEADFORMAT+keyDelimiter)) {
+        else if (key.startsWith(TempIndexInfo.HEADFORMAT/*+keyDelimiter*/)) {
         	//CSV format don't support tempIndexInfo scense,so transfer to json format
         	dataType = Model.TEMP_INDEX_INFO;
         	dataTypeInt = DATATYPE_TEMPINDEX;
@@ -170,11 +170,11 @@ public class DataFormatForCsv implements DataFormatInterface {
 	        JSONObject jsonObject = null;
 	        final String strKey = bkey.toStringUtf8();
 	        final String strValue = bvalue.toStringUtf8();
-	        if (strKey.startsWith(IndexInfo.HEADFORMAT+keyDelimiter)) {
+	        if (strKey.startsWith(IndexInfo.HEADFORMAT/*+keyDelimiter*/)) {
 	            jsonObject = JSONObject.parseObject(strValue);
 	            IndexInfo indexInfo = JSON.toJavaObject(jsonObject, IndexInfo.class);
 	            return indexInfo;
-	        } else if (strKey.startsWith(TempIndexInfo.HEADFORMAT+keyDelimiter)) {
+	        } else if (strKey.startsWith(TempIndexInfo.HEADFORMAT/*+keyDelimiter*/)) {
 	            jsonObject = JSONObject.parseObject(strValue);
 	            TempIndexInfo tempIndexInfo = JSON.toJavaObject(jsonObject, TempIndexInfo.class);
 	            return tempIndexInfo;

@@ -5,12 +5,12 @@ import com.pingcap.task.TaskInterface;
 
 import java.util.Map;
 import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.DoubleAdder;
 
 public class ExportTimer extends TimerTaskBase {
     private final long startTime = System.currentTimeMillis();
 
-    public ExportTimer(ThreadPoolExecutor threadPoolFileLoading,TaskInterface cmdInterFace,AtomicInteger exportTotalCounter) {
+    public ExportTimer(ThreadPoolExecutor threadPoolFileLoading,TaskInterface cmdInterFace,DoubleAdder exportTotalCounter) {
         this.cmdInterFace = cmdInterFace;
         this.processFileLines = exportTotalCounter;
         //this.totalLines = totalLines;
@@ -24,7 +24,7 @@ public class ExportTimer extends TimerTaskBase {
     @Override
     public void run() {
         cmpConfingUpdate();
-		cmdInterFace.getLogger().info("Total exportNum={} and used time={}s", processFileLines.get(),String.format("%.2f", (float)(System.currentTimeMillis()-startTime)/1000));
+		cmdInterFace.getLogger().info("Total exportNum={} and used time={}s", processFileLines.longValue(),String.format("%.2f", (float)(System.currentTimeMillis()-startTime)/1000));
     }
 
 }

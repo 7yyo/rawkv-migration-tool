@@ -15,6 +15,7 @@ import java.util.Map;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.DoubleAdder;
 
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
@@ -47,13 +48,13 @@ public class Export implements TaskInterface {
     private static final int LISTBUFFSIZE = 4096;
     private static final String EXPORT_FILE_PATH = "/export%s_%s_%d.txt";
     private Histogram EXPORT_DURATION = Histogram.build().name("Export_duration_").help("export duration").labelNames("type").register();
-    private final AtomicInteger totalExportCount = new AtomicInteger(0);
-    private final AtomicInteger totalExportIndexType = new AtomicInteger(0);
-    private final AtomicInteger totalExportIndexInfo = new AtomicInteger(0);
-    private final AtomicInteger totalExportTempIndex = new AtomicInteger(0);
-    private final AtomicInteger totalParserError = new AtomicInteger(0);
-	private final AtomicInteger totalSkipCount = new AtomicInteger(0);
-    private final AtomicInteger totalIOError = new AtomicInteger(0);
+    private final DoubleAdder totalExportCount = new DoubleAdder();
+    private final DoubleAdder totalExportIndexType = new DoubleAdder();
+    private final DoubleAdder totalExportIndexInfo = new DoubleAdder();
+    private final DoubleAdder totalExportTempIndex = new DoubleAdder();
+    private final DoubleAdder totalParserError = new DoubleAdder();
+	private final DoubleAdder totalSkipCount = new DoubleAdder();
+    private final DoubleAdder totalIOError = new DoubleAdder();
     private static ArrayList<StringBuilder> wrtBufferIndexType = new ArrayList<StringBuilder>(LISTBUFFSIZE);
     private static ArrayList<StringBuilder> wrtBufferIndexInfo = new ArrayList<StringBuilder>(LISTBUFFSIZE);
     private static ArrayList<StringBuilder> wrtBufferIndexTemp = new ArrayList<StringBuilder>(LISTBUFFSIZE);
@@ -126,10 +127,13 @@ public class Export implements TaskInterface {
     }
     
     public void reloadConfig(int poolSize, int poolSizeMax, int packgeSize){
-    	if(0 < poolSize)
-    		threadPoolFileWriter.setCorePoolSize(poolSize);
-    	if(0 < poolSizeMax)
-    		threadPoolFileWriter.setMaximumPoolSize(poolSizeMax);
+    	if(0 < poolSizeMax && poolSizeMax >= poolSize){
+	    	threadPoolFileWriter.setMaximumPoolSize(poolSizeMax);    	
+	    	threadPoolFileWriter.setCorePoolSize(poolSize);
+    	}
+    	else{
+    		logger.error("Error configuration {} cannot be greater than {}",Model.CORE_POOL_SIZE,Model.MAX_POOL_SIZE);
+    	}
     	if(0 < packgeSize)
     		this.packgeSize = packgeSize;
     }
@@ -190,8 +194,14 @@ public class Export implements TaskInterface {
 		
         PropertiesUtil.checkNaturalNumber( properties, Model.INTERNAL_THREAD_POOL, false);
         PropertiesUtil.checkNaturalNumber( properties, Model.INTERNAL_MAXTHREAD_POOL, false);
-        threadPoolFileWriter.setCorePoolSize(Integer.parseInt(properties.get(Model.INTERNAL_THREAD_POOL)));
-        threadPoolFileWriter.setMaximumPoolSize(Integer.parseInt(properties.get(Model.INTERNAL_MAXTHREAD_POOL)));
+        int poolsize = Integer.parseInt(properties.get(Model.INTERNAL_THREAD_POOL));
+        int poolMax = Integer.parseInt(properties.get(Model.INTERNAL_MAXTHREAD_POOL));
+        if(poolsize > poolMax || 0 == poolMax){
+        	logger.error("Configuration {} cannot be greater than {}",Model.INTERNAL_THREAD_POOL,Model.INTERNAL_MAXTHREAD_POOL);
+        	System.exit(0);
+        }
+        threadPoolFileWriter.setMaximumPoolSize(poolMax);
+        threadPoolFileWriter.setCorePoolSize(poolsize);      
         
 		PropertiesUtil.checkConfig(properties, Model.EXPORT_FILE_PATH);
         exportFilePath = properties.get(Model.EXPORT_FILE_PATH);
@@ -229,17 +239,19 @@ public class Export implements TaskInterface {
 	}
 	
 	
-	public void executeSaveTo(List<Kvrpcpb.KvPair> kvPairList,String filePath) {
+	public void executeSaveTo(List<Kvrpcpb.KvPair> kvPairList,String filePath,DoubleAdder byteCounter) {
 		Histogram.Timer transformDuration;
         boolean ret;
         
         int total = 0;
+        double traffic = 0;
         String key,value;
         for (int i = 0; i < kvPairList.size(); i++) {
         	key = kvPairList.get(i).getKey().toStringUtf8();
         	value = kvPairList.get(i).getValue().toStringUtf8();
+        	traffic += (key.length() + value.length());
         	if(StringUtils.isEmpty(key)&&StringUtils.isEmpty(value)){
-        		totalSkipCount.incrementAndGet();
+        		totalSkipCount.add(1);//.incrementAndGet();
         		continue;
         	}
             transformDuration = EXPORT_DURATION.labels("transform duration").startTimer();
@@ -252,19 +264,19 @@ public class Export implements TaskInterface {
 						switch(typeInt){
 						case 0:
 							if(wrtTypes[0]){
-						    	totalExportIndexType.incrementAndGet();
+						    	totalExportIndexType.add(1);//.incrementAndGet();
 								fastWriteIndexType(kvPair,packgeSize);
 							}
 							break;
 						case 1:
 							if(wrtTypes[1]){
-								totalExportIndexInfo.incrementAndGet();
+								totalExportIndexInfo.add(1);//.incrementAndGet();
 								fastWriteIndexInfo(kvPair,packgeSize);
 							}
 							break;
 						default:
 							if(wrtTypes[2]){
-								totalExportTempIndex.incrementAndGet();
+								totalExportTempIndex.add(1);//.incrementAndGet();
 								fastWriteIndexTemp(kvPair,packgeSize);
 							}
 						}
@@ -275,7 +287,7 @@ public class Export implements TaskInterface {
 					++total;
 				
 			} catch (Exception e) {
-				totalParserError.incrementAndGet();
+				totalParserError.add(1);//.incrementAndGet();
 				logger.error("unFormatToKeyValue(key={},value={}) ocurred exception: {}", key, value, e.getMessage());
 				e.printStackTrace();
 			}
@@ -283,7 +295,9 @@ public class Export implements TaskInterface {
             	transformDuration.observeDuration();
             }
         }
-        totalExportCount.addAndGet(total);
+        totalExportCount.add(total);//.addAndGet(total);
+        byteCounter.add(traffic);
+        TaskInterface.totalDataBytes.add(traffic);
 	}
 
 	@Override
@@ -316,19 +330,19 @@ public class Export implements TaskInterface {
 		return new TikvScanner();
 	}
 	
-	public void printFinishedInfo(int total,long duration){
+	public void printFinishedInfo(long total,long duration){
 		final String headLogger = "["+this.getClass().getSimpleName()+" summary]";
 		StringBuilder result = new StringBuilder(
         		headLogger +
                         " file=" + properties.get(Model.EXPORT_FILE_PATH) + ", " +
                         "total=" + total + ", " +
-                        "exported=" + totalExportCount + ", " +
-                        "indexType=" + totalExportIndexType + ", " +
-                        "indexInfo=" + totalExportIndexInfo + ", " +
-                        "empty=" + totalSkipCount  + ", " +
-                        "tempIndex=" + totalExportTempIndex + ", " +
-                        "parseErr=" + totalParserError + ", " +
-                        "IoErr=" + totalIOError + ", " +
+                        "exported=" + totalExportCount.longValue() + ", " +
+                        "indexType=" + totalExportIndexType.longValue() + ", " +
+                        "indexInfo=" + totalExportIndexInfo.longValue() + ", " +
+                        "empty=" + totalSkipCount.longValue()  + ", " +
+                        "tempIndex=" + totalExportTempIndex.longValue() + ", " +
+                        "parseErr=" + totalParserError.longValue() + ", " +
+                        "IoErr=" + totalIOError.longValue() + ", " +
                         "duration=" + duration / 1000 + "s, ");
         logger.info(result.toString());
 	}
@@ -337,7 +351,7 @@ public class Export implements TaskInterface {
 	public void finishedReport(String filePath, int importFileLineNum, int totalImportCount, int totalEmptyCount,
 			int totalSkipCount, int totalParseErrorCount, int totalBatchPutFailCount, int totalDuplicateCount,
 			long duration, LinkedHashMap<String, Long> ttlSkipTypeMap,Map<String, Object> propParameters) {
-        StringBuilder result = new StringBuilder(
+/*        StringBuilder result = new StringBuilder(
                 "["+getClass().getSimpleName()+" summary]" +
                         ", Process ratio 100% file=" + filePath + ", " +
                         "total=" + importFileLineNum + ", " +
@@ -350,7 +364,7 @@ public class Export implements TaskInterface {
         for (Map.Entry<String, Long> item : ttlSkipTypeMap.entrySet()) {
             result.append("<").append(item.getKey()).append(">").append("[").append(item.getValue()).append("]").append("]");
         }
-        logger.info(result.toString());
+        logger.info(result.toString());*/
 	}
 
 	@Override

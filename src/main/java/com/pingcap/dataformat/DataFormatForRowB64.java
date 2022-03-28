@@ -41,12 +41,12 @@ public class DataFormatForRowB64 implements DataFormatInterface {
 			value = ByteString.copyFromUtf8(new String(DatatypeConverter.parseBase64Binary(arr[1]),"utf8"));
 		}
 		int dataTypeInt = DATATYPE_INDEXTYPE;
-		if (strKey.startsWith(IndexInfo.HEADFORMAT+keyDelimiter)) {
+		if (strKey.startsWith(IndexInfo.HEADFORMAT/*+keyDelimiter*/)) {
 			String keyArr[] = strKey.split(keyDelimiter,-1);
 			ttlType = keyArr[2];
 			dataTypeInt = DATATYPE_INDEXINFO;
 		}
-		else if (strKey.startsWith(TempIndexInfo.HEADFORMAT+keyDelimiter)) {
+		else if (strKey.startsWith(TempIndexInfo.HEADFORMAT/*+keyDelimiter*/)) {
         	dataTypeInt = DATATYPE_TEMPINDEX;
 		}
 		return dataFormatCallBack.putDataCallBack( ttlType, dataTypeInt, key, value);
@@ -64,11 +64,11 @@ public class DataFormatForRowB64 implements DataFormatInterface {
 		StringBuffer jsonString = new StringBuffer();
 		String dataType;
 		int dataTypeInt;
-	       if (key.startsWith(IndexInfo.HEADFORMAT+keyDelimiter)) {
+	       if (key.startsWith(IndexInfo.HEADFORMAT/*+keyDelimiter*/)) {
 	        	dataType = Model.INDEX_INFO;
 	            dataTypeInt = DATATYPE_INDEXINFO;
 	        }
-	        else if (key.startsWith(TempIndexInfo.HEADFORMAT+keyDelimiter)) {
+	        else if (key.startsWith(TempIndexInfo.HEADFORMAT/*+keyDelimiter*/)) {
 	        	dataType = Model.TEMP_INDEX_INFO;
 	        	dataTypeInt = DATATYPE_TEMPINDEX;
 	        }

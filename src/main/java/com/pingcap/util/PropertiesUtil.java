@@ -107,13 +107,18 @@ public class PropertiesUtil {
 	    	Map<String, String> oldProperties = cmdInterFace.getProperties();
 	    	String configFilePath = oldProperties.get(Model.SYS_CFG_PATH);
 			Map<String, String> newProperties = PropertiesUtil.getProperties(configFilePath);
-			int ret = cmpConfigUpdate(oldProperties,newProperties,Model.CORE_POOL_SIZE,cmdInterFace);
-			if(0 != ret){
-				threadPoolFileScanner.setCorePoolSize(ret);
+			int poolSizeMax = cmpConfigUpdate(oldProperties,newProperties,Model.MAX_POOL_SIZE,cmdInterFace);
+			int poolSize = cmpConfigUpdate(oldProperties,newProperties,Model.CORE_POOL_SIZE,cmdInterFace);
+			if(poolSizeMax >= poolSize){
+				if(0 != poolSizeMax){
+					threadPoolFileScanner.setMaximumPoolSize(poolSizeMax);
+				}
+				if(0 != poolSize){
+					threadPoolFileScanner.setCorePoolSize(poolSize);
+				}
 			}
-			ret = cmpConfigUpdate(oldProperties,newProperties,Model.MAX_POOL_SIZE,cmdInterFace);
-			if(0 != ret){
-				threadPoolFileScanner.setMaximumPoolSize(ret);
+			else{
+				logger.error("Error configuration {} cannot be greater than {}",Model.CORE_POOL_SIZE,Model.MAX_POOL_SIZE);
 			}
 			cmpConfigUpdate(oldProperties,newProperties,Model.INTERNAL_THREAD_POOL,cmdInterFace);
 			cmpConfigUpdate(oldProperties,newProperties,Model.INTERNAL_MAXTHREAD_POOL,cmdInterFace);

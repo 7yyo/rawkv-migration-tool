@@ -68,19 +68,26 @@ public class SystemMonitorTimer extends TimerTask {
 	
 	private synchronized void checkSpeedConfiguration(){
         double speedMax = java.lang.Double.MAX_VALUE;
-        String speedMaxStr = cmdInterFace.getProperties().get(Model.TASKSPEEDLIMIT);
-        if(null != speedMaxStr){
-        	speedMax = Integer.parseInt(speedMaxStr)*1024*1024;
+        String speedMaxStr = cmdInterFace.getProperties().get(Model.TASKSPEEDLIMIT).trim();
+        if("1000".equals(speedMaxStr)){
+        	if(LimitSpeedkv.getRateValue() == java.lang.Double.MAX_VALUE)
+        		return;
+        	LimitSpeedkv.setRateValue(java.lang.Double.MAX_VALUE);
         }
-        if(LimitSpeedkv.getRateValue() != speedMax){
-        	LimitSpeedkv.setRateValue(speedMax);
+        else{
+	        if(null != speedMaxStr){
+	        	speedMax = Integer.parseInt(speedMaxStr)*1024*1024;
+	        }
+	        if(LimitSpeedkv.getRateValue() != speedMax){
+	        	LimitSpeedkv.setRateValue(speedMax);
+	        }
         }
 	}
 
 	private synchronized List<double[]> putData(){
 		double curData[] = new double[2];
-		curData[1] = TaskInterface.totalDataBytes.getAndSet(0);	// bytes
-		curData[0] = System.currentTimeMillis();				// time
+		curData[1] = TaskInterface.totalDataBytes.sumThenReset();// bytes
+		curData[0] = System.currentTimeMillis();				 // time
 		traffic.add(curData);
 		if(5 < traffic.size())
 			traffic.remove(0);
